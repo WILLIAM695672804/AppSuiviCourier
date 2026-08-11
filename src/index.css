@@ -1,0 +1,281 @@
+@import "tailwindcss";
+
+/* Jetons de conception releves dans les maquettes Claude Design.
+   Toute couleur employee dans l'application vient d'ici,
+   jamais d'une valeur hexadecimale ecrite dans un composant. */
+@theme {
+  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
+
+  /* Surfaces */
+  --color-fond: #f4f5f7;
+  --color-surface: #ffffff;
+  --color-surface-douce: #f7f8fa;
+  --color-surface-tete: #fdfdfe;
+
+  /* Traits */
+  --color-bordure: #ecedf1;
+  --color-bordure-forte: #e4e7ec;
+  --color-bordure-champ: #d0d5dd;
+  --color-separateur: #f7f8fa;
+
+  /* Encres */
+  --color-encre: #101828;
+  --color-encre-douce: #344054;
+  --color-encre-moyenne: #475467;
+  --color-encre-faible: #667085;
+  --color-encre-tenue: #98a2b3;
+
+  /* Accent */
+  --color-accent: #2f6bed;
+  --color-accent-fonce: #1d4ed8;
+  --color-accent-voile: #eef3fe;
+  --color-accent-voile-fort: #dbe6fb;
+  --color-accent-trait: #d5e0fb;
+  --color-accent-nuit: #1e3a8a;
+
+  /* Etats */
+  --color-succes: #0f9d63;
+  --color-succes-vif: #12b76a;
+  --color-succes-voile: #f4fcf8;
+  --color-succes-trait: #b7ebd2;
+
+  --color-alerte: #b54708;
+  --color-alerte-vif: #f79009;
+  --color-alerte-voile: #fffaf0;
+  --color-alerte-trait: #f6d9a8;
+
+  --color-danger: #b42318;
+  --color-danger-vif: #f04438;
+  --color-danger-fonce: #d92d20;
+  --color-danger-voile: #fff7f6;
+  --color-danger-trait: #f7cfcb;
+
+  --color-confidentiel: #5b3bd4;
+  --color-confidentiel-voile: #f8f6ff;
+  --color-confidentiel-trait: #d9d1fb;
+
+  /* Series de graphique.
+     Une echelle sequentielle tiree de l'accent, du plus soutenu au plus
+     clair. Un camembert a cinq parts a besoin de cinq teintes qui se
+     distinguent en niveaux de gris : c'est la contrainte de l'impression
+     noir et blanc, dont le tableau de bord de direction sort souvent. */
+  --color-serie-1: #1e3a8a;
+  --color-serie-2: #2f6bed;
+  --color-serie-3: #6f9bf4;
+  --color-serie-4: #a9c4f9;
+  --color-serie-5: #cdddfb;
+
+  /* Neutre d'etiquette */
+  --color-neutre-voile: #f9fafb;
+  --color-neutre-trait: #e4e7ec;
+  --color-inerte: #eaecf0;
+
+  --radius-carte: 0px;
+  --radius-champ: 0px;
+  --radius-bouton: 0px;
+
+  /* Les cartes de l'espace de travail sont cernees ; celles de
+     l'administration ne le sont pas. Un seul jeton porte la difference. */
+  --color-bordure-carte: var(--color-bordure);
+}
+
+body {
+  background: var(--color-fond);
+  color: var(--color-encre);
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Charte de l'administration.
+ *
+ * L'administration n'est pas le travail quotidien : on n'y entre que pour
+ * regler l'institution, et rarement. Elle porte donc sa propre charte — fond
+ * papier, encre chaude, cartes posees sans cerne, navigation reduite a des
+ * icones. Le changement de decor previent l'agent qu'il a change de registre.
+ *
+ * Techniquement, il suffit de redefinir les jetons dans ce conteneur : tous
+ * les composants suivent, sans qu'aucun d'eux ait a connaitre les deux chartes.
+ */
+.zone-administration {
+  --color-fond: #f1f1ef;
+  --color-surface: #ffffff;
+  --color-surface-douce: #f4f4f2;
+  --color-surface-tete: #f9f9f7;
+
+  --color-bordure: #ececea;
+  --color-bordure-forte: #e3e3df;
+  --color-bordure-champ: #d5d5d0;
+  --color-separateur: #f2f2f0;
+  --color-bordure-carte: transparent;
+
+  --color-encre: #1a1a17;
+  --color-encre-douce: #42423d;
+  --color-encre-moyenne: #57574f;
+  --color-encre-faible: #6f6f69;
+  --color-encre-tenue: #a3a39d;
+
+  --color-accent-voile: #edf3fe;
+  --color-accent-trait: #d8e3fb;
+
+  --color-succes: #0f7b52;
+  --color-succes-voile: #e8f6ef;
+  --color-succes-trait: #bfe6d4;
+
+  --color-alerte: #a8823a;
+  --color-alerte-voile: #faf3e6;
+  --color-alerte-trait: #ecdcb8;
+
+  --color-danger: #b0402f;
+  --color-danger-voile: #fdf0ed;
+  --color-danger-trait: #f2cfc7;
+
+  --color-confidentiel: #5b3bd4;
+  --color-confidentiel-voile: #f3efff;
+  --color-confidentiel-trait: #ddd4f8;
+
+  --color-neutre-voile: #f9f9f7;
+  --color-neutre-trait: #ececea;
+  --color-inerte: #ececea;
+
+  --radius-carte: 0px;
+  --radius-champ: 0px;
+  --radius-bouton: 0px;
+
+  background: var(--color-fond);
+  color: var(--color-encre);
+}
+
+.zone-administration ::-webkit-scrollbar-thumb {
+  background: #dcdcd8;
+  border-color: #f1f1ef;
+}
+
+/* Barre de defilement discrete, comme dans les maquettes. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #dfe2e8;
+  border: 3px solid var(--color-fond);
+  border-radius: 8px;
+}
+
+/* Accessibilite : obligation dans le secteur public. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * Portail externe — la troisieme charte.
+ *
+ * Elle ne s'adresse pas a un agent forme mais a un usager, une entreprise ou
+ * une administration qui ouvrira ce site deux fois par an. Trois consequences,
+ * et elles vont toutes dans le meme sens : moins dense.
+ *
+ * Le texte est plus grand, les surfaces plus aerees, les rayons plus doux. La
+ * densite de l'espace de travail est un gain pour qui passe huit heures par
+ * jour dans l'outil ; c'est un obstacle pour qui y vient chercher ou en est
+ * son dossier.
+ *
+ * Le bleu institutionnel reste : c'est la meme institution, et l'usager doit
+ * reconnaitre qu'il est au bon endroit.
+ */
+.zone-portail {
+  --color-fond: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-surface-douce: #f2f4f7;
+  --color-surface-tete: #fbfcfd;
+
+  --color-bordure: #e4e7ec;
+  --color-bordure-forte: #d0d5dd;
+  --color-bordure-champ: #cfd4dc;
+  --color-separateur: #eef0f3;
+  --color-bordure-carte: #e4e7ec;
+
+  /* Contraste renforce : l'usager lit sur son telephone, souvent dehors. */
+  --color-encre: #0d1526;
+  --color-encre-douce: #2b3547;
+  --color-encre-moyenne: #414d61;
+  --color-encre-faible: #55627a;
+  --color-encre-tenue: #7b8698;
+
+  --radius-carte: 0px;
+  --radius-champ: 0px;
+  --radius-bouton: 0px;
+
+  background: var(--color-fond);
+  color: var(--color-encre);
+}
+
+/* ------------------------------------------------------------------ *
+ *  Impression
+ *
+ *  Les boutons « Exporter en PDF » passent par l'impression du navigateur :
+ *  c'est la seule voie sans dependance externe, et elle produit un vrai PDF
+ *  via le dialogue systeme. Le jour ou le serveur genere le document, ces
+ *  regles resteront utiles — un agent imprimera toujours son ecran.
+ *
+ *  Le principe : ne garder que le contenu. La navigation, les barres d'outils
+ *  et les boutons n'ont aucun sens sur papier, et mangent la premiere page.
+ * ------------------------------------------------------------------ */
+@media print {
+  /* Le fond gris de l'application vide les cartouches d'encre pour rien. */
+  :root,
+  body {
+    background: #fff !important;
+  }
+
+  /* Les hauteurs fixes et les zones defilantes decoupent le contenu a la
+     premiere page : il faut les liberer pour que le flux se pagine. */
+  .zone-administration,
+  main,
+  [class*="overflow-y-auto"],
+  [class*="overflow-hidden"] {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Navigation, tiroir, barres d'outils et actions : hors sujet sur papier. */
+  aside,
+  nav[aria-label],
+  [role="dialog"],
+  [data-impression="masquer"] {
+    display: none !important;
+  }
+
+  /* Les cartes ne doivent pas se couper au milieu d'une ligne. */
+  section,
+  article,
+  li,
+  tr {
+    break-inside: avoid;
+  }
+
+  /* Une couleur de fond ne s'imprime pas par defaut : sans cela, les feux
+     tricolores et les etiquettes de statut disparaissent completement. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Les liens perdent leur cible sur papier : on l'ecrit a cote, sauf pour la
+     navigation interne ou l'URL n'apprendrait rien. */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 9px;
+    font-weight: 500;
+    color: #667085;
+  }
+
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+}

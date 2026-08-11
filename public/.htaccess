@@ -1,0 +1,100 @@
+# =====================================================================
+#  Configuration Apache du frontend — hébergement mutualisé (cPanel)
+#
+#  Ce fichier est dans `public/` : Vite le recopie tel quel dans `dist/`
+#  à chaque construction. Il part donc avec le reste, sans geste manuel.
+# =====================================================================
+
+# ---------------------------------------------------------------------
+#  1. Routage de l'application
+#
+#  C'est la règle sans laquelle rien ne fonctionne. L'application tient
+#  dans un seul `index.html` et gère ses adresses elle-même. Sans cette
+#  réécriture, ouvrir directement /courriers — ou simplement recharger la
+#  page avec F5 — renvoie une erreur 404 d'Apache, qui cherche un dossier
+#  « courriers » qui n'existe pas.
+#
+#  On ne réécrit que ce qui n'est ni un fichier ni un dossier réel : les
+#  images, les scripts et les feuilles de style continuent d'être servis
+#  normalement.
+# ---------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Laisse passer les fichiers et dossiers qui existent vraiment.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Ne détourne pas les appels au serveur : le jour où le backend existe,
+  # /api doit atteindre le backend, pas l'application.
+  RewriteRule ^api/ - [L]
+
+  # Tout le reste est confié à l'application.
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# ---------------------------------------------------------------------
+#  2. Compression
+#
+#  Le fichier JavaScript pèse environ 1,2 Mo, et 250 Ko une fois
+#  compressé. Sur un réseau d'administration, c'est la différence entre
+#  une seconde et cinq.
+# ---------------------------------------------------------------------
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml
+  AddOutputFilterByType DEFLATE application/javascript application/json
+  AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# ---------------------------------------------------------------------
+#  3. Cache
+#
+#  Les fichiers de `assets/` portent une empreinte dans leur nom
+#  (index-D8nF1tf0.js) : leur contenu ne change jamais, on peut donc les
+#  garder un an. `index.html`, lui, ne doit JAMAIS être mis en cache —
+#  c'est lui qui désigne les fichiers de la version courante, et un
+#  index.html périmé fait servir un ancien build après chaque mise à jour.
+# ---------------------------------------------------------------------
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 month"
+  ExpiresByType image/jpeg "access plus 1 month"
+  ExpiresByType image/png "access plus 1 month"
+</IfModule>
+
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|svg|woff2)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  <FilesMatch "index\.html$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
+
+  # ---------------------------------------------------------------------
+  #  4. En-têtes de sécurité
+  #
+  #  Le minimum sur un site public. La politique de contenu autorise ce
+  #  que l'application emploie réellement — styles en ligne pour Tailwind,
+  #  images en données pour les icônes — et rien de plus.
+  # ---------------------------------------------------------------------
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), camera=(), microphone=()"
+</IfModule>
+
+# ---------------------------------------------------------------------
+#  5. Divers
+# ---------------------------------------------------------------------
+# Le listage d'un répertoire sans index expose l'arborescence.
+Options -Indexes
+
+# L'encodage par défaut, faute de quoi les accents peuvent se perdre.
+AddDefaultCharset UTF-8
+
+ErrorDocument 404 /index.html
