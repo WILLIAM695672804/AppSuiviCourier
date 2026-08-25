@@ -1,4 +1,9 @@
-import type { Incident, Integration, PerformanceEcran, ServicePlateforme } from "@/features/supervision/api";
+import type {
+  Incident,
+  Integration,
+  PerformanceEcran,
+  ServicePlateforme,
+} from "@/features/supervision/api";
 
 /**
  * Jeu de démonstration de l'exploitation technique.
@@ -81,8 +86,7 @@ export const INCIDENTS_DEMO: Incident[] = [
     gravite: "Majeur",
     service: "Interface de programmation",
     resume: "Saturation du pool de connexions à la base",
-    impact:
-      "Application inaccessible pendant 5 h 35 en heures ouvrées, sur l'ensemble des postes.",
+    impact: "Application inaccessible pendant 5 h 35 en heures ouvrées, sur l'ensemble des postes.",
     resolution:
       "Pool porté de 40 à 120 connexions, et requête de registre corrigée. Reprise en 335 minutes, au-delà des 240 minutes de l'engagement de reprise.",
     // 335 minutes : au-dela du RTO contractuel de 4 heures.

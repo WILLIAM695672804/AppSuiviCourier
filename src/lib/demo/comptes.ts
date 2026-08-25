@@ -116,10 +116,9 @@ export const COMPTES_DEMO: CompteDemo[] = [
         PERMISSIONS.REL,
         PERMISSIONS.STAT,
         PERMISSIONS.IMP,
-        // La DSR tient elle-meme le referentiel des structures : elle est
-        // autonome sur son dispositif, sans passer par l'administrateur — et
-        // sans quitter sa charte, puisque ADM_STR ouvre son propre ecran.
-        PERMISSIONS.ADM_STR,
+        // Plus d'ADM_STR : les structures s'inscrivent dans la zone
+        // d'administration (ADR 021). La DSR les consulte — le referentiel est
+        // ouvert a toute session (ADR 007) — et REL lui ouvre l'ecran.
         PERMISSIONS.ACT_LEC,
         /*
          * Le §3.3 lui demande un « accès complet : saisie, consolidation,
@@ -191,12 +190,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "LM",
       posteLibelle: "Point focal de la direction",
       structureLibelle: "DAF — Direction des affaires financières",
-      permissions: [
-        PERMISSIONS.LEC,
-        PERMISSIONS.ACT_LEC,
-        PERMISSIONS.ACT_SAI,
-        PERMISSIONS.DISPO,
-      ],
+      permissions: [PERMISSIONS.LEC, PERMISSIONS.ACT_LEC, PERMISSIONS.ACT_SAI, PERMISSIONS.DISPO],
       perimetre: { portee: "structure", structureId: 3 },
       sessionCourrier: null,
       litToutesSessions: false,
@@ -364,12 +358,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "MD",
       posteLibelle: "Gestionnaire de dossiers",
       structureLibelle: "DAF — Comptabilité",
-      permissions: [
-        PERMISSIONS.LEC,
-        PERMISSIONS.TRA,
-        PERMISSIONS.DOS_LEC,
-        PERMISSIONS.DOS_INS,
-      ],
+      permissions: [PERMISSIONS.LEC, PERMISSIONS.TRA, PERMISSIONS.DOS_LEC, PERMISSIONS.DOS_INS],
       perimetre: { portee: "poste", structureId: 3 },
       sessionCourrier: null,
       litToutesSessions: false,

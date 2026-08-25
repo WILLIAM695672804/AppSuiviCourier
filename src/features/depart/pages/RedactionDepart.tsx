@@ -61,6 +61,7 @@ export function RedactionDepart() {
   const [modeCircuit, setModeCircuit] = useState<"CASCADE" | "PARALLELE">("CASCADE");
   const [objet, setObjet] = useState("");
   const [corps, setCorps] = useState("");
+  const [fichiers, setFichiers] = useState<File[]>([]);
 
   return (
     <>
@@ -212,7 +213,19 @@ export function RedactionDepart() {
               </div>
             </Carte>
 
-            <BlocNumerisation pages={[]} />
+            {/*
+              Les fichiers restent en memoire : le pilier depart n'a aucune
+              route servie, et il n'y a donc rien ou les verser. Ils partiront
+              par `POST /pieces` le jour ou `POST /departs` existera, comme le
+              fait deja l'enregistrement d'un courrier arrive.
+            */}
+            <BlocNumerisation
+              fichiers={fichiers}
+              onAjouter={(ajoutes) => setFichiers((precedents) => [...precedents, ...ajoutes])}
+              onRetirer={(index) =>
+                setFichiers((precedents) => precedents.filter((_, rang) => rang !== index))
+              }
+            />
           </div>
 
           <div className="flex min-w-0 flex-col gap-4">

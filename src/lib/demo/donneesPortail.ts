@@ -83,9 +83,27 @@ export const DEMANDES_PORTAIL_DEMO: DemandeUsagerDetail[] = [
       },
     ],
     pieces: [
-      { id: 1, nom: "Demande-Camrail.pdf", taille: "1,4 Mo", deposeeLe: "2026-07-21", parVous: true },
-      { id: 2, nom: "Plan-implantation-v2.pdf", taille: "3,6 Mo", deposeeLe: "2026-08-01", parVous: true },
-      { id: 3, nom: "Attestation-assurance.pdf", taille: "480 Ko", deposeeLe: "2026-08-01", parVous: true },
+      {
+        id: 1,
+        nom: "Demande-Camrail.pdf",
+        taille: "1,4 Mo",
+        deposeeLe: "2026-07-21",
+        parVous: true,
+      },
+      {
+        id: 2,
+        nom: "Plan-implantation-v2.pdf",
+        taille: "3,6 Mo",
+        deposeeLe: "2026-08-01",
+        parVous: true,
+      },
+      {
+        id: 3,
+        nom: "Attestation-assurance.pdf",
+        taille: "480 Ko",
+        deposeeLe: "2026-08-01",
+        parVous: true,
+      },
     ],
   },
   {
@@ -119,8 +137,18 @@ export const DEMANDES_PORTAIL_DEMO: DemandeUsagerDetail[] = [
         explication:
           "Nous attendons des pièces de votre part. Le dossier ne peut pas avancer sans elles.",
       },
-      { libelle: "Décision", franchie: false, date: null, explication: "La décision vous sera notifiée." },
-      { libelle: "Dossier clos", franchie: false, date: null, explication: "Votre dossier sera archivé." },
+      {
+        libelle: "Décision",
+        franchie: false,
+        date: null,
+        explication: "La décision vous sera notifiée.",
+      },
+      {
+        libelle: "Dossier clos",
+        franchie: false,
+        date: null,
+        explication: "Votre dossier sera archivé.",
+      },
     ],
     messages: [
       {
@@ -134,7 +162,13 @@ export const DEMANDES_PORTAIL_DEMO: DemandeUsagerDetail[] = [
       },
     ],
     pieces: [
-      { id: 4, nom: "Demande-badges.pdf", taille: "620 Ko", deposeeLe: "2026-08-01", parVous: true },
+      {
+        id: 4,
+        nom: "Demande-badges.pdf",
+        taille: "620 Ko",
+        deposeeLe: "2026-08-01",
+        parVous: true,
+      },
     ],
   },
   {
@@ -150,15 +184,31 @@ export const DEMANDES_PORTAIL_DEMO: DemandeUsagerDetail[] = [
     contexte: "Reprise de l'étanchéité sur 120 mètres linéaires, hors période de forte activité.",
     complementAttendu: null,
     etapes: [
-      { libelle: "Demande reçue", franchie: true, date: "2026-05-04", explication: "Votre demande a été enregistrée." },
-      { libelle: "À l'étude", franchie: true, date: "2026-05-19", explication: "Le service a examiné votre dossier." },
+      {
+        libelle: "Demande reçue",
+        franchie: true,
+        date: "2026-05-04",
+        explication: "Votre demande a été enregistrée.",
+      },
+      {
+        libelle: "À l'étude",
+        franchie: true,
+        date: "2026-05-19",
+        explication: "Le service a examiné votre dossier.",
+      },
       {
         libelle: "Décision",
         franchie: true,
         date: "2026-05-28",
-        explication: "Votre demande a reçu une suite favorable. La décision figure dans vos pièces.",
+        explication:
+          "Votre demande a reçu une suite favorable. La décision figure dans vos pièces.",
       },
-      { libelle: "Dossier clos", franchie: true, date: "2026-06-01", explication: "Votre dossier est archivé." },
+      {
+        libelle: "Dossier clos",
+        franchie: true,
+        date: "2026-06-01",
+        explication: "Votre dossier est archivé.",
+      },
     ],
     messages: [
       {
@@ -172,8 +222,20 @@ export const DEMANDES_PORTAIL_DEMO: DemandeUsagerDetail[] = [
       },
     ],
     pieces: [
-      { id: 5, nom: "Demande-travaux.pdf", taille: "890 Ko", deposeeLe: "2026-05-04", parVous: true },
-      { id: 6, nom: "Autorisation-signee.pdf", taille: "1,1 Mo", deposeeLe: "2026-05-28", parVous: false },
+      {
+        id: 5,
+        nom: "Demande-travaux.pdf",
+        taille: "890 Ko",
+        deposeeLe: "2026-05-04",
+        parVous: true,
+      },
+      {
+        id: 6,
+        nom: "Autorisation-signee.pdf",
+        taille: "1,1 Mo",
+        deposeeLe: "2026-05-28",
+        parVous: false,
+      },
     ],
   },
 ];
@@ -229,11 +291,39 @@ export const PREFERENCES_DEMO: Preferences = {
   courriel: "contact@camrail.cm",
   telephone: "+237 6 99 00 11 22",
   canal: "Courriel",
+  // `obligatoire` est désormais porté par le serveur, en base : la demande de
+  // complément et la décision rendue ne se désactivent pas. Le jeu de démo suit
+  // la forme du serveur, qui fait foi.
   evenements: [
-    { cle: "depot", libelle: "Accusé de réception de mes dépôts", actif: true },
-    { cle: "complement", libelle: "Demande de pièce complémentaire", actif: true },
-    { cle: "decision", libelle: "Décision rendue sur ma demande", actif: true },
-    { cle: "echeance", libelle: "Rappel avant une échéance qui me concerne", actif: true },
-    { cle: "cloture", libelle: "Clôture et archivage de mon dossier", actif: false },
+    {
+      cle: "depot",
+      libelle: "Accusé de réception de mes dépôts",
+      actif: true,
+      obligatoire: false,
+    },
+    {
+      cle: "complement",
+      libelle: "Demande de pièce complémentaire",
+      actif: true,
+      obligatoire: true,
+    },
+    {
+      cle: "decision",
+      libelle: "Décision rendue sur ma demande",
+      actif: true,
+      obligatoire: true,
+    },
+    {
+      cle: "echeance",
+      libelle: "Rappel avant une échéance qui me concerne",
+      actif: true,
+      obligatoire: false,
+    },
+    {
+      cle: "cloture",
+      libelle: "Clôture et archivage de mon dossier",
+      actif: false,
+      obligatoire: false,
+    },
   ],
 };

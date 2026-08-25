@@ -32,9 +32,9 @@ import { PERMISSIONS, type Permission } from "@/types/habilitation";
 /*
  * Ce qui envoie dans la zone d'administration.
  *
- * ADM_ORG n'y figure plus. La DSR tient le referentiel des structures
- * (ADM_STR), mais elle n'administre pas l'outil : la ranger parmi les
- * administrateurs la faisait entrer par une charte et travailler dans une
+ * La DSR n'y figure pas : elle consulte le referentiel des structures depuis
+ * son espace de travail, elle ne l'ecrit plus (ADR 021). La ranger parmi les
+ * administrateurs la ferait entrer par une charte et travailler dans une
  * autre. Le descriptif fonctionnel la place au niveau 2, celui du pilotage
  * tactique, pas dans le parametrage.
  */

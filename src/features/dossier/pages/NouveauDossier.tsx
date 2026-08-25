@@ -7,7 +7,11 @@ import { Champ, Liste } from "@/components/ui/Champ";
 import { ChampDate } from "@/components/ui/ChampDate";
 import { ChampTexteLong } from "@/components/ui/ChampTexteLong";
 import { Encart } from "@/components/ui/Encart";
-import { useCreerDossier, type TypeDossier } from "@/features/dossier/api";
+import {
+  useCreerDossier,
+  type Criticite,
+  type TypeDossier,
+} from "@/features/dossier/api";
 
 /**
  * Ouverture d'un dossier à instruire — §3.6, dernier point.
@@ -15,7 +19,7 @@ import { useCreerDossier, type TypeDossier } from "@/features/dossier/api";
  * « Déclencher, le cas échéant, la création automatique d'un dossier à
  * instruire à partir d'un courrier entrant. »
  *
- * Un écran et non une modale : cinq champs dont un texte long, et surtout une
+ * Un écran et non une modale : sept champs dont un texte long, et surtout une
  * décision qui engage — le dossier ouvert fait courir un délai d'instruction
  * dont l'institution répond. La règle posée dans `Modale.tsx` s'applique :
  * « tout ce qui demande plus de trois champs mérite un écran ».
@@ -23,9 +27,23 @@ import { useCreerDossier, type TypeDossier } from "@/features/dossier/api";
  * Le courrier d'origine arrive par l'URL, jamais par un import du domaine
  * « courrier » : c'est ce qui garde les deux fonctionnalités indépendantes.
  */
-const TYPES: TypeDossier[] = ["Demande", "Réclamation", "Autorisation", "Requête", "Acte"];
+const TYPES: TypeDossier[] = [
+  "Demande",
+  "Réclamation",
+  "Autorisation",
+  "Requête",
+  "Acte",
+];
+const CRITICITES: Criticite[] = ["Standard", "Sensible", "Urgent"];
 
-/** Délai d'instruction par défaut, en jours ouvrés. */
+/**
+ * Délai d'instruction par défaut, en jours.
+ *
+ * Le serveur pose la même valeur, dans `parametre` →
+ * `dossier.delai_instruction_defaut_jours`. Elle est répétée ici pour
+ * pré-remplir le champ sans un aller-retour ; c'est le serveur qui tranche si
+ * l'agent efface l'échéance. Aucune source ne la fonde — voir A38.
+ */
 const DELAI_DEFAUT = 30;
 
 interface Champs {
@@ -34,6 +52,9 @@ interface Champs {
   demandeur: string;
   echeance: string;
   contexte: string;
+  criticite: Criticite;
+  /** Saisi en texte : un champ nombre vide rend `NaN`, pas `undefined`. */
+  montant: string;
 }
 
 function dansNJours(jours: number): string {
@@ -46,6 +67,9 @@ export function NouveauDossier() {
   const naviguer = useNavigate();
   const [parametres] = useSearchParams();
   const courrierId = Number(parametres.get("courrier")) || null;
+  // La référence lisible accompagne l'identifiant : c'est elle qui sera citée
+  // dans la fiche et dans les courriers, l'identifiant ne se lit pas.
+  const courrierReference = parametres.get("reference") ?? "";
 
   const creer = useCreerDossier();
   const {
@@ -53,17 +77,28 @@ export function NouveauDossier() {
     handleSubmit,
     formState: { errors },
   } = useForm<Champs>({
-    defaultValues: { type: "Demande", echeance: dansNJours(DELAI_DEFAUT) },
+    defaultValues: {
+      type: "Demande",
+      criticite: "Standard",
+      montant: "",
+      echeance: dansNJours(DELAI_DEFAUT),
+    },
   });
 
   const envoyer = handleSubmit((valeurs) => {
     creer.mutate(
       {
         courrierId: courrierId ?? 0,
+        courrierReference: courrierReference || undefined,
         type: valeurs.type,
         objet: valeurs.objet,
         demandeur: valeurs.demandeur,
         echeance: valeurs.echeance,
+        contexte: valeurs.contexte || undefined,
+        criticite: valeurs.criticite,
+        // Un montant absent n'est pas un montant nul : sans lui, une règle
+        // d'affectation à seuil ne s'applique pas, et c'est voulu.
+        montant: valeurs.montant.trim() ? Number(valeurs.montant) : undefined,
       },
       { onSuccess: (resultat) => naviguer(`/dossiers/${resultat.id}`) },
     );
@@ -93,7 +128,10 @@ export function NouveauDossier() {
       />
 
       <div className="flex-1 overflow-y-auto bg-fond p-4 md:p-[26px]">
-        <form onSubmit={envoyer} className="mx-auto flex max-w-[720px] flex-col gap-3.5">
+        <form
+          onSubmit={envoyer}
+          className="mx-auto flex max-w-[720px] flex-col gap-3.5"
+        >
           {creer.isError && (
             <Encart ton="danger" icone="croix">
               Le dossier n'a pas pu être ouvert.
@@ -101,8 +139,9 @@ export function NouveauDossier() {
           )}
 
           <Encart ton="accent" icone="horloge">
-            L'ouverture fait courir un délai d'instruction dont l'institution répond. Il continue
-            de courir même si le demandeur ne fournit pas les pièces attendues.
+            L'ouverture fait courir un délai d'instruction dont l'institution
+            répond. Il continue de courir même si le demandeur ne fournit pas
+            les pièces attendues.
           </Encart>
 
           <Carte titre="Le dossier">
@@ -137,8 +176,32 @@ export function NouveauDossier() {
                 placeholder="Société Camrail"
                 aide="Personne ou entité qui reçoit la notification en fin d'instruction."
                 erreur={errors.demandeur?.message}
-                {...register("demandeur", { required: "Indiquez le demandeur." })}
+                {...register("demandeur", {
+                  required: "Indiquez le demandeur.",
+                })}
               />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Liste
+                  libelle="Criticité"
+                  options={CRITICITES.map((c) => ({ valeur: c, libelle: c }))}
+                  aide="Elle peut décider de l'affectation, quand une règle la retient."
+                  {...register("criticite", { required: true })}
+                />
+                <Champ
+                  libelle="Montant en jeu (FCFA)"
+                  placeholder="Laisser vide si l'enjeu n'est pas chiffré"
+                  aide="Sans montant, une règle d'affectation à seuil ne s'applique pas."
+                  erreur={errors.montant?.message}
+                  {...register("montant", {
+                    validate: (valeur) =>
+                      !valeur.trim() ||
+                      (Number.isFinite(Number(valeur)) &&
+                        Number(valeur) >= 0) ||
+                      "Saisissez un montant en chiffres, sans séparateur.",
+                  })}
+                />
+              </div>
 
               <ChampTexteLong
                 libelle="Contexte"
@@ -150,12 +213,14 @@ export function NouveauDossier() {
 
             {courrierId ? (
               <p className="mt-4 border-t border-separateur pt-3.5 text-[11px] leading-[1.5] font-medium text-encre-tenue">
-                Le dossier gardera la référence du courrier d'origine. Le courrier, lui, poursuit
-                son propre circuit : ouvrir un dossier ne le clôt pas.
+                Le dossier gardera la référence du courrier d'origine. Le
+                courrier, lui, poursuit son propre circuit : ouvrir un dossier
+                ne le clôt pas.
               </p>
             ) : (
               <p className="mt-4 border-t border-separateur pt-3.5 text-[11px] leading-[1.5] font-medium text-encre-tenue">
-                Aucun courrier d'origine : le dossier sera enregistré comme un dépôt direct.
+                Aucun courrier d'origine : le dossier sera enregistré comme un
+                dépôt direct.
               </p>
             )}
           </Carte>

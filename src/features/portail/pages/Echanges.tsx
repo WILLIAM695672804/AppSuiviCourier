@@ -38,7 +38,9 @@ const TONS_NATURE: Record<Echange["nature"], TonEtiquette> = {
 export function Echanges() {
   const { data, isPending } = useQuery(echangesQuery());
   const echanges = data?.echanges ?? [];
-  const aDeposer = echanges.filter((e) => e.deposes < e.attendus && e.etat !== "Clos");
+  const aDeposer = echanges.filter(
+    (e) => e.deposes < e.attendus && e.etat !== "Clos",
+  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -47,7 +49,8 @@ export function Echanges() {
           Échanges
         </h1>
         <p className="text-[13px] leading-[1.55] font-medium text-encre-faible">
-          Marchés publics, conventions et reportings réglementaires qui vous concernent.
+          Marchés publics, conventions et reportings réglementaires qui vous
+          concernent.
         </p>
       </div>
 
@@ -56,7 +59,8 @@ export function Echanges() {
           {aDeposer.length === 1
             ? "Un dossier attend des pièces de votre part."
             : `${aDeposer.length} dossiers attendent des pièces de votre part.`}{" "}
-          Dans un marché public, un dossier incomplet à la clôture est écarté sans recours.
+          Dans un marché public, un dossier incomplet à la clôture est écarté
+          sans recours.
         </Encart>
       )}
 
@@ -84,7 +88,9 @@ export function Echanges() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="flex min-w-0 flex-col gap-2">
                         <span className="flex flex-wrap items-center gap-2.5">
-                          <Etiquette ton={TONS_NATURE[echange.nature]}>{echange.nature}</Etiquette>
+                          <Etiquette ton={TONS_NATURE[echange.nature]}>
+                            {echange.nature}
+                          </Etiquette>
                           <span className="text-[11.5px] leading-none font-semibold text-encre-tenue tabular-nums">
                             {echange.reference}
                           </span>
@@ -97,7 +103,11 @@ export function Echanges() {
                           {echange.echeance && (
                             <>
                               {" · "}
-                              <span className={urgent ? "font-bold text-danger" : undefined}>
+                              <span
+                                className={
+                                  urgent ? "font-bold text-danger" : undefined
+                                }
+                              >
                                 clôture le {formaterDate(echange.echeance)}
                               </span>
                             </>
@@ -105,7 +115,9 @@ export function Echanges() {
                         </span>
                       </div>
 
-                      <Etiquette ton={TONS_ETAT[echange.etat]}>{echange.etat}</Etiquette>
+                      <Etiquette ton={TONS_ETAT[echange.etat]}>
+                        {echange.etat}
+                      </Etiquette>
                     </div>
 
                     <div className="flex flex-col gap-2 border-t border-separateur pt-3.5 md:flex-row md:items-center md:gap-5">
@@ -116,8 +128,10 @@ export function Echanges() {
                           chiffre={false}
                         />
                         <span className="text-[11.5px] leading-none font-medium text-encre-tenue tabular-nums">
-                          {echange.deposes} pièce{echange.deposes > 1 ? "s" : ""} déposée
-                          {echange.deposes > 1 ? "s" : ""} sur {echange.attendus} attendue
+                          {echange.deposes} pièce
+                          {echange.deposes > 1 ? "s" : ""} déposée
+                          {echange.deposes > 1 ? "s" : ""} sur{" "}
+                          {echange.attendus} attendue
                           {echange.attendus > 1 ? "s" : ""}
                         </span>
                       </span>

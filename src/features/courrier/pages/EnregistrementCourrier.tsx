@@ -12,11 +12,9 @@ import { Encart, LigneControle } from "@/components/ui/Encart";
 import { Interrupteur } from "@/components/ui/Interrupteur";
 import { SelecteurSegments } from "@/components/ui/SelecteurSegments";
 import { contexteEnregistrementQuery, useEnregistrer } from "@/features/courrier/api";
-import {
-  BlocNumerisation,
-  type PageNumerisee,
-} from "@/features/courrier/components/BlocNumerisation";
+import { BlocNumerisation } from "@/features/courrier/components/BlocNumerisation";
 import { SelecteurCorrespondant } from "@/features/courrier/components/SelecteurCorrespondant";
+import { deposerPiece } from "@/features/pieces/api";
 import {
   schemaEnregistrement,
   VALEURS_INITIALES,
@@ -45,10 +43,34 @@ const DELAIS = [
   { valeur: "10", libelle: "10 j" },
 ] as const;
 
+/**
+ * Verse les documents numerises sur le courrier qui vient d'etre cree.
+ *
+ * **Un par un, et non en parallele.** Le serveur lit chaque fichier pour en
+ * calculer l'empreinte (RF-GED-09) ; cinq scans de vingt megaoctets envoyes
+ * ensemble depuis un poste du service courrier saturent la liaison avant de
+ * saturer le serveur.
+ *
+ * Un echec ne fait pas echouer l'enregistrement : le courrier est au registre,
+ * il a son numero, et l'agent redepose depuis la fiche. Perdre la saisie parce
+ * qu'un fichier depasse le plafond serait la punir deux fois.
+ */
+async function deposerNumerisation(courrierId: number, fichiers: File[]): Promise<number> {
+  let echecs = 0;
+  for (const fichier of fichiers) {
+    try {
+      await deposerPiece("courrier", courrierId, { fichier, categorie: "original" });
+    } catch {
+      echecs += 1;
+    }
+  }
+  return echecs;
+}
+
 export function EnregistrementCourrier() {
   const naviguer = useNavigate();
   const [correspondant, setCorrespondant] = useState<Correspondant | null>(null);
-  const [pages, setPages] = useState<PageNumerisee[]>([]);
+  const [fichiers, setFichiers] = useState<File[]>([]);
 
   const { data: contexte } = useQuery(contexteEnregistrementQuery());
   const { data: natures = [] } = useQuery(naturesQuery());
@@ -73,7 +95,22 @@ export function EnregistrementCourrier() {
 
   async function soumettre(valeurs: SaisieEnregistrement) {
     const courrier = await enregistrer.mutateAsync(valeurs);
-    naviguer(`/courriers/${courrier.id}${valeurs.coterMaintenant ? "?coter=1" : ""}`);
+
+    // Les pieces se deposent **apres** l'enregistrement : `POST /pieces` exige
+    // l'objet auquel il rattache, et le courrier n'a pas d'identifiant avant sa
+    // ligne. L'echec du depot ne perd pas l'enregistrement — le courrier est au
+    // registre, la fiche dira quelles pieces manquent.
+    const echecs = await deposerNumerisation(courrier.id, fichiers);
+
+    const suite = new URLSearchParams();
+    if (valeurs.coterMaintenant) suite.set("coter", "1");
+    if (valeurs.coterMaintenant && valeurs.structureDestinataireId) {
+      suite.set("structure", String(valeurs.structureDestinataireId));
+    }
+    if (echecs > 0) suite.set("piecesEnEchec", String(echecs));
+
+    const parametres = suite.toString();
+    naviguer(`/courriers/${courrier.id}${parametres ? `?${parametres}` : ""}`);
   }
 
   return (
@@ -112,9 +149,10 @@ export function EnregistrementCourrier() {
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_336px]">
           <div className="flex min-w-0 flex-col gap-4">
             <BlocNumerisation
-              pages={pages}
-              onNumeriser={() =>
-                setPages((p) => [...p, { id: crypto.randomUUID(), libelle: `Page ${p.length + 1}` }])
+              fichiers={fichiers}
+              onAjouter={(ajoutes) => setFichiers((precedents) => [...precedents, ...ajoutes])}
+              onRetirer={(index) =>
+                setFichiers((precedents) => precedents.filter((_, rang) => rang !== index))
               }
             />
 
@@ -298,41 +336,15 @@ export function EnregistrementCourrier() {
                   />
                 )}
 
-                <div className="flex flex-col gap-[9px] border-t border-separateur pt-3">
-                  <Controller
-                    control={control}
-                    name="inscrireBordereau"
-                    render={({ field }) => (
-                      <CaseLibellee
-                        cochee={field.value}
-                        onChange={field.onChange}
-                        libelle="Inscrire au bordereau du jour"
-                      />
-                    )}
-                  />
-                  <Controller
-                    control={control}
-                    name="imprimerEtiquette"
-                    render={({ field }) => (
-                      <CaseLibellee
-                        cochee={field.value}
-                        onChange={field.onChange}
-                        libelle="Imprimer l'étiquette du n°"
-                      />
-                    )}
-                  />
-                  <Controller
-                    control={control}
-                    name="envoyerAccuse"
-                    render={({ field }) => (
-                      <CaseLibellee
-                        cochee={field.value}
-                        onChange={field.onChange}
-                        libelle="Envoyer un accusé de réception"
-                      />
-                    )}
-                  />
-                </div>
+                {/*
+                  Le bordereau du jour, l'etiquette du numero et l'accuse de
+                  reception ont ete retires de cet ecran le 19 aout 2026. Les
+                  trois cases etaient cochees, envoyees au serveur, et ignorees :
+                  aucun de ces trois gestes n'existe. Une case cochee qui ne fait
+                  rien est pire qu'une case absente — l'agent croit l'accuse
+                  parti. Elles reviendront avec le pilier depart, qui porte le
+                  bordereau, et avec la table de decharges qui porte l'accuse.
+                */}
               </div>
             </Carte>
 
@@ -346,9 +358,14 @@ export function EnregistrementCourrier() {
                   </LigneControle>
                 )}
 
-                {pages.length === 0 && (
+                {fichiers.length === 0 ? (
                   <LigneControle ton="alerte">
-                    Aucune page numérisée : le courrier ne sera consultable qu'en version papier
+                    Aucun document joint : le courrier ne sera consultable qu'en version papier
+                  </LigneControle>
+                ) : (
+                  <LigneControle ton="succes">
+                    {fichiers.length} document{fichiers.length > 1 ? "s" : ""} à verser après
+                    l'enregistrement
                   </LigneControle>
                 )}
 

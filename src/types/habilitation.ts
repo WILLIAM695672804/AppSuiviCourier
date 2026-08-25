@@ -96,20 +96,6 @@ export const PERMISSIONS = {
   EXP_LEC: "EXP_LEC",
 
   /*
-   * Référentiel des structures, tenu par la DSR.
-   *
-   * Distinct d'ADM_ORG, qui couvre l'organigramme entier — structures, postes
-   * et niveaux hiérarchiques — et relève de l'administrateur fonctionnel.
-   * ADM_STR ne porte que la liste des Directions, filiales et succursales,
-   * que le descriptif fonctionnel confie explicitement à la DSR (§3.3).
-   *
-   * Deux permissions pour un objet commun, donc deux écrans : chacun dans la
-   * charte de celui qui l'ouvre. C'est le prix pour que la DSR n'ait jamais à
-   * traverser la zone d'administration.
-   */
-  ADM_STR: "ADM_STR",
-
-  /*
    * Projets et dossiers — l'instruction des demandes administratives.
    *
    * Distinctes des permissions de courrier : un courrier se transmet et se

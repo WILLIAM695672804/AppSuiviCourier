@@ -11,11 +11,13 @@ import { Icone } from "@/components/ui/Icone";
 import { Pastilles } from "@/components/ui/Pastilles";
 import {
   conformiteQuery,
+  PAS_JOURNAL,
   journalAccesQuery,
   journalEvenementsQuery,
   type AccesJournal,
   type EvenementJournal,
 } from "@/features/tracabilite/api";
+import { OngletHistorique } from "@/features/tracabilite/components/OngletHistorique";
 
 /**
  * I-01 / I-02 — traçabilite.
@@ -32,6 +34,7 @@ const ONGLETS: readonly { cle: string; libelle: string }[] = [
   { cle: "evenements", libelle: "Journal des événements" },
   { cle: "acces", libelle: "Journal des accès" },
   { cle: "conformite", libelle: "Conformité archivistique" },
+  { cle: "historique", libelle: "Historique des champs" },
 ];
 
 const FILTRES_EVENEMENTS = [
@@ -60,7 +63,6 @@ const TONS_ACTION: Record<string, TonEtiquette> = {
   Téléchargement: "accent",
   Impression: "confidentiel",
   Export: "alerte",
-  Refusé: "danger",
 };
 
 export function Tracabilite() {
@@ -70,9 +72,14 @@ export function Tracabilite() {
     <>
       <EnTeteAdmin
         titre="Traçabilité"
-        sousTitre="1er → 4 août 2026"
+        sousTitre="Journal des événements et des accès — en écriture seule"
         actions={
-          <Bouton variante="principal" icone="exporter">
+          <Bouton
+            variante="principal"
+            icone="exporter"
+            disabled
+            title="L'export du journal n'est pas ouvert : une extraction d'audit se demande à la DSI, tracée comme telle."
+          >
             Exporter le journal
           </Bouton>
         }
@@ -84,6 +91,7 @@ export function Tracabilite() {
         {onglet === "evenements" && <OngletEvenements />}
         {onglet === "acces" && <OngletAcces />}
         {onglet === "conformite" && <OngletConformite />}
+        {onglet === "historique" && <OngletHistorique />}
       </div>
     </>
   );
@@ -184,8 +192,8 @@ function OngletConformite() {
         )}
 
         <p className="mt-4 border-t border-separateur pt-3.5 text-[11px] leading-[1.5] font-medium text-encre-tenue">
-          Cet onglet est en consultation seule. Le versement et la validation des règles relèvent
-          du service des archives.
+          Cet onglet est en consultation seule. Le versement et la validation des règles relèvent du
+          service des archives.
         </p>
       </Carte>
     </div>
@@ -195,8 +203,12 @@ function OngletConformite() {
 function OngletEvenements() {
   const [filtre, setFiltre] = useState("Tous");
   const [choisiId, setChoisiId] = useState<number | null>(null);
+  // Le serveur rend les `limite` lignes les plus recentes ; on augmente la
+  // limite plutot que de pretendre paginer un journal qui grossit pendant
+  // qu'on le lit — une page 2 calculee sur un decalage sauterait des lignes.
+  const [limite, setLimite] = useState(PAS_JOURNAL);
 
-  const { data } = useQuery(journalEvenementsQuery(filtre));
+  const { data } = useQuery(journalEvenementsQuery(filtre, limite));
   const evenements = data?.evenements ?? [];
   const choisi: EvenementJournal | undefined =
     evenements.find((e) => e.id === choisiId) ?? evenements[0];
@@ -232,7 +244,12 @@ function OngletEvenements() {
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_372px]">
         <Carte>
-          <Pastilles actif={filtre} options={FILTRES_EVENEMENTS} onChange={setFiltre} libelle="Filtrer les événements" />
+          <Pastilles
+            actif={filtre}
+            options={FILTRES_EVENEMENTS}
+            onChange={setFiltre}
+            libelle="Filtrer les événements"
+          />
 
           <div className="mt-3.5 overflow-x-auto">
             <div className="min-w-[820px]">
@@ -293,7 +310,12 @@ function OngletEvenements() {
               ))}
 
               <div className="flex flex-wrap items-center gap-3 pt-3.5">
-                <Bouton>Charger 50 événements de plus</Bouton>
+                <Bouton
+                  onClick={() => setLimite((actuelle) => actuelle + PAS_JOURNAL)}
+                  disabled={(data?.evenements.length ?? 0) < limite}
+                >
+                  Charger {PAS_JOURNAL} événements de plus
+                </Bouton>
                 <span className="text-[11px] leading-[1.5] font-medium text-encre-tenue">
                   Le journal est en écriture seule : aucun événement ne peut être modifié ni
                   supprimé, y compris par un administrateur.
@@ -345,7 +367,11 @@ function OngletEvenements() {
                       <span className="rounded-none bg-danger-voile px-2.5 py-1.5 text-[11.5px] leading-[1.3] font-semibold text-danger line-through">
                         {difference.avant}
                       </span>
-                      <Icone nom="chevronDroite" taille={13} className="flex-none text-encre-tenue" />
+                      <Icone
+                        nom="chevronDroite"
+                        taille={13}
+                        className="flex-none text-encre-tenue"
+                      />
                       <span className="rounded-none bg-succes-voile px-2.5 py-1.5 text-[11.5px] leading-[1.3] font-semibold text-succes">
                         {difference.apres}
                       </span>
@@ -372,8 +398,9 @@ function OngletEvenements() {
 function OngletAcces() {
   const [filtre, setFiltre] = useState("Tous");
   const [choisiId, setChoisiId] = useState<number | null>(null);
+  const [limite, setLimite] = useState(PAS_JOURNAL);
 
-  const { data } = useQuery(journalAccesQuery(filtre));
+  const { data } = useQuery(journalAccesQuery(filtre, limite));
   const acces = data?.acces ?? [];
   const choisi: AccesJournal | undefined = acces.find((a) => a.id === choisiId) ?? acces[0];
 
@@ -403,7 +430,12 @@ function OngletAcces() {
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_372px]">
         <Carte>
-          <Pastilles actif={filtre} options={FILTRES_ACCES} onChange={setFiltre} libelle="Filtrer les accès" />
+          <Pastilles
+            actif={filtre}
+            options={FILTRES_ACCES}
+            onChange={setFiltre}
+            libelle="Filtrer les accès"
+          />
 
           <div className="mt-3.5 overflow-x-auto">
             <div className="min-w-[860px]">
@@ -428,7 +460,9 @@ function OngletAcces() {
                   }`}
                 >
                   <span className="flex flex-col gap-1">
-                    <span className="text-xs leading-none font-semibold text-encre">{ligne.heure}</span>
+                    <span className="text-xs leading-none font-semibold text-encre">
+                      {ligne.heure}
+                    </span>
                     <span className="text-[10.5px] leading-none font-medium text-encre-tenue">
                       {ligne.date}
                     </span>
@@ -456,7 +490,9 @@ function OngletAcces() {
                   </span>
 
                   <span className="justify-self-start">
-                    <Etiquette ton={TONS_ACTION[ligne.action] ?? "neutre"}>{ligne.action}</Etiquette>
+                    <Etiquette ton={TONS_ACTION[ligne.action] ?? "neutre"}>
+                      {ligne.action}
+                    </Etiquette>
                   </span>
 
                   <span className="justify-self-start">
@@ -468,7 +504,12 @@ function OngletAcces() {
               ))}
 
               <div className="flex flex-wrap items-center gap-3 pt-3.5">
-                <Bouton>Charger 50 accès de plus</Bouton>
+                <Bouton
+                  onClick={() => setLimite((actuelle) => actuelle + PAS_JOURNAL)}
+                  disabled={(data?.acces.length ?? 0) < limite}
+                >
+                  Charger {PAS_JOURNAL} accès de plus
+                </Bouton>
                 <span className="text-[11px] leading-[1.5] font-medium text-encre-tenue">
                   Toute consultation d'un courrier de la session confidentielle est enregistrée
                   nominativement, y compris les tentatives refusées.

@@ -161,11 +161,7 @@ export const routeur = createBrowserRouter([
             ],
           },
           {
-            element: (
-              <ExigePermission
-                permissions={[PERMISSIONS.COT, PERMISSIONS.COT_DEL]}
-              />
-            ),
+            element: <ExigePermission permissions={[PERMISSIONS.COT, PERMISSIONS.COT_DEL]} />,
             children: [{ path: "cotations", element: <Cotations /> }],
           },
           {
@@ -222,9 +218,19 @@ export const routeur = createBrowserRouter([
             children: [
               { path: "dossiers", element: <RegistreDossiers /> },
               { path: "dossiers/modeles", element: <ModelesCourrier /> },
-              { path: "dossiers/nouveau", element: <NouveauDossier /> },
               { path: "dossiers/:id", element: <FicheDossier /> },
             ],
+          },
+          /*
+           * L'ouverture est la seule route du pilier qui ecrit, et elle est
+           * gardee par DOS_INS. Sous DOS_LEC, le DG aurait pu remplir le
+           * formulaire en entier avant de recevoir un 401 a la validation :
+           * l'ecran doit refuser a l'entree ce que le serveur refusera a la
+           * sortie.
+           */
+          {
+            element: <ExigePermission permissions={[PERMISSIONS.DOS_INS]} />,
+            children: [{ path: "dossiers/nouveau", element: <NouveauDossier /> }],
           },
           /*
            * Archivage — le sort des dossiers une fois clos.
@@ -237,7 +243,10 @@ export const routeur = createBrowserRouter([
           {
             element: <ExigePermission permissions={[PERMISSIONS.ARCH]} />,
             children: [
-              { path: "archivage/referentiel", element: <ReferentielConservation /> },
+              {
+                path: "archivage/referentiel",
+                element: <ReferentielConservation />,
+              },
               { path: "archivage/versements", element: <Versements /> },
               { path: "archivage/versements/:id", element: <FicheVersement /> },
             ],
@@ -254,14 +263,20 @@ export const routeur = createBrowserRouter([
             element: <ExigePermission permissions={[PERMISSIONS.SCORE]} />,
             children: [
               { path: "performance/classement", element: <Classement /> },
-              { path: "performance/classement/:sigle", element: <FicheStructure /> },
+              {
+                path: "performance/classement/:sigle",
+                element: <FicheStructure />,
+              },
             ],
           },
           {
             element: <ExigePermission permissions={[PERMISSIONS.SCORE_ADM]} />,
             children: [
               { path: "performance/indicateurs", element: <Dictionnaire /> },
-              { path: "performance/calendrier", element: <CalendrierProduction /> },
+              {
+                path: "performance/calendrier",
+                element: <CalendrierProduction />,
+              },
             ],
           },
           /*
@@ -299,9 +314,7 @@ export const routeur = createBrowserRouter([
            * qui lit l'ensemble sans rien saisir.
            */
           {
-            element: (
-              <ExigePermission permissions={[PERMISSIONS.EXP_SAI, PERMISSIONS.EXP_LEC]} />
-            ),
+            element: <ExigePermission permissions={[PERMISSIONS.EXP_SAI, PERMISSIONS.EXP_LEC]} />,
             children: [{ path: "exploitation", element: <RelevesExploitation /> }],
           },
           /*
@@ -320,7 +333,20 @@ export const routeur = createBrowserRouter([
                * Une recommandation externe engage une structure comme une
                * decision d'instance : c'est la meme permission qui l'ouvre.
                */
-              { path: "gouvernance/representations", element: <Representations /> },
+              {
+                path: "gouvernance/representations",
+                element: <Representations />,
+              },
+              /*
+               * Filiales et succursales — §3.3. L'ecran est garde par DEC, pas
+               * par INST, pour deux raisons. Les prescriptions des organes de
+               * gestion sont des `engagement` d'origine ORGANE_FILIALE (ADR
+               * 006) : la matiere meme du registre des decisions, et l'aval —
+               * suivre leur mise en oeuvre — est la finalite de l'ecran. Et le
+               * DG comme le CODIR portent DEC sans porter INST : garder par
+               * INST fermerait l'ecran a ceux qui siegent dans ces organes.
+               */
+              { path: "gouvernance/filiales", element: <Filiales /> },
             ],
           },
           {
@@ -328,37 +354,36 @@ export const routeur = createBrowserRouter([
             children: [
               { path: "gouvernance/seances", element: <RegistreSeances /> },
               { path: "gouvernance/seances/:id", element: <FicheSeance /> },
-              /*
-               * Les organes de gestion des filiales sont des seances comme les
-               * autres : meme permission, meme geste — preparer un dossier,
-               * puis suivre ce qui en sort.
-               */
-              { path: "gouvernance/filiales", element: <Filiales /> },
             ],
           },
           {
             element: <ExigePermission permissions={[PERMISSIONS.DISPO]} />,
             children: [
-              { path: "gouvernance/disponibilites", element: <Disponibilites /> },
+              {
+                path: "gouvernance/disponibilites",
+                element: <Disponibilites />,
+              },
               { path: "gouvernance/conges", element: <PlanningConges /> },
             ],
           },
           /*
-           * Le referentiel des structures tenu par la DSR. Volontairement
-           * distinct de `/organisation`, qui couvre aussi les postes et les
-           * niveaux hierarchiques et reste dans la zone d'administration.
+           * Le referentiel des structures, en lecture, pour qui relance les
+           * structures (REL). Son ecriture vit dans `/organisation`, zone
+           * d'administration — ADR 021.
            */
           {
-            element: <ExigePermission permissions={[PERMISSIONS.ADM_STR]} />,
+            element: <ExigePermission permissions={[PERMISSIONS.REL]} />,
             children: [
-              { path: "gouvernance/structures", element: <ReferentielStructures /> },
+              {
+                path: "gouvernance/structures",
+                element: <ReferentielStructures />,
+              },
             ],
           },
           {
             element: <ExigePermission permissions={[PERMISSIONS.STAT]} />,
             children: [
               { path: "statistiques", element: <Statistiques /> },
-              { path: "rapports", element: <Rapports /> },
               /*
                * Analyses croisees et indicateurs du programme : le travail du
                * controle de gestion (§3.11). Meme permission que les
@@ -369,6 +394,18 @@ export const routeur = createBrowserRouter([
             ],
           },
           {
+            /*
+             * Les rapports periodiques se lisent a deux niveaux : le controle
+             * de gestion sort celui de l'institution (STAT), un responsable de
+             * structure celui de la sienne (ACT_LEC). C'est le perimetre, et
+             * non la garde, qui fait la difference — et la garde du serveur est
+             * la meme, `exige(ACT_LEC, STAT)`. Les laisser sous STAT seul
+             * aurait cache l'ecran a ceux dont il parle.
+             */
+            element: <ExigePermission permissions={[PERMISSIONS.STAT, PERMISSIONS.ACT_LEC]} />,
+            children: [{ path: "rapports", element: <Rapports /> }],
+          },
+          {
             element: <ExigePermission permissions={[PERMISSIONS.IMP]} />,
             children: [{ path: "impressions", element: <Impressions /> }],
           },
@@ -377,9 +414,7 @@ export const routeur = createBrowserRouter([
             path: "*",
             element: (
               <div className="grid flex-1 place-items-center">
-                <p className="text-[13px] font-semibold text-encre-tenue">
-                  Page introuvable.
-                </p>
+                <p className="text-[13px] font-semibold text-encre-tenue">Page introuvable.</p>
               </div>
             ),
           },
@@ -408,7 +443,10 @@ export const routeur = createBrowserRouter([
               { path: "portail/nouvelle", element: <DeposerDemande /> },
               { path: "portail/demandes/:id", element: <SuiviDemande /> },
               { path: "portail/echanges", element: <Echanges /> },
-              { path: "portail/preferences", element: <PreferencesNotification /> },
+              {
+                path: "portail/preferences",
+                element: <PreferencesNotification />,
+              },
             ],
           },
         ],

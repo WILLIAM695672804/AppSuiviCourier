@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
 import { Icone, type NomIcone } from "@/components/ui/Icone";
 import { Spinner } from "@/components/ui/Spinner";
 
@@ -21,7 +21,7 @@ const VARIANTES: Record<Variante, string> = {
   fantome: "text-white font-semibold hover:bg-white/10",
 };
 
-type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
+type ProprietesCommunes = {
   variante?: Variante;
   icone?: NomIcone;
   /** Remplace l'icone par un indicateur et desactive le bouton pendant l'envoi. */
@@ -29,28 +29,32 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
 };
 
+/**
+ * Un bouton, ou un lien de telechargement portant exactement les memes styles.
+ *
+ * `href` bascule le rendu vers un `<a download>` plutot qu'un `<button>` : le
+ * cas d'un export dont le fichier est ecrit par le serveur (voir
+ * `adresseExport()` / `adresseExportSynthese()`). Un second composant aux
+ * styles dupliques aurait fini par diverger du premier.
+ */
+type Props =
+  | (ProprietesCommunes & { href?: undefined } & ButtonHTMLAttributes<HTMLButtonElement>)
+  | (ProprietesCommunes & { href: string } & AnchorHTMLAttributes<HTMLAnchorElement>);
+
 export function Bouton({
   variante = "secondaire",
   icone,
   chargement = false,
   children,
   className = "",
-  disabled,
+  href,
   ...reste
 }: Props) {
   const rembourrage = variante === "principal" ? "px-[15px] py-2.5" : "px-3 py-2";
   const rayon = variante === "principal" ? "rounded-none" : "rounded-none";
-
-  return (
-    <button
-      type="button"
-      // Desactive pendant l'envoi : un second clic partirait en double, et
-      // c'est ainsi qu'on cree deux fois la meme decision.
-      disabled={disabled || chargement}
-      aria-busy={chargement || undefined}
-      {...reste}
-      className={`inline-flex items-center gap-[7px] text-xs leading-none transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45 ${rayon} ${rembourrage} ${VARIANTES[variante]} ${className}`}
-    >
+  const classes = `inline-flex items-center gap-[7px] text-xs leading-none transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45 ${rayon} ${rembourrage} ${VARIANTES[variante]} ${className}`;
+  const contenu = (
+    <>
       {/* Le spinner remplace l'icone plutot que de s'y ajouter : la largeur du
           bouton ne bouge pas, et rien ne saute sous le curseur. */}
       {chargement ? (
@@ -59,6 +63,34 @@ export function Bouton({
         icone && <Icone nom={icone} taille={14} epaisseur={variante === "principal" ? 1.8 : 1.6} />
       )}
       {children}
+    </>
+  );
+
+  if (href !== undefined) {
+    return (
+      <a
+        href={href}
+        download
+        {...(reste as AnchorHTMLAttributes<HTMLAnchorElement>)}
+        className={classes}
+      >
+        {contenu}
+      </a>
+    );
+  }
+
+  const { disabled, ...resteBouton } = reste as ButtonHTMLAttributes<HTMLButtonElement>;
+  return (
+    <button
+      type="button"
+      // Desactive pendant l'envoi : un second clic partirait en double, et
+      // c'est ainsi qu'on cree deux fois la meme decision.
+      disabled={disabled || chargement}
+      aria-busy={chargement || undefined}
+      {...resteBouton}
+      className={classes}
+    >
+      {contenu}
     </button>
   );
 }

@@ -10,12 +10,18 @@ import { Definition, GrilleDefinitions } from "@/components/ui/Definition";
 import { Encart } from "@/components/ui/Encart";
 import { Etiquette, type TonEtiquette } from "@/components/ui/Etiquette";
 import { Icone } from "@/components/ui/Icone";
-import { dossierQuery, modelesQuery, type EtatDossier } from "@/features/dossier/api";
+import {
+  dossierQuery,
+  modelesQuery,
+  useNoterReception,
+  type EtatDossier,
+} from "@/features/dossier/api";
 import {
   ModaleDemanderComplement,
   ModaleFusion,
   ModaleRetourEtape,
 } from "@/features/dossier/components/ModalesDossier";
+import { PiecesJointes } from "@/features/pieces/components/PiecesJointes";
 import { usePermission } from "@/lib/contexteSession";
 import { formaterDate } from "@/lib/format";
 import { PERMISSIONS } from "@/types/habilitation";
@@ -57,6 +63,7 @@ export function FicheDossier() {
   const peutRetourner = usePermission(PERMISSIONS.DOS_INS, PERMISSIONS.DOS_VAL);
   const [modale, setModale] = useState<"complement" | "retour" | "fusion" | null>(null);
   const [pieceOuverte, setPieceOuverte] = useState<number | null>(null);
+  const noterReception = useNoterReception();
 
   const { data: dossier } = useQuery(dossierQuery(Number(id)));
   const { data: bibliotheque } = useQuery(modelesQuery());
@@ -95,7 +102,11 @@ export function FicheDossier() {
                 </>
               )}
               {peutRetourner && (
-                <Bouton variante="principal" icone="chevronGauche" onClick={() => setModale("retour")}>
+                <Bouton
+                  variante="principal"
+                  icone="chevronGauche"
+                  onClick={() => setModale("retour")}
+                >
                   Retourner à une étape antérieure
                 </Bouton>
               )}
@@ -227,7 +238,11 @@ export function FicheDossier() {
                           onClick={() => setPieceOuverte(depliee ? null : piece.id)}
                           className="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-3 text-left transition-colors duration-150 hover:bg-surface-douce"
                         >
-                          <Icone nom="document" taille={15} className="flex-none text-encre-tenue" />
+                          <Icone
+                            nom="document"
+                            taille={15}
+                            className="flex-none text-encre-tenue"
+                          />
                           <span className="flex min-w-0 flex-1 flex-col gap-1.5">
                             <span className="truncate text-[12px] leading-none font-semibold text-encre">
                               {piece.nom}
@@ -306,6 +321,22 @@ export function FicheDossier() {
                         demandé le {formaterDate(complement.demandeLe)} · attendu pour le{" "}
                         {formaterDate(complement.echeance)}
                       </span>
+                      {peutInstruire && (
+                        <span className="mt-1 flex">
+                          <Bouton
+                            icone="coche"
+                            chargement={noterReception.isPending}
+                            onClick={() =>
+                              noterReception.mutate({
+                                dossierId: dossier.id,
+                                complementId: complement.id,
+                              })
+                            }
+                          >
+                            Pièce reçue
+                          </Bouton>
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -363,6 +394,11 @@ export function FicheDossier() {
                 ))}
               </ul>
             </Carte>
+
+            {/* Les pièces du dossier, avec leur binaire — RF-GED-04 et
+                RF-GED-09. `DOS_INS` porte le dépôt : verser une pièce à un
+                dossier est un acte d'instruction, pas de lecture. */}
+            <PiecesJointes objetType="dossier" objetId={dossier.id} lectureSeule={!peutInstruire} />
           </div>
         </div>
       </div>

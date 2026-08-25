@@ -51,15 +51,32 @@ export interface PartComite {
   valeur: number;
 }
 
+/**
+ * La place de la direction du membre au classement du mois.
+ *
+ * Remplace la sortie du classement colonne par colonne : passé quelques
+ * directions, l'histogramme des scores devenait illisible. Voir l'ADR 026.
+ */
+export interface PositionMembre {
+  structureSigle: string;
+  structureLibelle: string;
+  scoreGlobal: number;
+  feu: string;
+  rang: number;
+  /** `null` au premier mois classé : il n'y a pas de rang d'avant. */
+  rangPrecedent: number | null;
+  totalStructures: number;
+  moyenneCollege: number | null;
+}
+
 export interface VueEnsembleComite {
   institution: string;
   /**
    * Sigle de la direction du membre connecté, quand il en dirige une.
    *
-   * Il ne commande plus le contenu de la page — seulement la mise en évidence
-   * de sa colonne au classement. Un directeur siège au Comité sans cesser de
-   * répondre de sa branche : lui montrer où elle tombe dans l'ensemble est
-   * utile, la lui montrer seule ne l'était pas.
+   * Il désigne la structure dont la position est servie. Un directeur siège au
+   * Comité sans cesser de répondre de sa branche : c'est de celle-là qu'il
+   * vient voir la place.
    */
   structureSigle: string | null;
   /** Horodatage du dernier calcul, tel qu'il s'affiche en haut à droite. */
@@ -67,10 +84,10 @@ export interface VueEnsembleComite {
   exercice: string;
   reperes: RepereComite[];
   /**
-   * Score global de chaque direction. Le graphique central de l'écran : c'est
-   * la matière même de la délibération du Comité.
+   * Score et rang de la direction du membre. `null` quand il n'en dirige
+   * aucune, ou quand la sienne n'entre pas au classement du mois.
    */
-  scoreParStructure: PartComite[];
+  positionMembre: PositionMembre | null;
   /** Décisions du Comité de direction, réparties par état d'exécution. */
   decisionsParEtat: PartComite[];
   /** Les activités de toutes les directions, réparties par état. */
@@ -94,5 +111,6 @@ const CLE = "comite";
 export const vueEnsembleComiteQuery = () =>
   queryOptions({
     queryKey: [CLE, "vue-ensemble"],
-    queryFn: ({ signal }) => api.get<VueEnsembleComite>("/comite/vue-ensemble", signal),
+    queryFn: ({ signal }) =>
+      api.get<VueEnsembleComite>("/comite/vue-ensemble", signal),
   });

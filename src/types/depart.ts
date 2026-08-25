@@ -53,6 +53,7 @@ export interface BordereauCoursier {
   coursier: string;
   tournee: string;
   remisPar: string;
-  entete: { institution: string; service: string };
+  // Pas d'en-tete transmis : il est fixe, tenu par `EnTeteDocument` d'apres le
+  // modele Word remis par la DSR.
   plis: LignePli[];
 }

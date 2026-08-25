@@ -33,6 +33,7 @@ export function CourrierInitiative() {
   const [destinataire, setDestinataire] = useState<Correspondant | null>(null);
   const [objet, setObjet] = useState("");
   const [motif, setMotif] = useState("");
+  const [fichiers, setFichiers] = useState<File[]>([]);
 
   const complet = objet.trim().length >= 5 && motif.trim().length >= 10 && destinataire;
 
@@ -112,7 +113,19 @@ export function CourrierInitiative() {
               <SelecteurCorrespondant choisi={destinataire} onChoisir={setDestinataire} />
             </Carte>
 
-            <BlocNumerisation pages={[{ id: "1", libelle: "État du parc" }]} />
+            {/*
+              Les fichiers restent en memoire : le pilier depart n'a aucune
+              route servie, et il n'y a donc rien ou les verser. Ils partiront
+              par `POST /pieces` le jour ou `POST /departs` existera, comme le
+              fait deja l'enregistrement d'un courrier arrive.
+            */}
+            <BlocNumerisation
+              fichiers={fichiers}
+              onAjouter={(ajoutes) => setFichiers((precedents) => [...precedents, ...ajoutes])}
+              onRetirer={(index) =>
+                setFichiers((precedents) => precedents.filter((_, rang) => rang !== index))
+              }
+            />
           </div>
 
           <div className="flex min-w-0 flex-col gap-4">

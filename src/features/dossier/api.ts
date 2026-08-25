@@ -1,4 +1,8 @@
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { NiveauFeu } from "@/lib/feu";
 
@@ -27,21 +31,14 @@ import type { NiveauFeu } from "@/lib/feu";
  * référence de son courrier d'origine, et c'est tout.
  */
 
-export type TypeDossier = "Demande" | "Réclamation" | "Autorisation" | "Requête" | "Acte";
+export type TypeDossier =
+  "Demande" | "Réclamation" | "Autorisation" | "Requête" | "Acte";
 
 export type EtapeDossier =
-  | "Qualification"
-  | "Instruction"
-  | "Validation"
-  | "Notification"
-  | "Clos";
+  "Qualification" | "Instruction" | "Validation" | "Notification" | "Clos";
 
 export type EtatDossier =
-  | "En cours"
-  | "En attente de complément"
-  | "Retourné"
-  | "Hors délai"
-  | "Clos";
+  "En cours" | "En attente de complément" | "Retourné" | "Hors délai" | "Clos";
 
 export type Criticite = "Standard" | "Sensible" | "Urgent";
 
@@ -125,7 +122,13 @@ export interface DossierDetail extends Dossier {
    */
   regleAffectation: string;
   seuil: string | null;
-  etapes: { code: EtapeDossier; libelle: string; franchie: boolean; date: string | null; acteur: string | null }[];
+  etapes: {
+    code: EtapeDossier;
+    libelle: string;
+    franchie: boolean;
+    date: string | null;
+    acteur: string | null;
+  }[];
   pieces: PieceDossier[];
   complements: Complement[];
   historique: EvenementDossier[];
@@ -133,7 +136,12 @@ export interface DossierDetail extends Dossier {
 
 export interface RegistreDossiers {
   dossiers: Dossier[];
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
   total: number;
 }
 
@@ -174,7 +182,8 @@ export const dossierQuery = (id: number) =>
 export const modelesQuery = () =>
   queryOptions({
     queryKey: [CLE, "modeles"],
-    queryFn: ({ signal }) => api.get<{ modeles: ModeleCourrier[] }>("/dossiers/modeles", signal),
+    queryFn: ({ signal }) =>
+      api.get<{ modeles: ModeleCourrier[] }>("/dossiers/modeles", signal),
   });
 
 /* ------------------------------------------------------------------ *
@@ -201,10 +210,22 @@ export interface SaisieFusion {
 
 export interface SaisieDossierDepuisCourrier {
   courrierId: number;
+  /** Référence lisible du courrier d'origine, telle qu'elle sera citée. */
+  courrierReference?: string;
   type: TypeDossier;
   objet: string;
   demandeur: string;
   echeance: string;
+  /** Ce qui est demandé et sur quel fondement. Saisi, donc transmis. */
+  contexte?: string;
+  criticite?: Criticite;
+  /**
+   * L'enjeu financier, en francs CFA. Il décide de l'affectation quand une
+   * règle porte un seuil : sans montant, une règle à seuil ne s'applique pas —
+   * la réputer satisfaite enverrait au comité des engagements des dossiers dont
+   * personne n'a chiffré l'enjeu.
+   */
+  montant?: number;
 }
 
 function useEcriture<TCorps>(chemin: string | ((corps: TCorps) => string)) {
@@ -212,7 +233,10 @@ function useEcriture<TCorps>(chemin: string | ((corps: TCorps) => string)) {
 
   return useMutation({
     mutationFn: (corps: TCorps) =>
-      api.post<{ id: number }>(typeof chemin === "function" ? chemin(corps) : chemin, corps),
+      api.post<{ id: number }>(
+        typeof chemin === "function" ? chemin(corps) : chemin,
+        corps,
+      ),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: [CLE] });
       void client.invalidateQueries({ queryKey: ["pilotage"] });
@@ -221,7 +245,20 @@ function useEcriture<TCorps>(chemin: string | ((corps: TCorps) => string)) {
 }
 
 export const useDemanderComplement = () =>
-  useEcriture<SaisieComplement>((corps) => `/dossiers/${corps.dossierId}/complements`);
+  useEcriture<SaisieComplement>(
+    (corps) => `/dossiers/${corps.dossierId}/complements`,
+  );
+
+/**
+ * Note qu'une pièce réclamée est arrivée. Sans ce geste, le complément reste
+ * « attendu » indéfiniment : rien dans le dossier ne dit qu'il a été satisfait,
+ * et le rappel continue de s'afficher sur une pièce déjà reçue.
+ */
+export const useNoterReception = () =>
+  useEcriture<{ dossierId: number; complementId: number }>(
+    (corps) =>
+      `/dossiers/${corps.dossierId}/complements/${corps.complementId}/reception`,
+  );
 
 export const useRetournerEtape = () =>
   useEcriture<SaisieRetour>((corps) => `/dossiers/${corps.dossierId}/retour`);
@@ -229,4 +266,5 @@ export const useRetournerEtape = () =>
 export const useFusionner = () =>
   useEcriture<SaisieFusion>((corps) => `/dossiers/${corps.dossierId}/fusion`);
 
-export const useCreerDossier = () => useEcriture<SaisieDossierDepuisCourrier>("/dossiers");
+export const useCreerDossier = () =>
+  useEcriture<SaisieDossierDepuisCourrier>("/dossiers");

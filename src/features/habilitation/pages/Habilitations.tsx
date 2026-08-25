@@ -5,10 +5,12 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Bouton } from "@/components/ui/Bouton";
 import { Carte } from "@/components/ui/Carte";
 import { CaseLibellee } from "@/components/ui/CaseLibellee";
+import { Champ, Liste } from "@/components/ui/Champ";
 import { ChampRecherche } from "@/components/ui/ChampRecherche";
 import { Encart } from "@/components/ui/Encart";
 import { Etiquette } from "@/components/ui/Etiquette";
 import { Icone } from "@/components/ui/Icone";
+import { ModaleFormulaire } from "@/components/ui/ModaleFormulaire";
 import {
   delegationsQuery,
   perimetresQuery,
@@ -16,8 +18,17 @@ import {
   profilsQuery,
   sessionsQuery,
   useBasculerPermission,
+  useCreerProfil,
+  useDetacherAgent,
+  useInvaliderProfil,
+  useModifierProfil,
+  useRattacherAgent,
+  type Profil,
 } from "@/features/habilitation/api";
+import { ModaleAgent } from "@/features/habilitation/components/ModaleAgent";
+import { ModaleCreerCompte } from "@/features/habilitation/components/ModaleCreerCompte";
 import { GROUPES_PERMISSIONS } from "@/features/habilitation/libellesPermissions";
+import { messageDErreur } from "@/lib/erreurApi";
 import { formaterDate } from "@/lib/format";
 
 /**
@@ -63,15 +74,68 @@ export function Habilitations() {
   );
 }
 
+/**
+ * Le catalogue des profils, et son cycle de vie complet — G-02.
+ *
+ * Un profil **naît vide ou copié** : le serveur n'accepte aucune permission à la
+ * création. Ce n'est pas une limite mais la seule séquence qui produise une
+ * trace lisible — chaque permission accordée est un événement distinct, et une
+ * liste envoyée d'un bloc n'en aurait produit qu'un seul, muet sur ce qu'il
+ * couvrait. Les cases se cochent donc dans le panneau de droite, après création.
+ *
+ * Copier depuis un profil verrouillé est l'usage prévu : c'est ce que le refus
+ * de `PATCH /profils/{id}/permissions` recommande quand on tente de modifier un
+ * profil système.
+ */
 function OngletProfils() {
   const { data: profils = [] } = useQuery(profilsQuery());
   const [choisiId, setChoisiId] = useState<number | null>(null);
-  const choisi = profils.find((p) => p.id === choisiId) ?? profils[0];
+  const [creationOuverte, setCreationOuverte] = useState(false);
+  const [saisie, setSaisie] = useState(SAISIE_VIDE);
+  const choisi = creationOuverte ? undefined : profils.find((p) => p.id === choisiId) ?? profils[0];
   const basculer = useBasculerPermission(choisi?.id ?? 0);
+  const creerProfil = useCreerProfil();
+
+  function choisirProfil(id: number) {
+    setCreationOuverte(false);
+    setChoisiId(id);
+    creerProfil.reset();
+  }
+
+  function ouvrirCreation() {
+    setCreationOuverte(true);
+    setSaisie(SAISIE_VIDE);
+    creerProfil.reset();
+  }
+
+  function creerNouveauProfil() {
+    creerProfil.mutate(
+      {
+        code: saisie.code.trim().toUpperCase(),
+        libelle: saisie.libelle.trim(),
+        description: saisie.description.trim() === "" ? null : saisie.description.trim(),
+        depuisProfilId: saisie.depuisProfilId === "" ? null : Number(saisie.depuisProfilId),
+      },
+      {
+        onSuccess: (profil) => {
+          setCreationOuverte(false);
+          setChoisiId(profil.id);
+          setSaisie(SAISIE_VIDE);
+        },
+      },
+    );
+  }
 
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-      <Carte titre="Profils">
+      <Carte
+        titre="Profils"
+        aDroite={
+          <Bouton icone="plus" onClick={ouvrirCreation}>
+            Nouveau
+          </Bouton>
+        }
+      >
         <p className="mt-2 text-[11.5px] leading-[1.5] font-medium text-encre-tenue">
           Le profil dit ce qu'un agent peut faire. Le périmètre dit sur quoi.
         </p>
@@ -80,7 +144,7 @@ function OngletProfils() {
             <button
               key={profil.id}
               type="button"
-              onClick={() => setChoisiId(profil.id)}
+              onClick={() => choisirProfil(profil.id)}
               className={`flex items-center gap-2.5 rounded-none border px-3 py-2.5 text-left transition-colors duration-150 ${
                 choisi?.id === profil.id
                   ? "border-accent-trait bg-[#f8faff]"
@@ -102,6 +166,72 @@ function OngletProfils() {
         </div>
       </Carte>
 
+      {creationOuverte && (
+        <Carte titre="Nouveau profil">
+          <div className="mt-3.5 flex flex-col gap-4">
+            <Encart ton="neutre" icone="aide">
+              Le profil naît sans aucune permission, ou avec celles d'un profil existant. Les cases
+              se cochent ensuite, une à une, dans ce même panneau.
+            </Encart>
+
+            <div className="grid gap-4 md:grid-cols-[150px_minmax(0,1fr)]">
+              <Champ
+                libelle="Code"
+                placeholder="RESP_COURRIER"
+                value={saisie.code}
+                onChange={(e) => setSaisie({ ...saisie, code: e.target.value })}
+                aide="Sans accent, non modifiable ensuite."
+              />
+              <Champ
+                libelle="Libellé du profil"
+                placeholder="Ex. Responsable courrier"
+                value={saisie.libelle}
+                onChange={(e) => setSaisie({ ...saisie, libelle: e.target.value })}
+                aide="Le profil sera ensuite attribuable aux agents depuis leur fiche."
+              />
+            </div>
+
+            <Champ
+              libelle="Description"
+              placeholder="À qui ce profil est destiné, et pourquoi."
+              value={saisie.description}
+              onChange={(e) => setSaisie({ ...saisie, description: e.target.value })}
+            />
+
+            <Liste
+              libelle="Partir des permissions de"
+              invite="Aucune — profil vide"
+              aide="La copie est faite une fois ; les deux profils divergent ensuite."
+              options={profils.map((p) => ({
+                valeur: String(p.id),
+                libelle: `${p.libelle} (${p.permissions.length} permissions)`,
+              }))}
+              value={saisie.depuisProfilId}
+              onChange={(e) => setSaisie({ ...saisie, depuisProfilId: e.target.value })}
+            />
+
+            {creerProfil.isError && (
+              <Encart ton="danger" icone="croix">
+                {messageDErreur(creerProfil.error, "Le profil n'a pas pu être créé.")}
+              </Encart>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 border-t border-separateur pt-3.5">
+              <Bouton
+                variante="principal"
+                className="justify-center"
+                disabled={saisie.code.trim().length === 0 || saisie.libelle.trim().length === 0}
+                chargement={creerProfil.isPending}
+                onClick={creerNouveauProfil}
+              >
+                Créer le profil
+              </Bouton>
+              <Bouton onClick={() => setCreationOuverte(false)}>Annuler</Bouton>
+            </div>
+          </div>
+        </Carte>
+      )}
+
       {choisi && (
         <Carte
           titre={choisi.libelle}
@@ -109,9 +239,12 @@ function OngletProfils() {
             choisi.verrouille ? (
               <Etiquette ton="confidentiel">Verrouillé</Etiquette>
             ) : (
-              <span className="text-[11px] leading-none font-medium text-encre-tenue">
-                {choisi.nombreAgents} agents portent ce profil
-              </span>
+              <div className="flex items-center gap-2.5">
+                <span className="text-[11px] leading-none font-medium text-encre-tenue">
+                  {choisi.nombreAgents} agents portent ce profil
+                </span>
+                <VieDuProfil key={choisi.id} profil={choisi} onInvalide={() => setChoisiId(null)} />
+              </div>
             )
           }
         >
@@ -123,6 +256,11 @@ function OngletProfils() {
               </Encart>
             </div>
           )}
+
+          <p className="mt-3 text-[11.5px] leading-[1.5] font-medium text-encre-tenue">
+            <span className="font-bold text-encre-faible">{choisi.code}</span>
+            {choisi.description ? ` — ${choisi.description}` : ""}
+          </p>
 
           <div className="mt-4 flex flex-col gap-5">
             {GROUPES_PERMISSIONS.map((groupe) => (
@@ -147,6 +285,127 @@ function OngletProfils() {
         </Carte>
       )}
     </div>
+  );
+}
+
+/** L'état de la création. `depuisProfilId` reste une chaîne : un `select` vide
+ *  rend `""`, et le forcer en nombre ferait apparaître 0 là où rien n'est choisi. */
+const SAISIE_VIDE = { code: "", libelle: "", description: "", depuisProfilId: "" };
+
+/**
+ * Renommer un profil, ou le retirer du catalogue.
+ *
+ * Le **code** n'est pas modifiable, et son absence de ce formulaire est
+ * délibérée : il est cité par le semis, les migrations et les tests, et le
+ * renommer casserait ces références sans qu'aucune erreur ne se produise avant
+ * le déploiement suivant.
+ *
+ * Retirer n'est pas supprimer. Les agents qui ont porté le profil gardent leur
+ * historique, et le journal continue de citer le profil sous lequel une décision
+ * a été prise. Le serveur refuse d'ailleurs de retirer un profil encore porté :
+ * l'écran le dit avant d'essayer.
+ */
+function VieDuProfil({ profil, onInvalide }: { profil: Profil; onInvalide: () => void }) {
+  const modifier = useModifierProfil(profil.id);
+  const invalider = useInvaliderProfil(profil.id);
+  const [renommer, setRenommer] = useState(false);
+  const [retirer, setRetirer] = useState(false);
+  const [libelle, setLibelle] = useState(profil.libelle);
+  const [description, setDescription] = useState(profil.description ?? "");
+  const [motif, setMotif] = useState("");
+
+  function fermerRenommage() {
+    modifier.reset();
+    setLibelle(profil.libelle);
+    setDescription(profil.description ?? "");
+    setRenommer(false);
+  }
+
+  function fermerRetrait() {
+    invalider.reset();
+    setMotif("");
+    setRetirer(false);
+  }
+
+  return (
+    <>
+      <Bouton icone="reglages" onClick={() => setRenommer(true)}>
+        Renommer
+      </Bouton>
+      <Bouton icone="croix" className="text-danger" onClick={() => setRetirer(true)}>
+        Retirer
+      </Bouton>
+
+      <ModaleFormulaire
+        ouverte={renommer}
+        onFermer={fermerRenommage}
+        onEnvoyer={() =>
+          modifier.mutate(
+            {
+              libelle: libelle.trim(),
+              description: description.trim() === "" ? null : description.trim(),
+            },
+            { onSuccess: fermerRenommage },
+          )
+        }
+        titre="Renommer le profil"
+        sousTitre={`Le code ${profil.code} ne change pas : il est cité ailleurs que dans cet écran.`}
+        enCours={modifier.isPending}
+        erreur={modifier.error ? messageDErreur(modifier.error, "Le profil n'a pas pu être modifié.") : null}
+        consequence="Les permissions accordées ne bougent pas."
+      >
+        <Champ
+          libelle="Libellé du profil"
+          value={libelle}
+          onChange={(e) => setLibelle(e.target.value)}
+        />
+        <Champ
+          libelle="Description"
+          placeholder="À qui ce profil est destiné, et pourquoi."
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </ModaleFormulaire>
+
+      <ModaleFormulaire
+        ouverte={retirer}
+        onFermer={fermerRetrait}
+        onEnvoyer={() =>
+          invalider.mutate(
+            { motif: motif.trim() },
+            {
+              onSuccess: () => {
+                fermerRetrait();
+                onInvalide();
+              },
+            },
+          )
+        }
+        titre={`Retirer le profil « ${profil.libelle} »`}
+        libelleEnvoi="Retirer du catalogue"
+        enCours={invalider.isPending}
+        erreur={
+          invalider.error ? messageDErreur(invalider.error, "Le profil n'a pas pu être retiré.") : null
+        }
+        consequence="Le profil sort du catalogue ; l'historique des agents qui l'ont porté reste lisible."
+      >
+        {profil.nombreAgents > 0 && (
+          <Encart ton="alerte" icone="bouclier">
+            {profil.nombreAgents === 1
+              ? "Un agent porte encore ce profil."
+              : `${profil.nombreAgents} agents portent encore ce profil.`}{" "}
+            Retirez-le-leur d'abord : un agent sans aucun profil ne peut plus rien faire.
+          </Encart>
+        )}
+        <Champ
+          libelle="Motif du retrait"
+          placeholder="Profil fusionné avec…, créé par erreur…"
+          aide="C'est lui qu'on relira si le profil est réclamé plus tard."
+          value={motif}
+          onChange={(e) => setMotif(e.target.value)}
+        />
+      </ModaleFormulaire>
+    </>
   );
 }
 
@@ -198,37 +457,46 @@ function OngletPerimetres() {
         </div>
       </Carte>
 
-      <Carte titre={choisi ? "Modifier le périmètre" : "Créer un périmètre"}>
+      <Carte titre={choisi ? choisi.libelle : "Ce qu'ouvre un périmètre"}>
         <div className="mt-3.5 flex flex-col gap-2.5">
+          {/* Ces quatre lignes sont constatees, non administrees : trois d'entre
+              elles sont des PERMISSIONS des agents concernes, et la quatrieme
+              n'a aucune source. Les rendre cochables ici laisserait croire
+              qu'on modifie le perimetre alors qu'on toucherait aux profils. */}
           <span className="text-[11px] leading-none font-semibold text-encre-faible">
-            Ce que le périmètre ouvre
+            Ce que ce périmètre ouvre, chez les agents qui le portent
           </span>
           <CaseLibellee
             cochee={choisi?.inclureDescendants ?? false}
+            desactivee
             onChange={() => {}}
             libelle="Inclure les structures descendantes"
           />
           <CaseLibellee
             cochee={choisi?.voirConfidentiel ?? false}
+            desactivee
             onChange={() => {}}
             libelle="Voir le courrier de la session confidentielle"
           />
           <CaseLibellee
-            cochee={choisi?.lectureClotures ?? true}
+            cochee={choisi?.lectureClotures ?? false}
+            desactivee
             onChange={() => {}}
             libelle="Accès en lecture aux courriers clôturés"
           />
           <CaseLibellee
             cochee={choisi?.statistiquesAgregees ?? false}
+            desactivee
             onChange={() => {}}
             libelle="Statistiques agrégées sur tout le périmètre"
           />
 
-          <div className="mt-2 flex items-center gap-2">
-            <Bouton variante="principal" className="flex-1 justify-center">
-              Enregistrer
-            </Bouton>
-            <Bouton className="flex-1 justify-center">Dupliquer</Bouton>
+          <div className="mt-2">
+            <Encart ton="alerte" icone="bouclier">
+              Le périmètre se pose <strong>agent par agent</strong>, dans sa fiche : il n'existe pas
+              de catalogue modifiable. Les quatre lignes ci-dessus sont constatées — trois sont des
+              permissions portées par les profils, la quatrième n'a pas encore de source.
+            </Encart>
           </div>
         </div>
       </Carte>
@@ -238,9 +506,25 @@ function OngletPerimetres() {
 
 function OngletSessions() {
   const { data: sessions = [] } = useQuery(sessionsQuery());
+  const { data: agents = [] } = useQuery(utilisateursQuery("actifs"));
   const [choisiId, setChoisiId] = useState<number | null>(null);
   const [recherche, setRecherche] = useState("");
   const choisi = sessions.find((s) => s.id === choisiId) ?? sessions[0];
+
+  const rattacher = useRattacherAgent(choisi?.id ?? 0);
+  const detacher = useDetacherAgent(choisi?.id ?? 0);
+
+  // Le rattachement est exclusif : un agent n'appartient qu'a une session. Les
+  // agents deja rattaches ailleurs sont donc ecartes de la recherche plutot que
+  // proposes puis refuses en 409 apres la saisie.
+  const rattachesAilleurs = new Set(sessions.flatMap((s) => s.agents.map((a) => a.id)));
+  const candidats = recherche.trim()
+    ? agents.filter(
+        (a) =>
+          !rattachesAilleurs.has(a.id) &&
+          `${a.nomComplet} ${a.identifiant}`.toLowerCase().includes(recherche.trim().toLowerCase()),
+      )
+    : [];
 
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[322px_minmax(0,1fr)]">
@@ -287,16 +571,46 @@ function OngletSessions() {
             </span>
           }
         >
-          <div className="mt-3.5 flex items-center gap-2">
+          <div className="mt-3.5 flex flex-col gap-2">
             <ChampRecherche
               valeur={recherche}
               onChange={setRecherche}
               placeholder="Rechercher un agent à rattacher"
               className="flex-1"
             />
-            <Bouton variante="doux" disabled={!recherche.trim()}>
-              Rattacher
-            </Bouton>
+
+            {rattacher.isError && (
+              <Encart ton="danger" icone="croix">
+                {messageDErreur(rattacher.error, "Le rattachement a été refusé.")}
+              </Encart>
+            )}
+
+            {candidats.map((agent) => (
+              <div
+                key={agent.id}
+                className="flex items-center gap-3 rounded-none border border-bordure bg-surface-douce px-3.5 py-2.5"
+              >
+                <span className="min-w-0 flex-1 truncate text-[12px] leading-none font-semibold text-encre">
+                  {agent.nomComplet} — {agent.structure}
+                </span>
+                <Bouton
+                  variante="doux"
+                  disabled={rattacher.isPending}
+                  onClick={() =>
+                    rattacher.mutate(agent.id, { onSuccess: () => setRecherche("") })
+                  }
+                >
+                  Rattacher
+                </Bouton>
+              </div>
+            ))}
+
+            {recherche.trim() && candidats.length === 0 && (
+              <span className="text-[11px] leading-[1.5] font-medium text-encre-tenue">
+                Aucun agent disponible : un agent déjà rattaché à une session ne peut pas en tenir
+                une seconde.
+              </span>
+            )}
           </div>
 
           <div className="mt-3.5">
@@ -334,7 +648,9 @@ function OngletSessions() {
                 </span>
                 <button
                   type="button"
-                  className="justify-self-start text-[11px] leading-none font-bold text-danger hover:underline"
+                  onClick={() => detacher.mutate(agent.id)}
+                  disabled={detacher.isPending}
+                  className="justify-self-start text-[11px] leading-none font-bold text-danger hover:underline disabled:opacity-60"
                 >
                   Retirer
                 </button>
@@ -435,6 +751,8 @@ function OngletDelegations() {
 function OngletUtilisateurs() {
   const [vue, setVue] = useState("tous");
   const [recherche, setRecherche] = useState("");
+  const [creationOuverte, setCreationOuverte] = useState(false);
+  const [agentOuvert, setAgentOuvert] = useState<number | null>(null);
   const { data: utilisateurs = [] } = useQuery(utilisateursQuery(vue));
 
   const filtres = [
@@ -456,8 +774,12 @@ function OngletUtilisateurs() {
       aDroite={
         <div className="flex items-center gap-2">
           <Bouton icone="exporter">Exporter l'annuaire</Bouton>
-          <Bouton variante="doux" icone="personneAjout">
-            Inviter un utilisateur
+          <Bouton
+            variante="doux"
+            icone="personneAjout"
+            onClick={() => setCreationOuverte(true)}
+          >
+            Créer un compte
           </Bouton>
         </div>
       }
@@ -502,9 +824,11 @@ function OngletUtilisateurs() {
           </div>
 
           {visibles.map((utilisateur) => (
-            <div
+            <button
               key={utilisateur.id}
-              className="grid grid-cols-[minmax(170px,1.3fr)_minmax(190px,1.4fr)_140px_130px_100px] items-center gap-2.5 border-b border-separateur py-3"
+              type="button"
+              onClick={() => setAgentOuvert(utilisateur.id)}
+              className="grid w-full grid-cols-[minmax(170px,1.3fr)_minmax(190px,1.4fr)_140px_130px_100px] items-center gap-2.5 border-b border-separateur py-3 text-left transition-colors duration-150 hover:bg-[#fbfbfc]"
             >
               <span className="flex min-w-0 items-center gap-2">
                 <Avatar initiales={utilisateur.initiales} taille="petit" />
@@ -543,10 +867,13 @@ function OngletUtilisateurs() {
                       : "Invité"}
                 </Etiquette>
               </span>
-            </div>
+            </button>
           ))}
         </div>
       </div>
+
+      <ModaleCreerCompte ouverte={creationOuverte} onFermer={() => setCreationOuverte(false)} />
+      <ModaleAgent utilisateurId={agentOuvert} onFermer={() => setAgentOuvert(null)} />
     </Carte>
   );
 }

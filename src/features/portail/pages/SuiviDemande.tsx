@@ -9,7 +9,11 @@ import { Encart } from "@/components/ui/Encart";
 import { Etiquette, type TonEtiquette } from "@/components/ui/Etiquette";
 import { Icone } from "@/components/ui/Icone";
 import { ZoneDepot, type FichierDepose } from "@/components/ui/ZoneDepot";
-import { demandeQuery, useRepondre, type EtatDemandeUsager } from "@/features/portail/api";
+import {
+  demandeQuery,
+  useRepondre,
+  type EtatDemandeUsager,
+} from "@/features/portail/api";
 import { formaterDate } from "@/lib/format";
 
 /**
@@ -45,9 +49,7 @@ export function SuiviDemande() {
   const repondre = useRepondre();
 
   if (!demande) {
-    return (
-      <EtatChargement message="Ouverture de votre demande…" />
-    );
+    return <EtatChargement message="Ouverture de votre demande…" />;
   }
 
   function envoyer() {
@@ -105,7 +107,10 @@ export function SuiviDemande() {
             <Encart ton="danger" icone="cloche">
               {demande.complementAttendu.objet}
               <br />
-              <strong>À transmettre avant le {formaterDate(demande.complementAttendu.avantLe)}.</strong>{" "}
+              <strong>
+                À transmettre avant le{" "}
+                {formaterDate(demande.complementAttendu.avantLe)}.
+              </strong>{" "}
               Sans ces éléments, votre dossier ne peut pas avancer.
             </Encart>
 
@@ -132,7 +137,9 @@ export function SuiviDemande() {
                 disabled={fichiers.length === 0}
                 onClick={envoyer}
               >
-                {repondre.isPending ? "Envoi en cours…" : "Transmettre mes pièces"}
+                {repondre.isPending
+                  ? "Envoi en cours…"
+                  : "Transmettre mes pièces"}
               </Bouton>
             </div>
           </div>
@@ -142,7 +149,8 @@ export function SuiviDemande() {
       <Carte titre="Où en est votre demande">
         <ol className="mt-4 flex flex-col">
           {demande.etapes.map((etape, index) => {
-            const courante = !etape.franchie && demande.etapes[index - 1]?.franchie !== false;
+            const courante =
+              !etape.franchie && demande.etapes[index - 1]?.franchie !== false;
 
             return (
               <li key={etape.libelle} className="flex gap-3.5">
@@ -173,7 +181,9 @@ export function SuiviDemande() {
                   <span className="flex flex-wrap items-baseline gap-2.5">
                     <span
                       className={`text-[14px] leading-snug ${
-                        courante ? "font-extrabold text-encre" : "font-bold text-encre-douce"
+                        courante
+                          ? "font-extrabold text-encre"
+                          : "font-bold text-encre-douce"
                       }`}
                     >
                       {etape.libelle}
@@ -197,7 +207,8 @@ export function SuiviDemande() {
       <Carte titre="Échanges avec le service">
         {demande.messages.length === 0 ? (
           <p className="mt-3.5 text-[12.5px] font-medium text-encre-tenue">
-            Aucun échange pour l'instant. Le service vous écrira ici s'il a besoin d'une précision.
+            Aucun échange pour l'instant. Le service vous écrira ici s'il a
+            besoin d'une précision.
           </p>
         ) : (
           <ul className="mt-4 flex flex-col gap-4">
@@ -230,7 +241,11 @@ export function SuiviDemande() {
                         key={piece.nom}
                         className="flex items-center gap-1.5 rounded-none border border-bordure bg-surface px-2.5 py-1.5"
                       >
-                        <Icone nom="document" taille={13} className="text-encre-tenue" />
+                        <Icone
+                          nom="document"
+                          taille={13}
+                          className="text-encre-tenue"
+                        />
                         <span className="text-[11.5px] leading-none font-semibold text-encre-douce">
                           {piece.nom}
                         </span>
@@ -257,7 +272,11 @@ export function SuiviDemande() {
               value={texte}
               onChange={(e) => setTexte(e.target.value)}
             />
-            <ZoneDepot libelle="Joindre des pièces (facultatif)" fichiers={fichiers} onChange={setFichiers} />
+            <ZoneDepot
+              libelle="Joindre des pièces (facultatif)"
+              fichiers={fichiers}
+              onChange={setFichiers}
+            />
             <div>
               <Bouton
                 variante="principal"
@@ -282,14 +301,20 @@ export function SuiviDemande() {
                 index > 0 ? "border-t border-separateur" : ""
               }`}
             >
-              <Icone nom="document" taille={16} className="flex-none text-encre-tenue" />
+              <Icone
+                nom="document"
+                taille={16}
+                className="flex-none text-encre-tenue"
+              />
               <span className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="truncate text-[13px] leading-none font-semibold text-encre">
                   {piece.nom}
                 </span>
                 <span className="text-[11.5px] leading-none font-medium text-encre-tenue">
-                  {piece.parVous ? "Transmise par vous" : "Transmise par le service"} le{" "}
-                  {formaterDate(piece.deposeeLe)} · {piece.taille}
+                  {piece.parVous
+                    ? "Transmise par vous"
+                    : "Transmise par le service"}{" "}
+                  le {formaterDate(piece.deposeeLe)} · {piece.taille}
                 </span>
               </span>
               <Bouton icone="exporter">Télécharger</Bouton>

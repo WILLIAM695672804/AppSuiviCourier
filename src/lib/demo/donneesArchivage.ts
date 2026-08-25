@@ -107,13 +107,27 @@ export const VERSEMENTS_DEMO: VersementDetail[] = [
     versePar: null,
     anomalies: [],
     piecesJointes: [
-      { id: 1, nom: "Dossier-de-consultation.pdf", format: "PDF", taille: "3,4 Mo", presente: true },
+      {
+        id: 1,
+        nom: "Dossier-de-consultation.pdf",
+        format: "PDF",
+        taille: "3,4 Mo",
+        presente: true,
+      },
       { id: 2, nom: "Contrat-signe.pdf", format: "PDF", taille: "1,8 Mo", presente: true },
       { id: 3, nom: "PV-de-reception.pdf", format: "PDF", taille: "620 Ko", presente: true },
     ],
     chaineIntegrite: [
-      { etape: "Clôture du dossier", horodatage: "2021-06-18T16:42:00", empreinte: "a3f1c9e8d2b7460f8c15e3a7b942d0165fc8e3a1b7d492f06c8a3e51d7b09f24" },
-      { etape: "Contrôle de conformité", horodatage: "2026-08-04T09:12:00", empreinte: "7b2e94a1c6f03d85b1e7a94c2d608f31a5c9e042b8d7136f9a04e2c85b1d7639" },
+      {
+        etape: "Clôture du dossier",
+        horodatage: "2021-06-18T16:42:00",
+        empreinte: "a3f1c9e8d2b7460f8c15e3a7b942d0165fc8e3a1b7d492f06c8a3e51d7b09f24",
+      },
+      {
+        etape: "Contrôle de conformité",
+        horodatage: "2026-08-04T09:12:00",
+        empreinte: "7b2e94a1c6f03d85b1e7a94c2d608f31a5c9e042b8d7136f9a04e2c85b1d7639",
+      },
     ],
   },
   {
@@ -146,7 +160,11 @@ export const VERSEMENTS_DEMO: VersementDetail[] = [
       { id: 4, nom: "Registre-2016-scan.pdf", format: "PDF", taille: "42 Mo", presente: true },
     ],
     chaineIntegrite: [
-      { etape: "Clôture du dossier", horodatage: "2016-12-31T17:00:00", empreinte: "e1c74b90a2d635f8c47b1e93a05d28f6b3c9017e5a4d82f61c073b9e2a5d84f1" },
+      {
+        etape: "Clôture du dossier",
+        horodatage: "2016-12-31T17:00:00",
+        empreinte: "e1c74b90a2d635f8c47b1e93a05d28f6b3c9017e5a4d82f61c073b9e2a5d84f1",
+      },
     ],
   },
   {
@@ -181,7 +199,11 @@ export const VERSEMENTS_DEMO: VersementDetail[] = [
       { id: 8, nom: "Accuse-de-signification.pdf", format: "PDF", taille: "—", presente: false },
     ],
     chaineIntegrite: [
-      { etape: "Clôture du dossier", horodatage: "2023-11-09T11:28:00", empreinte: "c8a04f2e7b91d356e0a8c4d17b23d95f6e1a70c48b39d2f5a6e0c81b74d3925a" },
+      {
+        etape: "Clôture du dossier",
+        horodatage: "2023-11-09T11:28:00",
+        empreinte: "c8a04f2e7b91d356e0a8c4d17b23d95f6e1a70c48b39d2f5a6e0c81b74d3925a",
+      },
     ],
   },
   {
@@ -207,9 +229,21 @@ export const VERSEMENTS_DEMO: VersementDetail[] = [
       { id: 10, nom: "PV-session-2.pdf", format: "PDF", taille: "1,4 Mo", presente: true },
     ],
     chaineIntegrite: [
-      { etape: "Clôture du dossier", horodatage: "2024-12-20T15:05:00", empreinte: "b57e0d3a9c2184f61e7b0a35d92c8f4e1a60b7d38c9e52f0a1b4d76c83e9052f" },
-      { etape: "Contrôle de conformité", horodatage: "2026-07-14T10:33:00", empreinte: "f0d92a7e4b18c63d5a09e2b74f81c360a9d7e52b8c41f0369a2d5e07b8c14f93" },
-      { etape: "Versement au système d'archivage", horodatage: "2026-07-15T08:20:00", empreinte: "3a9c15e70b842d6f9e01c73a5b8d24f60c9e17a35d82b04f7e61a9c25d3b087e" },
+      {
+        etape: "Clôture du dossier",
+        horodatage: "2024-12-20T15:05:00",
+        empreinte: "b57e0d3a9c2184f61e7b0a35d92c8f4e1a60b7d38c9e52f0a1b4d76c83e9052f",
+      },
+      {
+        etape: "Contrôle de conformité",
+        horodatage: "2026-07-14T10:33:00",
+        empreinte: "f0d92a7e4b18c63d5a09e2b74f81c360a9d7e52b8c41f0369a2d5e07b8c14f93",
+      },
+      {
+        etape: "Versement au système d'archivage",
+        horodatage: "2026-07-15T08:20:00",
+        empreinte: "3a9c15e70b842d6f9e01c73a5b8d24f60c9e17a35d82b04f7e61a9c25d3b087e",
+      },
     ],
   },
   {
@@ -241,7 +275,11 @@ export const VERSEMENTS_DEMO: VersementDetail[] = [
       { id: 11, nom: "Reclamations-S2-2022.pdf", format: "PDF", taille: "8,7 Mo", presente: true },
     ],
     chaineIntegrite: [
-      { etape: "Clôture du dossier", horodatage: "2022-12-31T16:00:00", empreinte: "d4b81f0e9a20a297e35d6f81b04a9c72e5308df1a6b9c24e70f83a5d1c96b2e0" },
+      {
+        etape: "Clôture du dossier",
+        horodatage: "2022-12-31T16:00:00",
+        empreinte: "d4b81f0e9a20a297e35d6f81b04a9c72e5308df1a6b9c24e70f83a5d1c96b2e0",
+      },
     ],
   },
 ];

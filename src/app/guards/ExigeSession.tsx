@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, Outlet, useLocation } from "react-router";
+import { PageChargement } from "@/components/ui/EtatChargement";
 import { CLE_DECONNEXION, useSessionOptionnelle } from "@/lib/contexteSession";
 
 /**
@@ -32,11 +33,7 @@ export function ExigeSession() {
   // Tant que le serveur n'a pas repondu, on n'affiche rien : rediriger ici
   // ferait clignoter l'ecran de connexion a chaque rechargement de page.
   if (enCours) {
-    return (
-      <div className="grid h-screen place-items-center text-[13px] font-medium text-encre-tenue">
-        Ouverture de la session…
-      </div>
-    );
+    return <PageChargement message="Ouverture de la session…" />;
   }
 
   if (!utilisateur) {

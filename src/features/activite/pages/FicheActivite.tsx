@@ -17,12 +17,12 @@ import {
   ModaleInstructionActivite,
   ModaleLeveeInstruction,
   ModaleModifierActivite,
-  ModalePieceVie,
   ModaleRelanceActivite,
   ModaleReleveIndicateur,
   ModaleSuspensionActivite,
   ModaleTacheActivite,
 } from "@/features/activite/components/ModalesActivite";
+import { PiecesJointes } from "@/features/pieces/components/PiecesJointes";
 import {
   activiteQuery,
   type EtatActivite,
@@ -85,7 +85,6 @@ type ModaleOuverte =
   | { nom: "indicateur" }
   | { nom: "releve"; indicateur: IndicateurActivite }
   | { nom: "tache" }
-  | { nom: "piece" }
   | { nom: "suspension"; action: "suspendre" | "reprendre" }
   | { nom: "instruction" }
   | { nom: "levee"; instruction: InstructionActivite }
@@ -203,7 +202,8 @@ export function FicheActivite() {
                   {ecart >= 0
                     ? `En avance de ${ecart} points sur le rythme prévu à cette date.`
                     : `En retard de ${-ecart} points sur le rythme prévu à cette date.`}{" "}
-                  Le repère sur la barre marque l'avancement attendu au {formaterDate(new Date().toISOString())}.
+                  Le repère sur la barre marque l'avancement attendu au{" "}
+                  {formaterDate(new Date().toISOString())}.
                 </p>
               </div>
 
@@ -212,9 +212,10 @@ export function FicheActivite() {
                   <Encart ton="confidentiel" icone="horloge">
                     Activité suspendue le {formaterDate(activite.suspension.date)} par{" "}
                     {activite.suspension.decidePar}
-                    {activite.suspension.reference ? ` (${activite.suspension.reference})` : ""} :{" "}
-                    {activite.suspension.motif} Aucun retard n'est décompté et aucune relance n'est
-                    envoyée tant que la suspension n'est pas levée.
+                    {activite.suspension.reference
+                      ? ` (${activite.suspension.reference})`
+                      : ""} : {activite.suspension.motif} Aucun retard n'est décompté et aucune
+                    relance n'est envoyée tant que la suspension n'est pas levée.
                   </Encart>
                 </div>
               )}
@@ -232,8 +233,8 @@ export function FicheActivite() {
             >
               {activite.indicateurs.length === 0 ? (
                 <p className="mt-3 text-[11.5px] leading-[1.5] font-medium text-encre-tenue">
-                  Aucun indicateur posé. Sans indicateur, l'avancement déclaré ne repose sur rien
-                  de mesurable et le §15 du cahier des charges n'est pas satisfait.
+                  Aucun indicateur posé. Sans indicateur, l'avancement déclaré ne repose sur rien de
+                  mesurable et le §15 du cahier des charges n'est pas satisfait.
                 </p>
               ) : (
                 <ul className="mt-3.5 flex flex-col">
@@ -421,7 +422,9 @@ export function FicheActivite() {
                           }`}
                         >
                           <span className="flex flex-wrap items-center gap-2">
-                            <Etiquette ton={instruction.levee ? "succes" : enRetard ? "danger" : "alerte"}>
+                            <Etiquette
+                              ton={instruction.levee ? "succes" : enRetard ? "danger" : "alerte"}
+                            >
                               {instruction.levee ? "Levée" : enRetard ? "Délai dépassé" : "Due"}
                             </Etiquette>
                             <span className="text-[10.5px] leading-none font-medium text-encre-tenue">
@@ -435,7 +438,8 @@ export function FicheActivite() {
                           </span>
 
                           <span className="text-[10.5px] leading-none font-medium text-encre-tenue">
-                            {instruction.responsable} · délai au {formaterDate(instruction.echeance)}
+                            {instruction.responsable} · délai au{" "}
+                            {formaterDate(instruction.echeance)}
                             {instruction.levee && instruction.dateLevee
                               ? ` · levée le ${formaterDate(instruction.dateLevee)}`
                               : ""}
@@ -467,11 +471,6 @@ export function FicheActivite() {
                     <Etiquette ton="alerte">
                       {activite.instructions} instruction{activite.instructions > 1 ? "s" : ""}
                     </Etiquette>
-                  )}
-                  {peutSaisir && (
-                    <Bouton icone="document" onClick={() => setModale({ nom: "piece" })}>
-                      Joindre
-                    </Bouton>
                   )}
                 </span>
               }
@@ -519,6 +518,12 @@ export function FicheActivite() {
                 ))}
               </ul>
             </Carte>
+
+            {/* Le versement réel, avec le binaire — RF-GED-04 et RF-GED-09. La
+                fiche de vie ci-dessus garde les pièces mentionnées à un
+                événement, qui disent ce qu'elles justifient ; ce panneau tient
+                les fichiers eux-mêmes, versionnés et empreintés. */}
+            <PiecesJointes objetType="activite" objetId={activite.id} lectureSeule={!peutSaisir} />
           </div>
         </div>
       </div>
@@ -544,11 +549,6 @@ export function FicheActivite() {
       />
       <ModaleTacheActivite
         ouverte={modale?.nom === "tache"}
-        onFermer={() => setModale(null)}
-        activite={activite}
-      />
-      <ModalePieceVie
-        ouverte={modale?.nom === "piece"}
         onFermer={() => setModale(null)}
         activite={activite}
       />

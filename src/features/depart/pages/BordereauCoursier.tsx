@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router";
+import { EnTeteDocument, PiedDocument } from "@/components/EnTeteDocument";
 import { EnTetePage } from "@/components/EnTetePage";
 import { Bouton } from "@/components/ui/Bouton";
+import { EtatChargement } from "@/components/ui/EtatChargement";
 import { bordereauQuery } from "@/features/depart/api";
 import { formaterDate } from "@/lib/format";
 
@@ -20,7 +22,17 @@ export function BordereauCoursier() {
   const { data, isPending } = useQuery(bordereauQuery(numero ?? ""));
 
   if (isPending || !data) {
-    return <p className="px-[26px] py-10 text-[13px] text-encre-tenue">Chargement du bordereau…</p>;
+    return (
+      <>
+        <div className="print:hidden">
+          <EnTetePage
+            titre="Bordereau"
+            miettes={[{ libelle: "Courriers départ", chemin: "/courriers/departs" }]}
+          />
+        </div>
+        <EtatChargement message="Chargement du bordereau…" />
+      </>
+    );
   }
 
   return (
@@ -45,14 +57,7 @@ export function BordereauCoursier() {
 
       <div className="flex-1 overflow-y-auto bg-fond px-[26px] py-6 print:overflow-visible print:bg-white print:p-0">
         <article className="mx-auto max-w-[820px] rounded-none border border-bordure bg-surface p-10 shadow-[0_1px_2px_rgba(16,24,40,.04)] print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none">
-          <header className="border-b-2 border-encre pb-4 text-center">
-            <p className="text-[13px] leading-tight font-extrabold tracking-[.5px] text-encre uppercase">
-              {data.entete.institution}
-            </p>
-            <p className="mt-1 text-[11.5px] leading-none font-medium text-encre-moyenne">
-              {data.entete.service}
-            </p>
-          </header>
+          <EnTeteDocument />
 
           <div className="mt-6 text-center">
             <h2 className="text-base leading-none font-extrabold tracking-[-.2px] text-encre">
@@ -122,6 +127,8 @@ export function BordereauCoursier() {
               </div>
             ))}
           </div>
+
+          <PiedDocument reference={data.numero} />
         </article>
       </div>
     </>

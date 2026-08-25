@@ -65,7 +65,7 @@ export const GLOSSAIRE: EntreeGlossaire[] = [
   },
   {
     sigle: "DAF",
-    intitule: "s Affaires Financières",
+    intitule: "Direction des Affaires Financières",
     definition: "Direction chargée du budget, de la comptabilité et des marchés.",
     famille: "Institution",
   },

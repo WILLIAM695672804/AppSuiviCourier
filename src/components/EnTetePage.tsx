@@ -3,6 +3,7 @@ import { FilAriane, type Miette } from "@/components/ui/FilAriane";
 import { BoutonGlossaire, Glossaire } from "@/components/ui/Glossaire";
 import { Icone } from "@/components/ui/Icone";
 import { MenuProfil } from "@/components/ui/MenuProfil";
+import { ClocheNotifications } from "@/features/notifications/components/ClocheNotifications";
 import { BoutonTiroir } from "@/components/ui/TiroirNavigation";
 import { useTiroir } from "@/lib/contexteTiroir";
 import { useSession } from "@/lib/contexteSession";
@@ -92,14 +93,7 @@ export function EnTetePage({
             >
               <Icone nom="parametres" taille={17} />
             </button>
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="relative text-encre-tenue hover:text-encre-faible"
-            >
-              <Icone nom="cloche" taille={17} />
-              <span className="absolute -top-px right-0 size-[7px] rounded-none border-[1.5px] border-white bg-danger-vif" />
-            </button>
+            <ClocheNotifications />
 
             <div className="ml-0.5">
               <MenuProfil compact />

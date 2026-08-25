@@ -28,6 +28,28 @@ function versParametres(filtres: FiltresRegistre): string {
   return chaine ? `?${chaine}` : "";
 }
 
+/**
+ * L'adresse d'édition du registre.
+ *
+ * Un lien, et non un `fetch` suivi d'un `Blob` : le cookie de session part avec
+ * la navigation, le navigateur nomme le fichier d'après l'en-tête que le
+ * serveur pose, et la sortie passe par le serveur, qui l'inscrit au journal des
+ * accès. Un document assemblé côté client n'aurait laissé aucune trace.
+ *
+ * Les paramètres sont **ceux du registre affiché** : on édite ce qu'on regarde.
+ * `page` est écartée — un document se lit d'un bout à l'autre, il n'a pas de
+ * page courante.
+ */
+export function adresseExportRegistre(filtres: FiltresRegistre, format: "pdf" | "docx"): string {
+  const parametres = versParametres({ ...filtres, page: undefined });
+  return `/api/courriers/export${parametres ? `${parametres}&` : "?"}format=${format}`;
+}
+
+/** L'adresse de la fiche de cotation — B-03, le bordereau qui suit le pli. */
+export function adresseExportFicheCotation(id: number, format: "pdf" | "docx"): string {
+  return `/api/courriers/${id}/fiche-cotation/export?format=${format}`;
+}
+
 export interface PageCourriers {
   lignes: CourrierResume[];
   /** Nombre de courriers retenus par le filtre courant. */
@@ -110,6 +132,11 @@ export interface SaisieCotation {
   mentionTypeId: number | null;
   annotation: string;
   delaiFixe: string | null;
+  /**
+   * Le delai imparti, en jours **ouvres**. Le serveur en tire la date : compter
+   * les jours ouvres suppose le calendrier des feries, qui est en base.
+   */
+  delaiJours: number | null;
   /** L'autorite qui a decide — distincte de l'agent qui saisit. */
   decideParId: number;
   decideLe: string;
@@ -117,10 +144,18 @@ export interface SaisieCotation {
   structureIds: number[];
 }
 
-export function useCoter(courrierId: number) {
+/**
+ * La cotation, un courrier a la fois.
+ *
+ * Le courrier est passe **a l'appel** et non a la construction du hook : le
+ * registre cote une selection, et la meme decision se repete alors sur chaque
+ * ligne. Une route de lot aurait masque un refus partiel — un courrier clos au
+ * milieu de vingt — sous une reponse unique.
+ */
+export function useCoter() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (saisie: SaisieCotation) =>
+    mutationFn: ({ courrierId, saisie }: { courrierId: number; saisie: SaisieCotation }) =>
       api.post<CourrierDetail>(`/courriers/${courrierId}/cotations`, saisie),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: clesCourrier.racine });
@@ -216,6 +251,62 @@ export function useAffecter(courrierId: number) {
   return useMutation({
     mutationFn: (corps: { utilisateurId: number; consigne: string }) =>
       api.post<CourrierDetail>(`/courriers/${courrierId}/affectations`, corps),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: clesCourrier.racine });
+    },
+  });
+}
+
+/**
+ * Le report d'echeance.
+ *
+ * `delaiJours` compte en jours **ouvres**, et le serveur les ajoute a
+ * l'echeance en vigueur — pas a aujourd'hui : prolonger de trois jours un
+ * courrier en retard de huit ne doit pas effacer le retard.
+ */
+export interface SaisieProlongation {
+  nouvelleEcheance?: string | null;
+  delaiJours?: number | null;
+  /** Obligatoire : un report sans raison ne se défend pas devant un contrôle. */
+  motif: string;
+}
+
+export function useProlonger(courrierId: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (saisie: SaisieProlongation) =>
+      api.post<CourrierDetail>(`/courriers/${courrierId}/prolongation`, saisie),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: clesCourrier.racine });
+    },
+  });
+}
+
+/**
+ * Une correction de saisie. **Les champs omis restent inchanges** : c'est un
+ * `PATCH`, et un formulaire partiel ne doit pas effacer ce qu'il n'affiche pas.
+ *
+ * Le numero, le registre, le sens, la confidentialite et la date de reception
+ * n'y figurent pas : ce sont les mentions du cahier, et les corriger apres coup
+ * ote au registre sa valeur probante.
+ */
+export interface SaisieCorrection {
+  objet?: string;
+  correspondantId?: number;
+  natureId?: number;
+  referenceExpediteur?: string;
+  dateLettre?: string;
+  nombrePages?: number;
+  urgent?: boolean;
+  observations?: string;
+  motif?: string;
+}
+
+export function useCorriger(courrierId: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (saisie: SaisieCorrection) =>
+      api.patch<CourrierDetail>(`/courriers/${courrierId}`, saisie),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: clesCourrier.racine });
     },

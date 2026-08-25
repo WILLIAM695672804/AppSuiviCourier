@@ -6,7 +6,10 @@ import { Encart } from "@/components/ui/Encart";
 import { Etiquette, type TonEtiquette } from "@/components/ui/Etiquette";
 import { Icone } from "@/components/ui/Icone";
 import { SqueletteCarte } from "@/components/ui/Squelette";
-import { mesDemandesQuery, type EtatDemandeUsager } from "@/features/portail/api";
+import {
+  mesDemandesQuery,
+  type EtatDemandeUsager,
+} from "@/features/portail/api";
 import { formaterDate } from "@/lib/format";
 
 /**
@@ -50,11 +53,16 @@ export function MesDemandes() {
             Mes demandes
           </h1>
           <p className="text-[13px] leading-[1.5] font-medium text-encre-faible">
-            {data?.identite ?? "—"} — vous ne voyez ici que les dossiers que vous avez déposés.
+            {data?.identite ?? "—"} — vous ne voyez ici que les dossiers que
+            vous avez déposés.
           </p>
         </div>
 
-        <Bouton variante="principal" icone="plus" onClick={() => naviguer("/portail/nouvelle")}>
+        <Bouton
+          variante="principal"
+          icone="plus"
+          onClick={() => naviguer("/portail/nouvelle")}
+        >
           Déposer une demande
         </Bouton>
       </div>
@@ -87,12 +95,16 @@ export function MesDemandes() {
               <Link
                 to={`/portail/demandes/${demande.id}`}
                 className={`flex flex-col gap-3 rounded-none border bg-surface px-5 py-4 transition-colors duration-150 hover:border-accent md:flex-row md:items-center md:gap-5 ${
-                  demande.actionAttendue ? "border-danger-trait" : "border-bordure"
+                  demande.actionAttendue
+                    ? "border-danger-trait"
+                    : "border-bordure"
                 }`}
               >
                 <span className="flex min-w-0 flex-1 flex-col gap-2">
                   <span className="flex flex-wrap items-center gap-2.5">
-                    <Etiquette ton={TONS_ETAT[demande.etat]}>{demande.etat}</Etiquette>
+                    <Etiquette ton={TONS_ETAT[demande.etat]}>
+                      {demande.etat}
+                    </Etiquette>
                     <span className="text-[11.5px] leading-none font-semibold text-encre-tenue tabular-nums">
                       {demande.reference}
                     </span>
@@ -118,7 +130,11 @@ export function MesDemandes() {
                       Action requise
                     </span>
                   )}
-                  <Icone nom="chevronDroite" taille={16} className="text-encre-tenue" />
+                  <Icone
+                    nom="chevronDroite"
+                    taille={16}
+                    className="text-encre-tenue"
+                  />
                 </span>
               </Link>
             </li>

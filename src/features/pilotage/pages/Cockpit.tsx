@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
+import { EnTeteDocument, PiedDocument } from "@/components/EnTeteDocument";
 import { EnTetePage } from "@/components/EnTetePage";
 import { BarreProgression } from "@/components/ui/BarreProgression";
 import { Bouton } from "@/components/ui/Bouton";
@@ -56,6 +57,10 @@ export function Cockpit() {
       />
 
       <div className="flex-1 overflow-y-auto bg-fond p-4 md:overflow-hidden md:p-[22px]">
+        {/* L'en-tete institutionnel n'apparait qu'a l'impression : a l'ecran,
+            la barre de titre dit deja ou l'on est. */}
+        <EnTeteDocument impressionSeule />
+
         <div className="flex h-auto flex-col gap-3 md:h-full">
           {/* Les quatre chiffres qui ouvrent la vue. */}
           <div className="grid flex-none grid-cols-2 gap-3 xl:grid-cols-4">
@@ -223,6 +228,8 @@ export function Cockpit() {
             </div>
           </div>
         </div>
+
+        <PiedDocument impressionSeule />
       </div>
     </>
   );

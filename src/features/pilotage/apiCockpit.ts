@@ -98,6 +98,7 @@ export interface TableauStructure {
   periode: string;
   rang: number | null;
   totalStructures: number;
+  /** `null` quand la structure n'est pas classée : toutes ne le sont pas. */
   scoreGlobal: number | null;
   feu: NiveauFeu;
   activites: BlocTableauStructure[];
@@ -134,26 +135,43 @@ export interface SyntheseInstance {
  *  que quatre écrans qui obligeraient à les rapprocher de tête.
  * ------------------------------------------------------------------ */
 
+/**
+ * Les quatre mesures du §3.11, et le `null` qui les accompagne.
+ *
+ * Deux d'entre elles n'ont aucune source aujourd'hui : les piliers courrier et
+ * dossiers ne sont pas en service. Elles arrivent à `null` et non à zéro — un
+ * taux à 0 % se lit comme une défaillance, se commente en séance, et rien ne le
+ * soutient. Voir l'ADR 011 et A30.
+ */
 export interface LigneCroisee {
   sigle: string;
   libelle: string;
-  /** Taux d'exécution du plan d'actions. */
-  activites: number;
-  /** Taux de courriers traités dans le délai imparti. */
-  courrier: number;
-  /** Taux de dossiers instruits dans le délai. */
-  dossiers: number;
-  /** Taux de respect des délais, toutes natures confondues. */
-  delais: number;
+  /** Taux d'activités menées à l'heure. `null` si aucune n'a commencé. */
+  activites: number | null;
+  /** Taux de courriers traités dans le délai imparti. `null` : non mesuré. */
+  courrier: number | null;
+  /** Taux de dossiers instruits dans le délai. `null` : non mesuré. */
+  dossiers: number | null;
+  /** Taux de productions déposées à l'échéance. */
+  delais: number | null;
   feu: NiveauFeu;
-  /** Écart entre la meilleure et la moins bonne des quatre mesures. */
+  /**
+   * Écart entre la meilleure et la moins bonne des mesures **disponibles**.
+   * Zéro quand il n'en reste qu'une : il n'y a alors aucune dispersion à
+   * constater, et non une dispersion nulle.
+   */
   dispersion: number;
 }
 
 export interface AnalysesCroisees {
   periode: string;
   lignes: LigneCroisee[];
-  moyennes: { activites: number; courrier: number; dossiers: number; delais: number };
+  moyennes: {
+    activites: number | null;
+    courrier: number | null;
+    dossiers: number | null;
+    delais: number | null;
+  };
   /**
    * Constats tirés des données, formulés par le serveur.
    * Ils décrivent ce qu'on voit ; ils n'expliquent rien.
@@ -177,7 +195,12 @@ export interface IndicateurProgramme {
   unite: string;
   valeurN: number | null;
   valeurN1: number | null;
-  cible: number;
+  /**
+   * `null` quand la cible n'a pas été fixée — c'est le cas des quatre
+   * indicateurs semés, faute de valeurs communiquées (A32). Zéro aurait été une
+   * cible atteinte d'avance.
+   */
+  cible: number | null;
   /** Vrai quand la cible est un plafond à ne pas dépasser. */
   cibleMaximum: boolean;
   echeance: string;
@@ -224,3 +247,16 @@ export const syntheseQuery = () =>
     queryKey: [CLE, "synthese"],
     queryFn: ({ signal }) => api.get<SyntheseInstance>("/pilotage/synthese", signal),
   });
+
+/**
+ * L'adresse d'export de la note de synthèse.
+ *
+ * Un lien, et non un `fetch` suivi d'un `Blob` — même motif que
+ * `adresseExport()` dans `apiRapports.ts`. Le cookie de session part avec la
+ * navigation, le navigateur nomme le fichier d'après l'en-tête que le serveur
+ * pose, et la sortie de données passe par le serveur, qui l'inscrit au journal
+ * des accès. Un document assemblé côté client n'aurait laissé aucune trace.
+ */
+export function adresseExportSynthese(format: "pdf" | "docx"): string {
+  return `/api/pilotage/synthese/export?format=${format}`;
+}

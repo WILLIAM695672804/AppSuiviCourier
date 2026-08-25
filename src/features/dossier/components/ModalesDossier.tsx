@@ -55,7 +55,10 @@ export function ModaleDemanderComplement({
   }
 
   const envoyer = handleSubmit((valeurs) => {
-    demander.mutate({ dossierId: dossier.id, ...valeurs }, { onSuccess: fermer });
+    demander.mutate(
+      { dossierId: dossier.id, ...valeurs },
+      { onSuccess: fermer },
+    );
   });
 
   return (
@@ -72,8 +75,8 @@ export function ModaleDemanderComplement({
       largeur={600}
     >
       <Encart ton="alerte" icone="horloge">
-        Demander un complément ne suspend pas le délai d'instruction. Le dossier reste dû au{" "}
-        {dossier.echeance}, que le demandeur réponde ou non.
+        Demander un complément ne suspend pas le délai d'instruction. Le dossier
+        reste dû au {dossier.echeance}, que le demandeur réponde ou non.
       </Encart>
 
       <ChampTexteLong
@@ -88,7 +91,9 @@ export function ModaleDemanderComplement({
         libelle="Attendu pour le"
         aide="Passée cette date sans réponse, le dossier peut être clos sans suite."
         erreur={errors.echeance?.message}
-        {...register("echeance", { required: "Fixez une échéance au demandeur." })}
+        {...register("echeance", {
+          required: "Fixez une échéance au demandeur.",
+        })}
       />
     </ModaleFormulaire>
   );
@@ -125,7 +130,10 @@ export function ModaleRetourEtape({
   }
 
   const envoyer = handleSubmit((valeurs) => {
-    retourner.mutate({ dossierId: dossier.id, ...valeurs }, { onSuccess: fermer });
+    retourner.mutate(
+      { dossierId: dossier.id, ...valeurs },
+      { onSuccess: fermer },
+    );
   });
 
   return (
@@ -137,25 +145,31 @@ export function ModaleRetourEtape({
       sousTitre={`${dossier.reference} — actuellement en ${dossier.etape.toLowerCase()}`}
       libelleEnvoi="Retourner le dossier"
       enCours={retourner.isPending}
-      erreur={retourner.isError ? "Le retour n'a pas pu être enregistré." : null}
+      erreur={
+        retourner.isError ? "Le retour n'a pas pu être enregistré." : null
+      }
       consequence="Rien n'est effacé : le premier passage reste à l'historique."
       largeur={600}
     >
       <Encart ton="accent" icone="horloge">
-        Le retour ne supprime aucune trace. Les étapes déjà franchies restent au dossier avec leur
-        acteur et leur date ; seul leur état repasse à « non franchie ».
+        Le retour ne supprime aucune trace. Les étapes déjà franchies restent au
+        dossier avec leur acteur et leur date ; seul leur état repasse à « non
+        franchie ».
       </Encart>
 
       {cibles.length === 0 ? (
         <p className="text-[12px] leading-[1.5] font-medium text-encre-tenue">
-          Aucune étape antérieure n'a encore été franchie : ce dossier ne peut pas être retourné.
+          Aucune étape antérieure n'a encore été franchie : ce dossier ne peut
+          pas être retourné.
         </p>
       ) : (
         <Liste
           libelle="Retourner à"
           options={cibles}
           erreur={errors.etapeCible?.message}
-          {...register("etapeCible", { required: "Choisissez l'étape de retour." })}
+          {...register("etapeCible", {
+            required: "Choisissez l'étape de retour.",
+          })}
         />
       )}
 
@@ -166,7 +180,10 @@ export function ModaleRetourEtape({
         erreur={errors.motif?.message}
         {...register("motif", {
           required: "Le motif est obligatoire.",
-          minLength: { value: 15, message: "Soyez explicite : quinze caractères au minimum." },
+          minLength: {
+            value: 15,
+            message: "Soyez explicite : quinze caractères au minimum.",
+          },
         })}
       />
     </ModaleFormulaire>
@@ -192,7 +209,10 @@ export function ModaleFusion({
 
   /** Aperçu : les variables renseignées sont remplacées, les autres restent visibles. */
   const apercu = modele
-    ? modele.corps.replace(/\{\{(\w+)\}\}/g, (_, nom: string) => valeurs[nom]?.trim() || `{{${nom}}}`)
+    ? modele.corps.replace(
+        /\{\{(\w+)\}\}/g,
+        (_, nom: string) => valeurs[nom]?.trim() || `{{${nom}}}`,
+      )
     : "";
   const manquantes = modele
     ? modele.variables.filter((variable) => !valeurs[variable]?.trim())
@@ -211,7 +231,10 @@ export function ModaleFusion({
       onFermer={fermer}
       onEnvoyer={() => {
         if (!modele) return;
-        fusionner.mutate({ dossierId: dossier.id, modeleId: modele.id, valeurs }, { onSuccess: fermer });
+        fusionner.mutate(
+          { dossierId: dossier.id, modeleId: modele.id, valeurs },
+          { onSuccess: fermer },
+        );
       }}
       titre="Générer un courrier-type"
       sousTitre={`${dossier.reference} — ${dossier.demandeur}`}
@@ -224,7 +247,10 @@ export function ModaleFusion({
       <Liste
         libelle="Modèle"
         invite="Choisir un modèle…"
-        options={modeles.map((m) => ({ valeur: String(m.id), libelle: `${m.code} — ${m.libelle}` }))}
+        options={modeles.map((m) => ({
+          valeur: String(m.id),
+          libelle: `${m.code} — ${m.libelle}`,
+        }))}
         value={modeleId === null ? "" : String(modeleId)}
         onChange={(e) => {
           setModeleId(e.target.value ? Number(e.target.value) : null);
@@ -245,7 +271,10 @@ export function ModaleFusion({
                 libelle={variable}
                 value={valeurs[variable] ?? ""}
                 onChange={(e) =>
-                  setValeurs((actuelles) => ({ ...actuelles, [variable]: e.target.value }))
+                  setValeurs((actuelles) => ({
+                    ...actuelles,
+                    [variable]: e.target.value,
+                  }))
                 }
               />
             ))}
@@ -253,16 +282,19 @@ export function ModaleFusion({
 
           {manquantes.length > 0 && (
             <Encart ton="alerte" icone="horloge">
-              {manquantes.length} variable{manquantes.length > 1 ? "s" : ""} non renseignée
+              {manquantes.length} variable{manquantes.length > 1 ? "s" : ""} non
+              renseignée
               {manquantes.length > 1 ? "s" : ""} : {manquantes.join(", ")}. Elle
               {manquantes.length > 1 ? "s apparaîtront" : " apparaîtra"} telle
-              {manquantes.length > 1 ? "s" : ""} quelle{manquantes.length > 1 ? "s" : ""} dans le
-              courrier produit.
+              {manquantes.length > 1 ? "s" : ""} quelle
+              {manquantes.length > 1 ? "s" : ""} dans le courrier produit.
             </Encart>
           )}
 
           <div className="flex flex-col gap-[7px]">
-            <span className="text-[11px] leading-none font-semibold text-encre-faible">Aperçu</span>
+            <span className="text-[11px] leading-none font-semibold text-encre-faible">
+              Aperçu
+            </span>
             <div className="max-h-[220px] overflow-y-auto rounded-none border border-bordure bg-surface-douce px-3.5 py-3">
               <p className="text-[11.5px] leading-[1.65] font-medium whitespace-pre-line text-encre-douce">
                 {apercu}

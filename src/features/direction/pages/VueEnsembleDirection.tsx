@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { EnTeteDocument, PiedDocument } from "@/components/EnTeteDocument";
 import { EnTetePage } from "@/components/EnTetePage";
 import { BandeReperes } from "@/components/ui/BandeReperes";
 import { Bouton } from "@/components/ui/Bouton";
@@ -51,6 +52,10 @@ export function VueEnsembleDirection() {
       />
 
       <div className="flex-1 overflow-y-auto bg-fond p-4 md:p-[22px]">
+        {/* L'en-tete institutionnel n'apparait qu'a l'impression : a l'ecran,
+            la barre de titre dit deja ou l'on est. */}
+        <EnTeteDocument impressionSeule />
+
         <div className="flex flex-col gap-3.5">
           <BandeReperes reperes={reperes} />
 
@@ -68,20 +73,22 @@ export function VueEnsembleDirection() {
               )}
             </PanneauGraphe>
 
-            <PanneauGraphe titre="Cinq structures les plus chargées">
+            <PanneauGraphe titre="Cinq structures les plus avancées">
               {data && (
                 <GrapheRepartition
-                  parts={data.chargeParStructure}
-                  libelleTotal="courriers en cours"
+                  parts={data.executionParStructure}
+                  libelleTotal="points d'exécution"
                 />
               )}
             </PanneauGraphe>
 
-            <PanneauGraphe titre="Cinq correspondants les plus émetteurs">
+            {/* Les structures sans retard n'y figurent pas : un histogramme de
+                retards ne se lit que par ce qu'il montre. */}
+            <PanneauGraphe titre="Cinq structures les plus en retard">
               {data && (
                 <GrapheRepartition
-                  parts={data.volumeParCorrespondant}
-                  libelleTotal="courriers reçus"
+                  parts={data.retardsParStructure}
+                  libelleTotal="productions en retard"
                 />
               )}
             </PanneauGraphe>
@@ -223,6 +230,8 @@ export function VueEnsembleDirection() {
             </PanneauGraphe>
           </div>
         </div>
+
+        <PiedDocument impressionSeule />
       </div>
     </>
   );

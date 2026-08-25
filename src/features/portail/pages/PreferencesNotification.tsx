@@ -34,8 +34,15 @@ const CANAUX: { valeur: CanalNotification; libelle: string }[] = [
   { valeur: "Portail seulement", libelle: "Portail seulement" },
 ];
 
-/** Événements que l'usager ne peut pas couper. */
-const OBLIGATOIRES = ["complement", "decision"];
+/*
+ * La liste des événements non désactivables ne vit plus ici.
+ *
+ * Elle était en dur — `["complement", "decision"]` — et le serveur, lui, la
+ * porte en base avec la colonne `obligatoire`. Deux listes pour une seule
+ * règle, c'est une divergence qui attend son heure : un troisième événement
+ * rendu obligatoire par le métier aurait été grisé côté serveur et coché
+ * côté écran. La règle est désormais lue, pas répétée.
+ */
 
 export function PreferencesNotification() {
   const { data } = useQuery(preferencesQuery());
@@ -63,10 +70,16 @@ export function PreferencesNotification() {
     actifs: (data?.evenements ?? []).filter((e) => e.actif).map((e) => e.cle),
   };
 
-  const modifier = (champs: Partial<typeof valeurs>) => setBrouillon({ ...valeurs, ...champs });
+  const modifier = (champs: Partial<typeof valeurs>) =>
+    setBrouillon({ ...valeurs, ...champs });
+
+  /** Les clés que le serveur déclare non désactivables. */
+  const obligatoires = (data?.evenements ?? [])
+    .filter((e) => e.obligatoire)
+    .map((e) => e.cle);
 
   function basculer(cle: string) {
-    if (OBLIGATOIRES.includes(cle)) return;
+    if (obligatoires.includes(cle)) return;
     modifier({
       actifs: valeurs.actifs.includes(cle)
         ? valeurs.actifs.filter((c) => c !== cle)
@@ -123,15 +136,16 @@ export function PreferencesNotification() {
 
           {valeurs.canal === "SMS" && !valeurs.telephone.trim() && (
             <Encart ton="alerte" icone="cloche">
-              Renseignez un numéro de téléphone, sans quoi aucune notification ne pourra vous
-              parvenir.
+              Renseignez un numéro de téléphone, sans quoi aucune notification
+              ne pourra vous parvenir.
             </Encart>
           )}
 
           {valeurs.canal === "Portail seulement" && (
             <Encart ton="alerte" icone="horloge">
-              Vous ne serez averti nulle part ailleurs : il vous faudra revenir sur ce portail pour
-              savoir où en sont vos dossiers. Les délais courent malgré tout.
+              Vous ne serez averti nulle part ailleurs : il vous faudra revenir
+              sur ce portail pour savoir où en sont vos dossiers. Les délais
+              courent malgré tout.
             </Encart>
           )}
         </div>
@@ -140,7 +154,7 @@ export function PreferencesNotification() {
       <Carte titre="Ce dont vous voulez être averti">
         <ul className="mt-4 flex flex-col gap-1">
           {(data?.evenements ?? []).map((evenement) => {
-            const obligatoire = OBLIGATOIRES.includes(evenement.cle);
+            const obligatoire = evenement.obligatoire;
 
             return (
               <li
@@ -157,8 +171,9 @@ export function PreferencesNotification() {
                 />
                 {obligatoire && (
                   <span className="pl-7 text-[11px] leading-[1.5] font-medium text-encre-tenue">
-                    Cette notification ne peut pas être désactivée : c'est un moment où le silence
-                    peut vous faire perdre le bénéfice de votre dossier.
+                    Cette notification ne peut pas être désactivée : c'est un
+                    moment où le silence peut vous faire perdre le bénéfice de
+                    votre dossier.
                   </span>
                 )}
               </li>
@@ -177,11 +192,13 @@ export function PreferencesNotification() {
               courriel: valeurs.courriel,
               telephone: valeurs.telephone.trim() || null,
               canal: valeurs.canal,
-              evenements: [...new Set([...valeurs.actifs, ...OBLIGATOIRES])],
+              evenements: [...new Set([...valeurs.actifs, ...obligatoires])],
             })
           }
         >
-          {enregistrer.isPending ? "Enregistrement…" : "Enregistrer mes préférences"}
+          {enregistrer.isPending
+            ? "Enregistrement…"
+            : "Enregistrer mes préférences"}
         </Bouton>
       </div>
     </div>

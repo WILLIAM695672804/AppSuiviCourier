@@ -35,15 +35,61 @@ export const DECISIONS_DEMO: DecisionDetail[] = [
       "Le Conseil constate la lenteur des circuits papier et demande un schéma directeur chiffré, assorti d'un calendrier de déploiement par direction.",
     origine: { type: "Session", libelle: "Session du CA du 26 juin 2026", id: 2 },
     structures: [
-      { id: 7, sigle: "DSI", libelle: "Direction des systèmes d'information", pilote: true, avancement: 70 },
-      { id: 3, sigle: "DAF", libelle: "Direction des affaires financières", pilote: false, avancement: 55 },
-      { id: 9, sigle: "CDA", libelle: "Centre de la documentation et des archives", pilote: false, avancement: 60 },
+      {
+        id: 7,
+        sigle: "DSI",
+        libelle: "Direction des systèmes d'information",
+        pilote: true,
+        avancement: 70,
+      },
+      {
+        id: 3,
+        sigle: "DAF",
+        libelle: "Direction des affaires financières",
+        pilote: false,
+        avancement: 55,
+      },
+      {
+        id: 9,
+        sigle: "CDA",
+        libelle: "Centre de la documentation et des archives",
+        pilote: false,
+        avancement: 60,
+      },
     ],
     jalons: [
-      { id: 1, libelle: "Cartographie des flux existants", echeance: "2026-07-15", fait: true, dateRealisation: "2026-07-11", structure: "DSI" },
-      { id: 2, libelle: "Chiffrage et arbitrage budgétaire", echeance: "2026-08-15", fait: true, dateRealisation: "2026-08-04", structure: "DAF" },
-      { id: 3, libelle: "Référentiel de conservation validé", echeance: "2026-09-05", fait: false, dateRealisation: null, structure: "CDA" },
-      { id: 4, libelle: "Présentation au CODIR", echeance: "2026-09-25", fait: false, dateRealisation: null, structure: "DSI" },
+      {
+        id: 1,
+        libelle: "Cartographie des flux existants",
+        echeance: "2026-07-15",
+        fait: true,
+        dateRealisation: "2026-07-11",
+        structure: "DSI",
+      },
+      {
+        id: 2,
+        libelle: "Chiffrage et arbitrage budgétaire",
+        echeance: "2026-08-15",
+        fait: true,
+        dateRealisation: "2026-08-04",
+        structure: "DAF",
+      },
+      {
+        id: 3,
+        libelle: "Référentiel de conservation validé",
+        echeance: "2026-09-05",
+        fait: false,
+        dateRealisation: null,
+        structure: "CDA",
+      },
+      {
+        id: 4,
+        libelle: "Présentation au CODIR",
+        echeance: "2026-09-25",
+        fait: false,
+        dateRealisation: null,
+        structure: "DSI",
+      },
     ],
     observations: [
       {
@@ -52,7 +98,8 @@ export const DECISIONS_DEMO: DecisionDetail[] = [
         initiales: "FN",
         poste: "Chef de la DSR",
         date: "2026-07-30",
-        texte: "Relance adressée au CDA : le référentiel de conservation conditionne les deux jalons suivants.",
+        texte:
+          "Relance adressée au CDA : le référentiel de conservation conditionne les deux jalons suivants.",
         relance: true,
       },
       {
@@ -66,8 +113,18 @@ export const DECISIONS_DEMO: DecisionDetail[] = [
       },
     ],
     retombees: [
-      { type: "Courrier", libelle: "Note de cadrage aux directions", reference: "0284/2026", chemin: "/courriers/1" },
-      { type: "Activité", libelle: "Déploiement pilote au bureau d'ordre", reference: "PAA-DSI-07", chemin: null },
+      {
+        type: "Courrier",
+        libelle: "Note de cadrage aux directions",
+        reference: "0284/2026",
+        chemin: "/courriers/1",
+      },
+      {
+        type: "Activité",
+        libelle: "Déploiement pilote au bureau d'ordre",
+        reference: "PAA-DSI-07",
+        chemin: null,
+      },
     ],
   },
   {
@@ -84,15 +141,46 @@ export const DECISIONS_DEMO: DecisionDetail[] = [
     relances: 3,
     contexte:
       "Instruction donnée en réunion de coordination : le délai constaté de transmission dépasse cinq jours sur certaines directions, ce qui vide la cotation de son sens.",
-    origine: { type: "Instruction verbale", libelle: "Réunion de coordination du 3 août 2026", id: 1 },
+    origine: {
+      type: "Instruction verbale",
+      libelle: "Réunion de coordination du 3 août 2026",
+      id: 1,
+    },
     structures: [
       { id: 6, sigle: "SCC", libelle: "Service du courrier central", pilote: true, avancement: 35 },
-      { id: 15, sigle: "DSR", libelle: "Division du suivi et de la relance", pilote: false, avancement: 15 },
+      {
+        id: 15,
+        sigle: "DSR",
+        libelle: "Division du suivi et de la relance",
+        pilote: false,
+        avancement: 15,
+      },
     ],
     jalons: [
-      { id: 5, libelle: "Diagnostic des délais par direction", echeance: "2026-08-10", fait: true, dateRealisation: "2026-08-09", structure: "DSR" },
-      { id: 6, libelle: "Réorganisation des tournées du coursier", echeance: "2026-08-18", fait: false, dateRealisation: null, structure: "SCC" },
-      { id: 7, libelle: "Consigne écrite aux structures", echeance: "2026-08-20", fait: false, dateRealisation: null, structure: "SCC" },
+      {
+        id: 5,
+        libelle: "Diagnostic des délais par direction",
+        echeance: "2026-08-10",
+        fait: true,
+        dateRealisation: "2026-08-09",
+        structure: "DSR",
+      },
+      {
+        id: 6,
+        libelle: "Réorganisation des tournées du coursier",
+        echeance: "2026-08-18",
+        fait: false,
+        dateRealisation: null,
+        structure: "SCC",
+      },
+      {
+        id: 7,
+        libelle: "Consigne écrite aux structures",
+        echeance: "2026-08-20",
+        fait: false,
+        dateRealisation: null,
+        structure: "SCC",
+      },
     ],
     observations: [
       {
@@ -101,7 +189,8 @@ export const DECISIONS_DEMO: DecisionDetail[] = [
         initiales: "FN",
         poste: "Chef de la DSR",
         date: "2026-08-05",
-        texte: "Troisième relance au SCC. Sans réorganisation des tournées, l'échéance du 20 août ne sera pas tenue.",
+        texte:
+          "Troisième relance au SCC. Sans réorganisation des tournées, l'échéance du 20 août ne sera pas tenue.",
         relance: true,
       },
     ],
@@ -123,11 +212,31 @@ export const DECISIONS_DEMO: DecisionDetail[] = [
       "Le comité constate que quatre directions ne tiennent pas de réunion de service et demande la généralisation, avec dépôt du compte rendu dans les cinq jours.",
     origine: { type: "Réunion", libelle: "CODIR du 12 juin 2026", id: 3 },
     structures: [
-      { id: 15, sigle: "DSR", libelle: "Division du suivi et de la relance", pilote: true, avancement: 100 },
+      {
+        id: 15,
+        sigle: "DSR",
+        libelle: "Division du suivi et de la relance",
+        pilote: true,
+        avancement: 100,
+      },
     ],
     jalons: [
-      { id: 8, libelle: "Note de rappel aux directions", echeance: "2026-06-25", fait: true, dateRealisation: "2026-06-20", structure: "DSR" },
-      { id: 9, libelle: "Premier relevé de conformité", echeance: "2026-07-31", fait: true, dateRealisation: "2026-07-28", structure: "DSR" },
+      {
+        id: 8,
+        libelle: "Note de rappel aux directions",
+        echeance: "2026-06-25",
+        fait: true,
+        dateRealisation: "2026-06-20",
+        structure: "DSR",
+      },
+      {
+        id: 9,
+        libelle: "Premier relevé de conformité",
+        echeance: "2026-07-31",
+        fait: true,
+        dateRealisation: "2026-07-28",
+        structure: "DSR",
+      },
     ],
     observations: [
       {
@@ -141,7 +250,12 @@ export const DECISIONS_DEMO: DecisionDetail[] = [
       },
     ],
     retombees: [
-      { type: "Courrier", libelle: "Note de rappel aux directions", reference: "0231/2026", chemin: "/courriers/2" },
+      {
+        type: "Courrier",
+        libelle: "Note de rappel aux directions",
+        reference: "0231/2026",
+        chemin: "/courriers/2",
+      },
     ],
   },
   {
@@ -158,14 +272,44 @@ export const DECISIONS_DEMO: DecisionDetail[] = [
     relances: 1,
     contexte:
       "Les remontées d'activité sont irrégulières faute d'interlocuteur identifié dans chaque structure.",
-    origine: { type: "Instruction verbale", libelle: "Réunion de coordination du 22 juillet 2026", id: 4 },
+    origine: {
+      type: "Instruction verbale",
+      libelle: "Réunion de coordination du 22 juillet 2026",
+      id: 4,
+    },
     structures: [
-      { id: 15, sigle: "DSR", libelle: "Division du suivi et de la relance", pilote: true, avancement: 80 },
-      { id: 11, sigle: "DRH", libelle: "Direction des ressources humaines", pilote: false, avancement: 70 },
+      {
+        id: 15,
+        sigle: "DSR",
+        libelle: "Division du suivi et de la relance",
+        pilote: true,
+        avancement: 80,
+      },
+      {
+        id: 11,
+        sigle: "DRH",
+        libelle: "Direction des ressources humaines",
+        pilote: false,
+        avancement: 70,
+      },
     ],
     jalons: [
-      { id: 10, libelle: "Modèle de désignation diffusé", echeance: "2026-07-30", fait: true, dateRealisation: "2026-07-29", structure: "DSR" },
-      { id: 11, libelle: "Retour des douze directions", echeance: "2026-08-15", fait: false, dateRealisation: null, structure: "DRH" },
+      {
+        id: 10,
+        libelle: "Modèle de désignation diffusé",
+        echeance: "2026-07-30",
+        fait: true,
+        dateRealisation: "2026-07-29",
+        structure: "DSR",
+      },
+      {
+        id: 11,
+        libelle: "Retour des douze directions",
+        echeance: "2026-08-15",
+        fait: false,
+        dateRealisation: null,
+        structure: "DRH",
+      },
     ],
     observations: [
       {
@@ -228,12 +372,38 @@ export const DECISIONS_DEMO: DecisionDetail[] = [
       "Le comité demande une restitution mensuelle homogène, alimentée par la matrice de scoring administratif.",
     origine: { type: "Réunion", libelle: "CODIR du 10 juillet 2026", id: 5 },
     structures: [
-      { id: 15, sigle: "DSR", libelle: "Division du suivi et de la relance", pilote: true, avancement: 0 },
-      { id: 12, sigle: "DCG", libelle: "Direction du contrôle de gestion", pilote: false, avancement: 0 },
+      {
+        id: 15,
+        sigle: "DSR",
+        libelle: "Division du suivi et de la relance",
+        pilote: true,
+        avancement: 0,
+      },
+      {
+        id: 12,
+        sigle: "DCG",
+        libelle: "Direction du contrôle de gestion",
+        pilote: false,
+        avancement: 0,
+      },
     ],
     jalons: [
-      { id: 12, libelle: "Maquette du rapport validée", echeance: "2026-08-25", fait: false, dateRealisation: null, structure: "DCG" },
-      { id: 13, libelle: "Première publication", echeance: "2026-09-10", fait: false, dateRealisation: null, structure: "DSR" },
+      {
+        id: 12,
+        libelle: "Maquette du rapport validée",
+        echeance: "2026-08-25",
+        fait: false,
+        dateRealisation: null,
+        structure: "DCG",
+      },
+      {
+        id: 13,
+        libelle: "Première publication",
+        echeance: "2026-09-10",
+        fait: false,
+        dateRealisation: null,
+        structure: "DSR",
+      },
     ],
     observations: [],
     retombees: [],
@@ -255,23 +425,64 @@ export const SEANCES_DEMO: SeanceDetail[] = [
     decisionsIssues: 3,
     structure: "Direction générale",
     ordreDuJour: [
-      { id: 1, rang: 1, point: "Délais de transmission des courriers cotés", rapporteur: "F. Ngo Bell" },
-      { id: 2, rang: 2, point: "Avancement du schéma directeur de dématérialisation", rapporteur: "T. Owona" },
-      { id: 3, rang: 3, point: "Préparation de la session du CA de septembre", rapporteur: "F. Ngo Bell" },
+      {
+        id: 1,
+        rang: 1,
+        point: "Délais de transmission des courriers cotés",
+        rapporteur: "F. Ngo Bell",
+      },
+      {
+        id: 2,
+        rang: 2,
+        point: "Avancement du schéma directeur de dématérialisation",
+        rapporteur: "T. Owona",
+      },
+      {
+        id: 3,
+        rang: 3,
+        point: "Préparation de la session du CA de septembre",
+        rapporteur: "F. Ngo Bell",
+      },
     ],
     documents: [
-      { id: 1, nature: "Ordre du jour", libelle: "Ordre du jour du 3 août 2026", depose: true, dateDepot: "2026-08-01", poids: "82 Ko", deposePar: "F. Ngo Bell" },
-      { id: 2, nature: "Compte rendu", libelle: "Compte rendu de la réunion", depose: true, dateDepot: "2026-08-05", poids: "310 Ko", deposePar: "F. Ngo Bell" },
+      {
+        id: 1,
+        nature: "Ordre du jour",
+        libelle: "Ordre du jour du 3 août 2026",
+        depose: true,
+        dateDepot: "2026-08-01",
+        poids: "82 Ko",
+        deposePar: "F. Ngo Bell",
+      },
+      {
+        id: 2,
+        nature: "Compte rendu",
+        libelle: "Compte rendu de la réunion",
+        depose: true,
+        dateDepot: "2026-08-05",
+        poids: "310 Ko",
+        deposePar: "F. Ngo Bell",
+      },
     ],
     presents: [
       { nom: "N'Guessan Y.", initiales: "NY", poste: "Directeur général", present: true },
-      { nom: "P. Etoundi", initiales: "PE", poste: "Directeur des affaires financières", present: true },
+      {
+        nom: "P. Etoundi",
+        initiales: "PE",
+        poste: "Directeur des affaires financières",
+        present: true,
+      },
       { nom: "F. Ngo Bell", initiales: "FN", poste: "Chef de la DSR", present: true },
       { nom: "T. Owona", initiales: "TO", poste: "Administrateur technique", present: true },
       { nom: "C. Abena", initiales: "CA", poste: "Contrôleur de gestion", present: false },
     ],
     decisions: [
-      { id: 2, reference: "DG-2026-041", objet: "Réduire à 48 heures le délai de transmission", etat: "En retard" },
+      {
+        id: 2,
+        reference: "DG-2026-041",
+        objet: "Réduire à 48 heures le délai de transmission",
+        etat: "En retard",
+      },
     ],
   },
   {
@@ -288,13 +499,39 @@ export const SEANCES_DEMO: SeanceDetail[] = [
     decisionsIssues: 14,
     structure: "Conseil d'administration",
     ordreDuJour: [
-      { id: 4, rang: 1, point: "Exécution budgétaire au premier semestre", rapporteur: "P. Etoundi" },
+      {
+        id: 4,
+        rang: 1,
+        point: "Exécution budgétaire au premier semestre",
+        rapporteur: "P. Etoundi",
+      },
       { id: 5, rang: 2, point: "Schéma directeur de dématérialisation", rapporteur: "T. Owona" },
-      { id: 6, rang: 3, point: "Projet d'extension du terminal", rapporteur: "Direction des travaux" },
+      {
+        id: 6,
+        rang: 3,
+        point: "Projet d'extension du terminal",
+        rapporteur: "Direction des travaux",
+      },
     ],
     documents: [
-      { id: 3, nature: "Dossier de séance", libelle: "Dossier de la 2ᵉ session ordinaire", depose: true, dateDepot: "2026-06-19", poids: "4,2 Mo", deposePar: "F. Ngo Bell" },
-      { id: 4, nature: "Procès-verbal", libelle: "Procès-verbal de la session", depose: true, dateDepot: "2026-07-08", poids: "1,1 Mo", deposePar: "F. Ngo Bell" },
+      {
+        id: 3,
+        nature: "Dossier de séance",
+        libelle: "Dossier de la 2ᵉ session ordinaire",
+        depose: true,
+        dateDepot: "2026-06-19",
+        poids: "4,2 Mo",
+        deposePar: "F. Ngo Bell",
+      },
+      {
+        id: 4,
+        nature: "Procès-verbal",
+        libelle: "Procès-verbal de la session",
+        depose: true,
+        dateDepot: "2026-07-08",
+        poids: "1,1 Mo",
+        deposePar: "F. Ngo Bell",
+      },
     ],
     presents: [
       { nom: "Président du Conseil", initiales: "PC", poste: "Président", present: true },
@@ -302,8 +539,18 @@ export const SEANCES_DEMO: SeanceDetail[] = [
       { nom: "F. Ngo Bell", initiales: "FN", poste: "Chef de la DSR — secrétariat", present: true },
     ],
     decisions: [
-      { id: 1, reference: "CA-2026-014", objet: "Adopter le schéma directeur de dématérialisation", etat: "En cours" },
-      { id: 5, reference: "CA-2026-011", objet: "Suspendre le projet d'extension du terminal", etat: "Suspendue" },
+      {
+        id: 1,
+        reference: "CA-2026-014",
+        objet: "Adopter le schéma directeur de dématérialisation",
+        etat: "En cours",
+      },
+      {
+        id: 5,
+        reference: "CA-2026-011",
+        objet: "Suspendre le projet d'extension du terminal",
+        etat: "Suspendue",
+      },
     ],
   },
   {
@@ -324,16 +571,42 @@ export const SEANCES_DEMO: SeanceDetail[] = [
       { id: 8, rang: 2, point: "Classement mensuel des structures", rapporteur: "C. Abena" },
     ],
     documents: [
-      { id: 5, nature: "Ordre du jour", libelle: "Ordre du jour du CODIR de juin", depose: true, dateDepot: "2026-06-10", poids: "64 Ko", deposePar: "F. Ngo Bell" },
-      { id: 6, nature: "Compte rendu", libelle: "Compte rendu du CODIR de juin", depose: true, dateDepot: "2026-06-16", poids: "428 Ko", deposePar: "F. Ngo Bell" },
+      {
+        id: 5,
+        nature: "Ordre du jour",
+        libelle: "Ordre du jour du CODIR de juin",
+        depose: true,
+        dateDepot: "2026-06-10",
+        poids: "64 Ko",
+        deposePar: "F. Ngo Bell",
+      },
+      {
+        id: 6,
+        nature: "Compte rendu",
+        libelle: "Compte rendu du CODIR de juin",
+        depose: true,
+        dateDepot: "2026-06-16",
+        poids: "428 Ko",
+        deposePar: "F. Ngo Bell",
+      },
     ],
     presents: [
       { nom: "N'Guessan Y.", initiales: "NY", poste: "Directeur général", present: true },
-      { nom: "P. Etoundi", initiales: "PE", poste: "Directeur des affaires financières", present: true },
+      {
+        nom: "P. Etoundi",
+        initiales: "PE",
+        poste: "Directeur des affaires financières",
+        present: true,
+      },
       { nom: "F. Ngo Bell", initiales: "FN", poste: "Chef de la DSR — secrétariat", present: true },
     ],
     decisions: [
-      { id: 3, reference: "CODIR-2026-088", objet: "Généraliser la tenue mensuelle des réunions de service", etat: "Exécutée" },
+      {
+        id: 3,
+        reference: "CODIR-2026-088",
+        objet: "Généraliser la tenue mensuelle des réunions de service",
+        etat: "Exécutée",
+      },
     ],
   },
   {
@@ -350,18 +623,44 @@ export const SEANCES_DEMO: SeanceDetail[] = [
     decisionsIssues: 2,
     structure: "Direction générale",
     ordreDuJour: [
-      { id: 9, rang: 1, point: "Alimentation des tableaux de bord par les structures", rapporteur: "F. Ngo Bell" },
+      {
+        id: 9,
+        rang: 1,
+        point: "Alimentation des tableaux de bord par les structures",
+        rapporteur: "F. Ngo Bell",
+      },
     ],
     documents: [
-      { id: 7, nature: "Ordre du jour", libelle: "Ordre du jour du 22 juillet 2026", depose: true, dateDepot: "2026-07-21", poids: "58 Ko", deposePar: "F. Ngo Bell" },
-      { id: 8, nature: "Compte rendu", libelle: "Compte rendu de la réunion", depose: true, dateDepot: "2026-08-02", poids: "266 Ko", deposePar: "F. Ngo Bell" },
+      {
+        id: 7,
+        nature: "Ordre du jour",
+        libelle: "Ordre du jour du 22 juillet 2026",
+        depose: true,
+        dateDepot: "2026-07-21",
+        poids: "58 Ko",
+        deposePar: "F. Ngo Bell",
+      },
+      {
+        id: 8,
+        nature: "Compte rendu",
+        libelle: "Compte rendu de la réunion",
+        depose: true,
+        dateDepot: "2026-08-02",
+        poids: "266 Ko",
+        deposePar: "F. Ngo Bell",
+      },
     ],
     presents: [
       { nom: "N'Guessan Y.", initiales: "NY", poste: "Directeur général", present: true },
       { nom: "F. Ngo Bell", initiales: "FN", poste: "Chef de la DSR", present: true },
     ],
     decisions: [
-      { id: 4, reference: "DG-2026-039", objet: "Désigner un point focal par direction", etat: "En cours" },
+      {
+        id: 4,
+        reference: "DG-2026-039",
+        objet: "Désigner un point focal par direction",
+        etat: "En cours",
+      },
     ],
   },
   {
@@ -378,19 +677,45 @@ export const SEANCES_DEMO: SeanceDetail[] = [
     decisionsIssues: 6,
     structure: "Comité de direction",
     ordreDuJour: [
-      { id: 10, rang: 1, point: "Rapport mensuel de performance par direction", rapporteur: "C. Abena" },
+      {
+        id: 10,
+        rang: 1,
+        point: "Rapport mensuel de performance par direction",
+        rapporteur: "C. Abena",
+      },
       { id: 11, rang: 2, point: "Suivi des décisions du CA de juin", rapporteur: "F. Ngo Bell" },
     ],
     documents: [
-      { id: 9, nature: "Ordre du jour", libelle: "Ordre du jour du CODIR de juillet", depose: true, dateDepot: "2026-07-08", poids: "61 Ko", deposePar: "F. Ngo Bell" },
-      { id: 10, nature: "Compte rendu", libelle: "Compte rendu du CODIR de juillet", depose: false, dateDepot: null, poids: null, deposePar: null },
+      {
+        id: 9,
+        nature: "Ordre du jour",
+        libelle: "Ordre du jour du CODIR de juillet",
+        depose: true,
+        dateDepot: "2026-07-08",
+        poids: "61 Ko",
+        deposePar: "F. Ngo Bell",
+      },
+      {
+        id: 10,
+        nature: "Compte rendu",
+        libelle: "Compte rendu du CODIR de juillet",
+        depose: false,
+        dateDepot: null,
+        poids: null,
+        deposePar: null,
+      },
     ],
     presents: [
       { nom: "N'Guessan Y.", initiales: "NY", poste: "Directeur général", present: true },
       { nom: "C. Abena", initiales: "CA", poste: "Contrôleur de gestion", present: true },
     ],
     decisions: [
-      { id: 6, reference: "CODIR-2026-091", objet: "Publier un rapport mensuel de performance", etat: "À lancer" },
+      {
+        id: 6,
+        reference: "CODIR-2026-091",
+        objet: "Publier un rapport mensuel de performance",
+        etat: "À lancer",
+      },
     ],
   },
   {
@@ -408,7 +733,15 @@ export const SEANCES_DEMO: SeanceDetail[] = [
     structure: "DAF — Direction des affaires financières",
     ordreDuJour: [],
     documents: [
-      { id: 11, nature: "Rapport", libelle: "Rapport d'activité de juillet", depose: false, dateDepot: null, poids: null, deposePar: null },
+      {
+        id: 11,
+        nature: "Rapport",
+        libelle: "Rapport d'activité de juillet",
+        depose: false,
+        dateDepot: null,
+        poids: null,
+        deposePar: null,
+      },
     ],
     presents: [],
     decisions: [],

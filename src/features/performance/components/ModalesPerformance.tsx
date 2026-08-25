@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { useForm, useWatch } from "react-hook-form";
 import { Champ, Liste } from "@/components/ui/Champ";
 import { ChampTexteLong } from "@/components/ui/ChampTexteLong";
@@ -5,6 +6,7 @@ import { Encart } from "@/components/ui/Encart";
 import { Interrupteur } from "@/components/ui/Interrupteur";
 import { ModaleFormulaire } from "@/components/ui/ModaleFormulaire";
 import {
+  dictionnaireQuery,
   useCreerIndicateur,
   useCreerProduction,
   type Periodicite,
@@ -22,13 +24,6 @@ import {
  * auteur ; ici, elle engage tout le monde.
  */
 const PERIODICITES: Periodicite[] = ["Mensuelle", "Trimestrielle", "Semestrielle", "Annuelle"];
-
-const CRITERES = [
-  "Exécution des activités",
-  "Traitement du courrier",
-  "Conformité aux rituels",
-  "Instruction des dossiers",
-];
 
 interface ChampsIndicateur {
   code: string;
@@ -52,6 +47,11 @@ export function ModaleNouvelIndicateur({
   onFermer: () => void;
 }) {
   const creer = useCreerIndicateur();
+  // Les critères viennent du serveur : une liste écrite ici se serait
+  // désynchronisée au premier critère ajouté par la DSR, et la saisie aurait
+  // été refusée sans que l'agent comprenne pourquoi.
+  const { data: dictionnaire } = useQuery(dictionnaireQuery());
+  const criteres = dictionnaire?.criteres ?? [];
   const {
     register,
     control,
@@ -59,7 +59,12 @@ export function ModaleNouvelIndicateur({
     reset,
     formState: { errors },
   } = useForm<ChampsIndicateur>({
-    defaultValues: { periodicite: "Mensuelle", unite: "%", seuilVert: 85, seuilOrange: 60 },
+    defaultValues: {
+      periodicite: "Mensuelle",
+      unite: "%",
+      seuilVert: 85,
+      seuilOrange: 60,
+    },
   });
 
   const seuilVert = useWatch({ control, name: "seuilVert" });
@@ -98,8 +103,9 @@ export function ModaleNouvelIndicateur({
     >
       {critere && (
         <Encart ton="alerte" icone="bouclier">
-          Cet indicateur alimentera le critère « {critere} » de la matrice de scoring. Il changera
-          donc le classement de toutes les structures dès le mois suivant.
+          Cet indicateur alimentera le critère «{" "}
+          {criteres.find((c) => c.code === critere)?.libelle ?? critere} » de la matrice de scoring.
+          Il changera donc le classement de toutes les structures dès le mois suivant.
         </Encart>
       )}
 
@@ -124,7 +130,9 @@ export function ModaleNouvelIndicateur({
         placeholder="Ce que l'indicateur mesure exactement, et sur quel périmètre."
         rows={3}
         erreur={errors.definition?.message}
-        {...register("definition", { required: "La définition est obligatoire." })}
+        {...register("definition", {
+          required: "La définition est obligatoire.",
+        })}
       />
 
       <Champ
@@ -159,7 +167,10 @@ export function ModaleNouvelIndicateur({
         <Liste
           libelle="Critère alimenté"
           invite="Aucun — indicateur de suivi seul"
-          options={CRITERES.map((c) => ({ valeur: c, libelle: c }))}
+          options={criteres.map((c) => ({
+            valeur: c.code,
+            libelle: `${c.libelle} · ${c.poids} %`,
+          }))}
           {...register("critere")}
         />
       </div>
@@ -198,8 +209,6 @@ interface ChampsProduction {
   nature: string;
   periodicite: Periodicite;
   echeance: string;
-  structuresAttendues: number;
-  responsable: string;
   joursAvantRelance: number;
 }
 
@@ -221,7 +230,6 @@ export function ModaleNouvelleProduction({
   } = useForm<ChampsProduction & { relanceAutomatique: boolean }>({
     defaultValues: {
       periodicite: "Mensuelle",
-      structuresAttendues: 12,
       relanceAutomatique: true,
       joursAvantRelance: 3,
     },
@@ -242,8 +250,6 @@ export function ModaleNouvelleProduction({
         nature: valeurs.nature,
         periodicite: valeurs.periodicite,
         echeance: valeurs.echeance,
-        structuresAttendues: Number(valeurs.structuresAttendues),
-        responsable: valeurs.responsable,
         relanceAutomatique: valeurs.relanceAutomatique,
         joursAvantRelance: valeurs.relanceAutomatique ? Number(valeurs.joursAvantRelance) : null,
       },
@@ -264,8 +270,8 @@ export function ModaleNouvelleProduction({
       largeur={640}
     >
       <Encart ton="alerte" icone="cloche">
-        Une production inscrite au calendrier devient une obligation pour les structures
-        concernées, et son non-respect pèse sur leur classement mensuel.
+        Une production inscrite au calendrier devient une obligation pour les structures concernées,
+        et son non-respect pèse sur leur classement mensuel.
       </Encart>
 
       <Champ
@@ -297,20 +303,12 @@ export function ModaleNouvelleProduction({
         {...register("echeance", { required: "L'échéance est obligatoire." })}
       />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Champ
-          libelle="Structures attendues"
-          type="number"
-          min={1}
-          {...register("structuresAttendues", { required: true, min: 1 })}
-        />
-        <Champ
-          libelle="Responsable de la production"
-          placeholder="Point focal de chaque structure"
-          erreur={errors.responsable?.message}
-          {...register("responsable", { required: "Indiquez qui produit." })}
-        />
-      </div>
+      <Encart ton="accent" icone="organisation">
+        La production est ouverte à toutes les structures qui entrent au classement, et le
+        responsable en découle : la structure elle-même quand elle est seule concernée, la DSR quand
+        elles sont plusieurs. Ni l'un ni l'autre ne se saisit — un nombre écrit à la main
+        divergerait du référentiel dès la création de la direction suivante.
+      </Encart>
 
       <div className="flex flex-col gap-3 rounded-none border border-bordure px-3.5 py-3">
         <Interrupteur
@@ -326,12 +324,16 @@ export function ModaleNouvelleProduction({
             min={1}
             max={30}
             aide="La relance part avant l'échéance. Une relance qui arrive après ne fait que documenter le retard."
-            {...register("joursAvantRelance", { required: relance, min: 1, max: 30 })}
+            {...register("joursAvantRelance", {
+              required: relance,
+              min: 1,
+              max: 30,
+            })}
           />
         ) : (
           <p className="text-[11px] leading-[1.5] font-medium text-encre-tenue">
-            Sans relance automatique, le rappel repose sur la vigilance d'une personne — le
-            premier facteur de retard constaté.
+            Sans relance automatique, le rappel repose sur la vigilance d'une personne — le premier
+            facteur de retard constaté.
           </p>
         )}
       </div>

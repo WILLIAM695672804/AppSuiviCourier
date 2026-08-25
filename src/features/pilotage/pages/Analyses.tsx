@@ -55,7 +55,14 @@ export function Analyses() {
     cle,
     entete: LIBELLES_AXE[cle],
     largeur: "minmax(120px,1fr)",
-    rendu: (l) => <BarreProgression taux={l[cle]} />,
+    // Une mesure absente n'est pas une barre vide : une barre à zéro se lit
+    // comme un échec, quand il n'y a rien à lire (ADR 011).
+    rendu: (l) =>
+      l[cle] === null ? (
+        <span className="text-[11px] leading-none font-medium text-encre-tenue">Non mesuré</span>
+      ) : (
+        <BarreProgression taux={l[cle]} />
+      ),
   });
 
   const colonnes: Colonne<LigneCroisee>[] = [
@@ -118,8 +125,16 @@ export function Analyses() {
                 <span className="truncate text-[11px] leading-none font-semibold text-encre-moyenne">
                   {LIBELLES_AXE[cle]}
                 </span>
-                <span className="text-[22px] leading-none font-extrabold text-encre tabular-nums">
-                  {data?.moyennes[cle] ?? 0}
+                {/* `?? 0` aurait affiché « 0 » pour une moyenne qu'on n'a pas
+                    calculée — le travers exact que l'ADR 011 corrige. */}
+                <span
+                  className={
+                    data?.moyennes[cle] === null || data?.moyennes[cle] === undefined
+                      ? "text-[14px] leading-none font-bold text-encre-tenue"
+                      : "text-[22px] leading-none font-extrabold text-encre tabular-nums"
+                  }
+                >
+                  {data?.moyennes[cle] ?? "Non mesuré"}
                 </span>
                 <span className="text-[10.5px] leading-none font-medium text-encre-tenue">
                   moyenne institutionnelle
@@ -164,13 +179,19 @@ export function Analyses() {
                 libelle="Mesure en ordonnée"
               />
 
+              {/* Une structure dont l'un des deux axes n'est pas mesuré ne
+                  figure pas au nuage : la placer sur l'axe zéro l'aurait
+                  montrée au pire endroit du graphique, pour une donnée qui
+                  n'existe pas. */}
               <NuageDePoints
-                points={lignes.map((l) => ({
-                  libelle: l.sigle,
-                  x: l[axeX],
-                  y: l[axeY],
-                  feu: l.feu,
-                }))}
+                points={lignes
+                  .filter((l) => l[axeX] !== null && l[axeY] !== null)
+                  .map((l) => ({
+                    libelle: l.sigle,
+                    x: l[axeX] as number,
+                    y: l[axeY] as number,
+                    feu: l.feu,
+                  }))}
                 libelleX={LIBELLES_AXE[axeX]}
                 libelleY={LIBELLES_AXE[axeY]}
               />

@@ -10,7 +10,10 @@ import { Feu } from "@/components/ui/Feu";
 import { Onglets } from "@/components/ui/Onglets";
 import { Tableau, type Colonne } from "@/components/ui/Tableau";
 import { ModaleNouvelIndicateur } from "@/features/performance/components/ModalesPerformance";
-import { dictionnaireQuery, type IndicateurDictionnaire } from "@/features/performance/api";
+import {
+  dictionnaireQuery,
+  type IndicateurDictionnaire,
+} from "@/features/performance/api";
 
 /**
  * Dictionnaire des indicateurs et grille de cotation des risques — §3.3.
@@ -35,7 +38,8 @@ const ONGLETS = [
 ] as const;
 
 export function Dictionnaire() {
-  const [onglet, setOnglet] = useState<(typeof ONGLETS)[number]["cle"]>("indicateurs");
+  const [onglet, setOnglet] =
+    useState<(typeof ONGLETS)[number]["cle"]>("indicateurs");
   const [choisi, setChoisi] = useState<number | null>(null);
   const [modaleOuverte, setModaleOuverte] = useState(false);
 
@@ -50,7 +54,9 @@ export function Dictionnaire() {
       largeur: "104px",
       role: "resume",
       rendu: (i) => (
-        <span className="text-[11px] leading-none font-bold text-accent tabular-nums">{i.code}</span>
+        <span className="text-[11px] leading-none font-bold text-accent tabular-nums">
+          {i.code}
+        </span>
       ),
     },
     {
@@ -119,7 +125,11 @@ export function Dictionnaire() {
         titre="Indicateurs et cotation des risques"
         sousTitre="Le référentiel commun de mesure : définition, formule, source, périodicité"
         actions={
-          <Bouton variante="principal" icone="plus" onClick={() => setModaleOuverte(true)}>
+          <Bouton
+            variante="principal"
+            icone="plus"
+            onClick={() => setModaleOuverte(true)}
+          >
             Ajouter un indicateur
           </Bouton>
         }
@@ -153,10 +163,14 @@ export function Dictionnaire() {
                   )
                 }
               >
-                <p className="mt-3 text-[13px] leading-[1.4] font-bold text-encre">{ouvert.libelle}</p>
+                <p className="mt-3 text-[13px] leading-[1.4] font-bold text-encre">
+                  {ouvert.libelle}
+                </p>
 
                 <div className="mt-4 flex flex-col gap-3.5">
-                  <Definition libelle="Définition">{ouvert.definition}</Definition>
+                  <Definition libelle="Définition">
+                    {ouvert.definition}
+                  </Definition>
 
                   <Definition libelle="Formule de calcul">
                     <code className="block rounded-none bg-surface-douce px-2.5 py-2 font-mono text-[11.5px] leading-[1.5] font-medium text-encre-douce">
@@ -165,17 +179,27 @@ export function Dictionnaire() {
                   </Definition>
 
                   <Definition libelle="Source">{ouvert.source}</Definition>
-                  <Definition libelle="Périodicité">{ouvert.periodicite}</Definition>
-                  <Definition libelle="Responsable de la production">{ouvert.responsable}</Definition>
+                  <Definition libelle="Périodicité">
+                    {ouvert.periodicite}
+                  </Definition>
+                  <Definition libelle="Responsable de la production">
+                    {ouvert.responsable}
+                  </Definition>
 
                   <Definition libelle="Seuils de cotation">
                     <span className="flex flex-col gap-2">
-                      <Feu niveau="vert" libelle={`À partir de ${ouvert.seuilVert} ${ouvert.unite}`} />
+                      <Feu
+                        niveau="vert"
+                        libelle={`À partir de ${ouvert.seuilVert} ${ouvert.unite}`}
+                      />
                       <Feu
                         niveau="orange"
                         libelle={`De ${ouvert.seuilOrange} à ${ouvert.seuilVert} ${ouvert.unite}`}
                       />
-                      <Feu niveau="rouge" libelle={`En deçà de ${ouvert.seuilOrange} ${ouvert.unite}`} />
+                      <Feu
+                        niveau="rouge"
+                        libelle={`En deçà de ${ouvert.seuilOrange} ${ouvert.unite}`}
+                      />
                     </span>
                   </Definition>
 
@@ -187,8 +211,9 @@ export function Dictionnaire() {
                 {!ouvert.actif && (
                   <div className="mt-4">
                     <Encart ton="alerte" icone="horloge">
-                      Indicateur désactivé : il n'entre plus dans le calcul du mois en cours, mais
-                      reste au dictionnaire parce que les scores passés ont été établis avec lui.
+                      Indicateur désactivé : il n'entre plus dans le calcul du
+                      mois en cours, mais reste au dictionnaire parce que les
+                      scores passés ont été établis avec lui.
                     </Encart>
                   </div>
                 )}
@@ -198,9 +223,9 @@ export function Dictionnaire() {
         ) : (
           <div className="flex flex-col gap-3.5">
             <Encart ton="accent" icone="bouclier">
-              La grille de cotation traduit un score en conduite à tenir. Elle est le seul endroit
-              où l'application dit ce qu'il faut faire d'un chiffre — ailleurs, elle se contente de
-              le mesurer.
+              La grille de cotation traduit un score en conduite à tenir. Elle
+              est le seul endroit où l'application dit ce qu'il faut faire d'un
+              chiffre — ailleurs, elle se contente de le mesurer.
             </Encart>
 
             <div className="grid gap-3.5 md:grid-cols-2">
@@ -214,7 +239,9 @@ export function Dictionnaire() {
                     {risque.description}
                   </p>
                   <div className="mt-3.5 border-t border-separateur pt-3.5">
-                    <Definition libelle="Conduite à tenir">{risque.conduite}</Definition>
+                    <Definition libelle="Conduite à tenir">
+                      {risque.conduite}
+                    </Definition>
                   </div>
                 </Carte>
               ))}
@@ -223,7 +250,10 @@ export function Dictionnaire() {
         )}
       </div>
 
-      <ModaleNouvelIndicateur ouverte={modaleOuverte} onFermer={() => setModaleOuverte(false)} />
+      <ModaleNouvelIndicateur
+        ouverte={modaleOuverte}
+        onFermer={() => setModaleOuverte(false)}
+      />
     </>
   );
 }

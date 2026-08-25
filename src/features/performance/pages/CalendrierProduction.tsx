@@ -8,7 +8,10 @@ import { Encart } from "@/components/ui/Encart";
 import { Etiquette } from "@/components/ui/Etiquette";
 import { Tableau, type Colonne } from "@/components/ui/Tableau";
 import { ModaleNouvelleProduction } from "@/features/performance/components/ModalesPerformance";
-import { calendrierQuery, type LigneCalendrier } from "@/features/performance/api";
+import {
+  calendrierQuery,
+  type LigneCalendrier,
+} from "@/features/performance/api";
 
 /**
  * Calendrier officiel de production — §3.3.
@@ -30,7 +33,9 @@ export function CalendrierProduction() {
   const [modaleOuverte, setModaleOuverte] = useState(false);
   const { data, isPending } = useQuery(calendrierQuery());
   const lignes = data?.lignes ?? [];
-  const sansRelance = lignes.filter((l) => !l.relanceAutomatique && l.recus < l.structuresAttendues);
+  const sansRelance = lignes.filter(
+    (l) => !l.relanceAutomatique && l.recus < l.structuresAttendues,
+  );
 
   const colonnes: Colonne<LigneCalendrier>[] = [
     {
@@ -111,7 +116,11 @@ export function CalendrierProduction() {
         compte={lignes.length}
         sousTitre="Qui alimente quoi, à quelle fréquence, et ce qui se passe en cas de non-saisie"
         actions={
-          <Bouton variante="principal" icone="plus" onClick={() => setModaleOuverte(true)}>
+          <Bouton
+            variante="principal"
+            icone="plus"
+            onClick={() => setModaleOuverte(true)}
+          >
             Ajouter une production
           </Bouton>
         }
@@ -119,19 +128,24 @@ export function CalendrierProduction() {
 
       <div className="flex-1 overflow-y-auto bg-fond p-4 md:p-[26px]">
         <div className="flex flex-col gap-3.5">
-          <BandeauCompteurs compteurs={data?.compteurs ?? []} chargement={isPending} />
+          <BandeauCompteurs
+            compteurs={data?.compteurs ?? []}
+            chargement={isPending}
+          />
 
           {sansRelance.length > 0 && (
             <Encart ton="alerte" icone="cloche">
-              {sansRelance.length} production{sansRelance.length > 1 ? "s sont" : " est"} incomplète
-              {sansRelance.length > 1 ? "s" : ""} sans relance automatique configurée. Le rappel
-              repose alors sur la vigilance d'une personne, ce qui est le premier facteur de retard.
+              {sansRelance.length} production
+              {sansRelance.length > 1 ? "s sont" : " est"} incomplète
+              {sansRelance.length > 1 ? "s" : ""} sans relance automatique
+              configurée. Le rappel repose alors sur la vigilance d'une
+              personne, ce qui est le premier facteur de retard.
             </Encart>
           )}
 
           <div className="rounded-none border border-bordure bg-surface px-4 pt-2 pb-2 md:px-5">
             <Tableau
-                chargement={isPending}
+              chargement={isPending}
               colonnes={colonnes}
               lignes={lignes}
               cleLigne={(l) => l.id}
@@ -140,14 +154,18 @@ export function CalendrierProduction() {
           </div>
 
           <p className="px-1 text-[11px] leading-[1.5] font-medium text-encre-tenue">
-            La complétude du dernier cycle conditionne la fiabilité de la matrice de scoring : une
-            structure qui n'alimente pas ses registres n'est pas mal notée, elle devient non
-            évaluable — ce que la grille de cotation traite comme un signalement à part entière.
+            La complétude du dernier cycle conditionne la fiabilité de la
+            matrice de scoring : une structure qui n'alimente pas ses registres
+            n'est pas mal notée, elle devient non évaluable — ce que la grille
+            de cotation traite comme un signalement à part entière.
           </p>
         </div>
       </div>
 
-      <ModaleNouvelleProduction ouverte={modaleOuverte} onFermer={() => setModaleOuverte(false)} />
+      <ModaleNouvelleProduction
+        ouverte={modaleOuverte}
+        onFermer={() => setModaleOuverte(false)}
+      />
     </>
   );
 }

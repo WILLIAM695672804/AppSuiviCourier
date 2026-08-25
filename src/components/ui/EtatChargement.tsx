@@ -15,16 +15,45 @@ import { Spinner } from "@/components/ui/Spinner";
  * qu'il a demandé.
  */
 export function EtatChargement({ message = "Chargement en cours…" }: { message?: string }) {
+  return <PageChargement message={message} />;
+}
+
+export function PageChargement({ message = "Chargement en cours…" }: { message?: string }) {
   return (
     <div
       role="status"
       aria-live="polite"
-      className="grid flex-1 place-items-center px-6 py-16"
+      aria-busy="true"
+      className="grid flex-1 place-items-center bg-surface px-6 py-16"
     >
-      <div className="flex flex-col items-center gap-3">
-        <Spinner taille={26} className="text-accent" libelle={message} />
-        <p className="text-[12.5px] leading-none font-semibold text-encre-tenue">{message}</p>
+      <div className="flex min-w-[220px] flex-col items-center gap-3 border border-bordure bg-surface px-6 py-5 text-center shadow-[0_10px_30px_rgba(16,24,40,.05)]">
+        <span className="grid size-11 place-items-center bg-accent-voile text-accent">
+          <Spinner taille={26} libelle={message} />
+        </span>
+        <p className="text-[12.5px] leading-[1.45] font-semibold text-encre-douce">{message}</p>
       </div>
+    </div>
+  );
+}
+
+export function ChargementComposant({
+  message = "Chargement des données…",
+  compact = false,
+}: {
+  message?: string;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      className={`flex items-center justify-center gap-2.5 text-encre-tenue ${
+        compact ? "px-3 py-3" : "px-5 py-8"
+      }`}
+    >
+      <Spinner taille={compact ? 16 : 20} className="text-accent" libelle={message} />
+      <span className="text-[12px] leading-none font-semibold">{message}</span>
     </div>
   );
 }

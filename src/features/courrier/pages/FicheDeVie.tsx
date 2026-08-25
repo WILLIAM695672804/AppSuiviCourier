@@ -5,6 +5,7 @@ import { EnTetePage } from "@/components/EnTetePage";
 import { Avatar } from "@/components/ui/Avatar";
 import { Bouton } from "@/components/ui/Bouton";
 import { Carte } from "@/components/ui/Carte";
+import { EtatChargement, EtatErreur } from "@/components/ui/EtatChargement";
 import { Etiquette } from "@/components/ui/Etiquette";
 import { Icone } from "@/components/ui/Icone";
 import { ficheDeVieQuery } from "@/features/courrier/api";
@@ -29,11 +30,27 @@ export function FicheDeVie() {
   const { data, isPending, isError } = useQuery(ficheDeVieQuery(courrierId));
 
   if (isPending) {
-    return <p className="px-[26px] py-10 text-[13px] text-encre-tenue">Chargement de la fiche…</p>;
+    return (
+      <>
+        <EnTetePage
+          titre="Fiche de vie"
+          miettes={[{ libelle: "Registre des arrivées", chemin: "/courriers" }]}
+        />
+        <EtatChargement message="Chargement de la fiche…" />
+      </>
+    );
   }
 
   if (isError || !data) {
-    return <p className="px-[26px] py-10 text-[13px] text-danger">Fiche de vie indisponible.</p>;
+    return (
+      <>
+        <EnTetePage
+          titre="Fiche de vie"
+          miettes={[{ libelle: "Registre des arrivées", chemin: "/courriers" }]}
+        />
+        <EtatErreur message="Fiche de vie indisponible." />
+      </>
+    );
   }
 
   const etapes = jalonsSeuls ? data.etapes.filter((e) => e.jalon) : data.etapes;

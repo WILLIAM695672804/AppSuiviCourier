@@ -39,7 +39,9 @@ export function ModelesCourrier() {
       largeur: "112px",
       role: "resume",
       rendu: (m) => (
-        <span className="text-[11px] leading-none font-bold text-accent tabular-nums">{m.code}</span>
+        <span className="text-[11px] leading-none font-bold text-accent tabular-nums">
+          {m.code}
+        </span>
       ),
     },
     {
@@ -109,7 +111,7 @@ export function ModelesCourrier() {
         <div className="grid items-start gap-3.5 xl:grid-cols-[minmax(0,1fr)_400px]">
           <div className="rounded-none border border-bordure bg-surface px-4 pt-2 pb-2 md:px-5">
             <Tableau
-                chargement={isPending}
+              chargement={isPending}
               colonnes={colonnes}
               lignes={modeles}
               cleLigne={(m) => m.id}
@@ -121,7 +123,9 @@ export function ModelesCourrier() {
 
           {ouvert && (
             <Carte titre={ouvert.code}>
-              <p className="mt-3 text-[13px] leading-[1.4] font-bold text-encre">{ouvert.libelle}</p>
+              <p className="mt-3 text-[13px] leading-[1.4] font-bold text-encre">
+                {ouvert.libelle}
+              </p>
 
               <div className="mt-3.5 flex flex-col gap-3.5">
                 <Definition libelle="Objet">{ouvert.description}</Definition>
@@ -156,8 +160,9 @@ export function ModelesCourrier() {
               {ouvert.code === "REJ-MOT" && (
                 <div className="mt-4">
                   <Encart ton="alerte" icone="bouclier">
-                    Ce modèle porte les mentions de recours. Un rejet notifié sans elles est
-                    attaquable, quel que soit son bien-fondé : ne les retirez pas.
+                    Ce modèle porte les mentions de recours. Un rejet notifié
+                    sans elles est attaquable, quel que soit son bien-fondé : ne
+                    les retirez pas.
                   </Encart>
                 </div>
               )}

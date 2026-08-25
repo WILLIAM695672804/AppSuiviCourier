@@ -6,15 +6,28 @@ import { ChampFlottant } from "@/components/ui/ChampFlottant";
 import { Encart } from "@/components/ui/Encart";
 import { Icone } from "@/components/ui/Icone";
 import { Interrupteur } from "@/components/ui/Interrupteur";
+import { Spinner } from "@/components/ui/Spinner";
 import { useConnexion } from "@/features/authentification/api";
 import {
   schemaConnexion,
   type SaisieConnexion,
 } from "@/features/authentification/schemaConnexion";
-import { COMPTES_DEMO } from "@/lib/demo/comptes";
+import {
+  COMPTES_JEU_ESSAI,
+  FAMILLES_JEU_ESSAI,
+  MOT_DE_PASSE_JEU_ESSAI,
+} from "@/features/authentification/comptesJeuEssai";
 import { useSessionOptionnelle } from "@/lib/contexteSession";
 
-const MODE_DEMO = import.meta.env.VITE_MODE_DEMO === "true";
+/**
+ * Le rappel des comptes du jeu d'essai ne s'affiche qu'en developpement.
+ *
+ * Il dependait de `VITE_MODE_DEMO`, drapeau supprime avec le serveur simule
+ * (ADR 008). `import.meta.env.DEV` est un meilleur critere : ces identifiants
+ * sont ceux de `manage.py semer`, ils existent vraiment en base — les afficher
+ * dans un bundle de production reviendrait a publier une liste de comptes.
+ */
+const AFFICHER_COMPTES_ESSAI = import.meta.env.DEV;
 
 /**
  * Ecran de connexion.
@@ -80,7 +93,7 @@ export function Connexion() {
           <p className="mt-2.5 text-center text-[13px] leading-[1.5] font-medium text-encre-faible">
             Application de suivi du courrier
             <br />
-            Direction du suivi et de la relance
+            Division du suivi et de la relance
           </p>
 
           <form
@@ -138,13 +151,17 @@ export function Connexion() {
             <button
               type="submit"
               disabled={connexion.isPending}
-              className="mt-2 w-full rounded-none bg-linear-[180deg,#3b78f0,#2059d8] py-3.5 text-[13.5px] leading-none font-bold text-white shadow-[0_1px_2px_rgba(32,89,216,.4)] transition-[filter] duration-150 hover:brightness-[1.06] disabled:cursor-not-allowed disabled:opacity-60"
+              aria-busy={connexion.isPending || undefined}
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-none bg-linear-[180deg,#3b78f0,#2059d8] py-3.5 text-[13.5px] leading-none font-bold text-white shadow-[0_1px_2px_rgba(32,89,216,.4)] transition-[filter] duration-150 hover:brightness-[1.06] disabled:cursor-not-allowed disabled:opacity-60"
             >
+              {connexion.isPending && (
+                <Spinner taille={15} libelle="Connexion en cours" />
+              )}
               {connexion.isPending ? "Connexion…" : "Se connecter"}
             </button>
           </form>
 
-          {MODE_DEMO && <ComptesDeDemonstration onChoisir={remplir} />}
+          {AFFICHER_COMPTES_ESSAI && <ComptesDuJeuDEssai onChoisir={remplir} />}
         </div>
       </div>
     </div>
@@ -198,19 +215,24 @@ function PanneauIllustration() {
 }
 
 /**
- * Comptes de demonstration, affiches uniquement en mode demonstration.
+ * Les comptes du jeu de demonstration, en developpement seulement.
  *
- * Le bloc est explicite sur ce qu'il est : sans cet avertissement, un lecteur
- * pourrait croire l'application livrable en l'etat.
+ * Ils ne sont plus simules : ce sont les comptes que `manage.py demonstration`
+ * cree reellement en base, et la connexion part au backend comme n'importe
+ * quelle autre. Le bloc reste donc utile — il evite de retenir trente-trois
+ * identifiants — mais il ne prouve plus rien sur les droits : c'est le serveur
+ * qui les applique.
  *
- * Treize entrees a la suite formaient un mur. Elles sont donc groupees par
+ * Trente-trois entrees a la suite formeraient un mur. Elles sont groupees par
  * famille et repliees derriere un `<details>` : qui vient travailler ouvre
  * l'application, qui vient explorer deplie la liste. Sur telephone, ce repli
  * est ce qui garde le formulaire visible sans avoir a faire defiler.
+ *
+ * L'ordre des familles vient de `comptesJeuEssai.ts` et non d'ici : le jour ou
+ * une famille s'ajoute, elle apparait sans qu'on ait a y penser — une liste
+ * tenue a deux endroits finit toujours par en oublier une.
  */
-const FAMILLES = ["Gouvernance", "Structures", "Chaîne du courrier", "Fonctions support", "Externe"] as const;
-
-function ComptesDeDemonstration({
+function ComptesDuJeuDEssai({
   onChoisir,
 }: {
   onChoisir: (identifiant: string, motDePasse: string) => void;
@@ -223,17 +245,20 @@ function ComptesDeDemonstration({
           taille={12}
           className="flex-none transition-transform duration-150 group-open:rotate-90"
         />
-        Mode démonstration — {COMPTES_DEMO.length} postes à essayer
+        Jeu de démonstration — {COMPTES_JEU_ESSAI.length} comptes à essayer
       </summary>
 
       <p className="mt-2.5 text-[11px] leading-[1.5] font-medium text-encre-tenue">
-        Aucun mot de passe n'est protégé. Choisissez un poste pour voir
-        l'application telle qu'il la voit.
+        Comptes créés par <code>manage.py demonstration</code>, mot de passe
+        commun «&nbsp;{MOT_DE_PASSE_JEU_ESSAI}&nbsp;». Choisissez un poste pour
+        voir l'application telle qu'il la voit.
       </p>
 
-      <div className="mt-3 flex max-h-[300px] flex-col gap-3 overflow-y-auto pr-1">
-        {FAMILLES.map((famille) => {
-          const comptes = COMPTES_DEMO.filter((c) => c.famille === famille);
+      <div className="mt-3 flex max-h-[340px] flex-col gap-3 overflow-y-auto pr-1">
+        {FAMILLES_JEU_ESSAI.map((famille) => {
+          const comptes = COMPTES_JEU_ESSAI.filter(
+            (c) => c.famille === famille,
+          );
           if (comptes.length === 0) return null;
 
           return (
@@ -246,15 +271,17 @@ function ComptesDeDemonstration({
                 <button
                   key={compte.identifiant}
                   type="button"
-                  onClick={() => onChoisir(compte.identifiant, compte.motDePasse)}
+                  onClick={() =>
+                    onChoisir(compte.identifiant, MOT_DE_PASSE_JEU_ESSAI)
+                  }
                   className="flex items-center gap-2.5 rounded-none border border-bordure px-3 py-2.5 text-left transition-colors duration-150 hover:bg-surface-douce"
                 >
-                  <span className="w-[74px] flex-none text-[11px] leading-none font-bold text-accent">
+                  <span className="w-[92px] flex-none text-[11px] leading-none font-bold text-accent">
                     {compte.identifiant}
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="truncate text-[11.5px] leading-none font-semibold text-encre">
-                      {compte.utilisateur.posteLibelle}
+                      {compte.poste}
                     </span>
                     <span className="truncate text-[10.5px] leading-none font-medium text-encre-tenue">
                       {compte.description}

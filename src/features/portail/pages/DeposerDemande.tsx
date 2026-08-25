@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router";
 import { Bouton } from "@/components/ui/Bouton";
@@ -8,7 +9,7 @@ import { ChampTexteLong } from "@/components/ui/ChampTexteLong";
 import { Encart } from "@/components/ui/Encart";
 import { Icone } from "@/components/ui/Icone";
 import { ZoneDepot, type FichierDepose } from "@/components/ui/ZoneDepot";
-import { useDeposerDemande } from "@/features/portail/api";
+import { mesDemandesQuery, useDeposerDemande } from "@/features/portail/api";
 
 /**
  * Dépôt d'une demande — §3.13, premier point.
@@ -21,11 +22,22 @@ import { useDeposerDemande } from "@/features/portail/api";
  * Le délai de réponse est annoncé **avant** le dépôt et non après. Un usager
  * qui sait qu'il attendra trente jours ne rappelle pas au bout de trois ;
  * celui qui ne sait rien appelle le standard.
+ *
+ * Ce délai vient du serveur, qui le règle en base et le fige sur la demande au
+ * moment du dépôt. Il était écrit en dur ici : l'écran promettait trente jours
+ * quoi qu'il arrive, et une direction qui aurait raccourci le délai aurait
+ * découvert l'écart en lisant une réclamation.
  */
 const TYPES = [
-  { valeur: "Demande", libelle: "Demande — autorisation, information, document" },
+  {
+    valeur: "Demande",
+    libelle: "Demande — autorisation, information, document",
+  },
   { valeur: "Réclamation", libelle: "Réclamation — contestation, litige" },
-  { valeur: "Autorisation", libelle: "Autorisation — occupation, travaux, accès" },
+  {
+    valeur: "Autorisation",
+    libelle: "Autorisation — occupation, travaux, accès",
+  },
   { valeur: "Requête", libelle: "Requête — révision d'une décision" },
 ];
 
@@ -39,6 +51,10 @@ export function DeposerDemande() {
   const naviguer = useNavigate();
   const [fichiers, setFichiers] = useState<FichierDepose[]>([]);
   const deposer = useDeposerDemande();
+  // La liste des demandes porte le délai réglé : elle est déjà en cache quand
+  // l'usager arrive ici depuis « Mes demandes », d'où aucune requête de plus.
+  const { data: mesDemandes } = useQuery(mesDemandesQuery());
+  const delai = mesDemandes?.delaiReponseJours;
 
   const {
     register,
@@ -73,13 +89,18 @@ export function DeposerDemande() {
           Déposer une demande
         </h1>
         <p className="text-[13px] leading-[1.55] font-medium text-encre-faible">
-          Vous recevrez un accusé de réception immédiat, puis une réponse sous trente jours.
+          Vous recevrez un accusé de réception immédiat, puis une réponse
+          {delai === undefined
+            ? " dans le délai annoncé à l'enregistrement"
+            : ` sous ${delai} jours`}
+          .
         </p>
       </div>
 
       {deposer.isError && (
         <Encart ton="danger" icone="croix">
-          Votre demande n'a pas pu être déposée. Réessayez dans quelques instants.
+          Votre demande n'a pas pu être déposée. Réessayez dans quelques
+          instants.
         </Encart>
       )}
 
@@ -100,7 +121,10 @@ export function DeposerDemande() {
               erreur={errors.objet?.message}
               {...register("objet", {
                 required: "Indiquez l'objet de votre demande.",
-                minLength: { value: 10, message: "Précisez un peu : dix caractères au minimum." },
+                minLength: {
+                  value: 10,
+                  message: "Précisez un peu : dix caractères au minimum.",
+                },
               })}
             />
 
@@ -111,7 +135,10 @@ export function DeposerDemande() {
               erreur={errors.contexte?.message}
               {...register("contexte", {
                 required: "Décrivez votre demande.",
-                minLength: { value: 30, message: "Trente caractères au minimum." },
+                minLength: {
+                  value: 30,
+                  message: "Trente caractères au minimum.",
+                },
               })}
             />
 
@@ -125,13 +152,18 @@ export function DeposerDemande() {
         </Carte>
 
         <Encart ton="accent" icone="horloge">
-          Une fois déposée, votre demande reçoit une référence que vous retrouverez dans « Mes
-          demandes ». Vous serez averti à chaque étape, par le canal choisi dans vos préférences de
-          notification.
+          Une fois déposée, votre demande reçoit une référence que vous
+          retrouverez dans « Mes demandes ». Vous serez averti à chaque étape,
+          par le canal choisi dans vos préférences de notification.
         </Encart>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Bouton variante="principal" icone="exporter" chargement={deposer.isPending} onClick={envoyer}>
+          <Bouton
+            variante="principal"
+            icone="exporter"
+            chargement={deposer.isPending}
+            onClick={envoyer}
+          >
             {deposer.isPending ? "Dépôt en cours…" : "Déposer ma demande"}
           </Bouton>
           <Bouton onClick={() => naviguer("/portail")}>Annuler</Bouton>

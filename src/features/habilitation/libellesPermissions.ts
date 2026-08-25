@@ -77,7 +77,6 @@ export const GROUPES_PERMISSIONS: GroupePermissions[] = [
       { code: PERMISSIONS.COCKPIT, libelle: "Accéder au cockpit exécutif de gouvernance" },
       { code: PERMISSIONS.VUE_DG, libelle: "Accéder à la vue d'ensemble de la Direction générale" },
       { code: PERMISSIONS.VUE_CODIR, libelle: "Accéder à la vue d'ensemble du Comité de direction" },
-      { code: PERMISSIONS.ADM_STR, libelle: "Tenir le référentiel des structures" },
     ],
   },
   {

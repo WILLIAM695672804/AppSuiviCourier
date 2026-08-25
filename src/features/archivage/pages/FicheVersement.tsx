@@ -54,7 +54,11 @@ export function FicheVersement() {
   }
 
   const bloquantes = versement.anomalies.filter((a) => a.bloquante);
+  // Sans règle de conservation, il n'y a pas d'échéance : ce n'est pas un
+  // dépassement, c'est une règle absente — et l'anomalie bloquante le dit
+  // déjà, en propres termes.
   const echeanceDepassee =
+    versement.echeanceSortFinal !== null &&
     versement.echeanceSortFinal < new Date().toISOString().slice(0, 10) &&
     versement.etat !== "Versé";
 
@@ -96,15 +100,25 @@ export function FicheVersement() {
           <div className="flex min-w-0 flex-col gap-3.5">
             <Carte
               titre="Le dossier"
-              aDroite={<Etiquette ton={TONS_ETAT[versement.etat]}>{versement.etat}</Etiquette>}
+              aDroite={
+                <Etiquette ton={TONS_ETAT[versement.etat]}>
+                  {versement.etat}
+                </Etiquette>
+              }
             >
               <GrilleDefinitions>
-                <Definition libelle="Structure d'origine">{versement.structure}</Definition>
-                <Definition libelle="Clos le">{formaterDate(versement.closLe)}</Definition>
+                <Definition libelle="Structure d'origine">
+                  {versement.structure}
+                </Definition>
+                <Definition libelle="Clos le">
+                  {formaterDate(versement.closLe)}
+                </Definition>
                 <Definition libelle="Durée d'utilité administrative">
                   {versement.dua} ans
                 </Definition>
-                <Definition libelle="Sort final">{versement.sortFinal}</Definition>
+                <Definition libelle="Sort final">
+                  {versement.sortFinal}
+                </Definition>
                 <Definition libelle="Échéance du sort final">
                   {formaterDate(versement.echeanceSortFinal)}
                 </Definition>
@@ -116,15 +130,18 @@ export function FicheVersement() {
               </GrilleDefinitions>
 
               <div className="mt-4 border-t border-separateur pt-4">
-                <Definition libelle="Fondement juridique">{versement.fondementJuridique}</Definition>
+                <Definition libelle="Fondement juridique">
+                  {versement.fondementJuridique}
+                </Definition>
               </div>
 
               {echeanceDepassee && (
                 <div className="mt-4">
                   <Encart ton="danger" icone="horloge">
                     La durée d'utilité administrative est échue depuis le{" "}
-                    {formaterDate(versement.echeanceSortFinal)}. Le sort final aurait dû être
-                    proposé à cette date : c'est une non-conformité opposable en cas de contrôle.
+                    {formaterDate(versement.echeanceSortFinal)}. Le sort final
+                    aurait dû être proposé à cette date : c'est une
+                    non-conformité opposable en cas de contrôle.
                   </Encart>
                 </div>
               )}
@@ -145,7 +162,8 @@ export function FicheVersement() {
             >
               {versement.anomalies.length === 0 ? (
                 <p className="mt-3.5 text-[12px] leading-[1.5] font-medium text-encre-tenue">
-                  Aucune anomalie. Le dossier est complet et sa règle de conservation est validée.
+                  Aucune anomalie. Le dossier est complet et sa règle de
+                  conservation est validée.
                 </p>
               ) : (
                 <ul className="mt-3.5 flex flex-col gap-2.5">
@@ -162,7 +180,9 @@ export function FicheVersement() {
                         <span className="text-[12px] leading-none font-bold text-encre">
                           {anomalie.libelle}
                         </span>
-                        {anomalie.bloquante && <Etiquette ton="danger">Bloquante</Etiquette>}
+                        {anomalie.bloquante && (
+                          <Etiquette ton="danger">Bloquante</Etiquette>
+                        )}
                       </span>
                       <span className="text-[11.5px] leading-[1.5] font-medium text-encre-moyenne">
                         {anomalie.precision}
@@ -178,7 +198,9 @@ export function FicheVersement() {
               aDroite={
                 <span
                   className={`text-[11px] leading-none font-bold tabular-nums ${
-                    versement.pieces < versement.piecesAttendues ? "text-danger" : "text-encre-tenue"
+                    versement.pieces < versement.piecesAttendues
+                      ? "text-danger"
+                      : "text-encre-tenue"
                   }`}
                 >
                   {versement.pieces} / {versement.piecesAttendues}
@@ -206,7 +228,9 @@ export function FicheVersement() {
                       {piece.nom}
                     </span>
                     <span className="flex-none text-[10.5px] leading-none font-medium text-encre-tenue tabular-nums">
-                      {piece.presente ? `${piece.format} · ${piece.taille}` : "manquante"}
+                      {piece.presente
+                        ? `${piece.format} · ${piece.taille}`
+                        : "manquante"}
                     </span>
                   </li>
                 ))}
@@ -216,8 +240,9 @@ export function FicheVersement() {
 
           <Carte titre="Chaîne d'intégrité">
             <p className="mt-2.5 text-[11px] leading-[1.5] font-medium text-encre-tenue">
-              Chaque étape scelle l'état du dossier à ce moment. C'est cette chaîne qui permet de
-              démontrer qu'aucune pièce n'a été ajoutée ni retirée depuis la clôture.
+              Chaque étape scelle l'état du dossier à ce moment. C'est cette
+              chaîne qui permet de démontrer qu'aucune pièce n'a été ajoutée ni
+              retirée depuis la clôture.
             </p>
 
             <ul className="mt-3.5 flex flex-col gap-3.5">

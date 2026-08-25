@@ -449,10 +449,12 @@ export interface SaisieSeance {
   type: TypeSeance;
   intitule: string;
   date: string;
-  president: string;
+  /** L'identifiant de l'agent, `null` tant que la présidence n'est pas décidée. */
+  presidentId: number | null;
   structure: string;
   echeanceDepot: string;
-  ordreDuJour: { point: string; rapporteur: string }[];
+  /** Idem pour le rapporteur : un point s'inscrit avant qu'on sache qui le rapporte. */
+  ordreDuJour: { point: string; rapporteurId: number | null }[];
 }
 
 export interface SaisieDocument {
@@ -464,22 +466,18 @@ export interface SaisieDocument {
 }
 
 export interface SaisieAbsence {
-  responsable: string;
-  poste: string;
-  structure: string;
+  /**
+   * L'agent absent, par identifiant — ADR 020.
+   *
+   * `poste` et `structure` ont disparu de cette saisie : le front les envoyait
+   * pour son propre affichage, et le serveur ne les a jamais écrits. Ils
+   * viennent du compte désigné, qui est désormais choisi et non plus tapé.
+   */
+  responsableId: number;
   type: TypeAbsence;
   du: string;
   au: string;
-  interimaire: string | null;
-}
-
-export interface SaisieStructure {
-  libelle: string;
-  sigle: string;
-  /** Direction, service, division, filiale ou succursale. */
-  nature: string;
-  niveau: number;
-  responsable: string | null;
+  interimaireId: number | null;
 }
 
 function useEcriture<TCorps>(chemin: string | ((corps: TCorps) => string)) {
@@ -494,6 +492,16 @@ function useEcriture<TCorps>(chemin: string | ((corps: TCorps) => string)) {
       // doivent bouger en meme temps, sans quoi deux ecrans se contredisent.
       void client.invalidateQueries({ queryKey: ["pilotage"] });
       void client.invalidateQueries({ queryKey: ["performance"] });
+      // Creer une structure change le referentiel de l'organigramme, qui est
+      // garde une heure en cache (`structuresQuery`) : sans cette ligne, la
+      // nouvelle direction n'apparaitrait dans aucun selecteur avant une heure.
+      void client.invalidateQueries({ queryKey: ["referentiel", "structures"] });
+      // Creer une structure ouvre aussi son poste responsable, vacant : les
+      // selecteurs de poste et l'organigramme de l'administration doivent le
+      // voir apparaitre, sans quoi la structure existerait sans poste ou l'on
+      // puisse affecter quelqu'un.
+      void client.invalidateQueries({ queryKey: ["referentiel", "postes"] });
+      void client.invalidateQueries({ queryKey: ["organisation"] });
     },
   });
 }
@@ -512,5 +520,3 @@ export const useDeposerDocument = () =>
   useEcriture<SaisieDocument>((corps) => `/gouvernance/seances/${corps.seanceId}/documents`);
 
 export const useDeclarerAbsence = () => useEcriture<SaisieAbsence>("/gouvernance/disponibilites");
-
-export const useCreerStructure = () => useEcriture<SaisieStructure>("/gouvernance/structures");

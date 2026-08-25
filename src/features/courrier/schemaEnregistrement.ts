@@ -41,10 +41,8 @@ export const schemaEnregistrement = z.object({
 
   /** Suites immediates cochees a l'enregistrement. */
   coterMaintenant: z.boolean(),
+  /** Pre-selection de la fenetre de cotation, quand on cote des l'enregistrement. */
   structureDestinataireId: z.number().int().positive().nullable(),
-  inscrireBordereau: z.boolean(),
-  imprimerEtiquette: z.boolean(),
-  envoyerAccuse: z.boolean(),
 });
 
 export type SaisieEnregistrement = z.infer<typeof schemaEnregistrement>;
@@ -62,7 +60,4 @@ export const VALEURS_INITIALES: SaisieEnregistrement = {
   reponseAttendue: false,
   coterMaintenant: false,
   structureDestinataireId: null,
-  inscrireBordereau: true,
-  imprimerEtiquette: true,
-  envoyerAccuse: false,
 };

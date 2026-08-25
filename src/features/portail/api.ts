@@ -1,4 +1,8 @@
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 /**
@@ -21,11 +25,7 @@ import { api } from "@/lib/api";
  */
 
 export type EtatDemandeUsager =
-  | "Déposée"
-  | "À l'étude"
-  | "Complément attendu"
-  | "Décision rendue"
-  | "Close";
+  "Déposée" | "À l'étude" | "Complément attendu" | "Décision rendue" | "Close";
 
 export interface DemandeUsager {
   id: number;
@@ -62,7 +62,13 @@ export interface DemandeUsagerDetail extends DemandeUsager {
   contexte: string;
   etapes: EtapeUsager[];
   messages: MessagePortail[];
-  pieces: { id: number; nom: string; taille: string; deposeeLe: string; parVous: boolean }[];
+  pieces: {
+    id: number;
+    nom: string;
+    taille: string;
+    deposeeLe: string;
+    parVous: boolean;
+  }[];
   /** Complément réclamé, avec sa date limite. `null` si rien n'est attendu. */
   complementAttendu: { objet: string; avantLe: string } | null;
 }
@@ -73,11 +79,23 @@ export interface Preferences {
   courriel: string;
   telephone: string | null;
   canal: CanalNotification;
-  /** Événements pour lesquels l'usager veut être prévenu. */
-  evenements: { cle: string; libelle: string; actif: boolean }[];
+  /**
+   * Événements pour lesquels l'usager veut être prévenu.
+   *
+   * `obligatoire` vient du serveur, qui porte la règle en base : la demande de
+   * complément et la décision rendue ne se désactivent pas. L'écran la reflète,
+   * il ne la redéfinit pas — et le serveur les rallume de toute façon.
+   */
+  evenements: {
+    cle: string;
+    libelle: string;
+    actif: boolean;
+    obligatoire: boolean;
+  }[];
 }
 
-export type NatureEchange = "Marché public" | "Convention" | "Reporting réglementaire";
+export type NatureEchange =
+  "Marché public" | "Convention" | "Reporting réglementaire";
 
 export interface Echange {
   id: number;
@@ -94,29 +112,42 @@ export interface Echange {
 
 const CLE = "portail";
 
+export interface MesDemandes {
+  demandes: DemandeUsager[];
+  identite: string;
+  /**
+   * Le délai que l'institution annonce **avant** le dépôt, tel qu'il est réglé
+   * en base. Le formulaire l'affichait en dur ; une promesse affichée qui ne
+   * vient pas de là où elle est réglée finit par contredire la date calculée.
+   */
+  delaiReponseJours: number;
+}
+
 export const mesDemandesQuery = () =>
   queryOptions({
     queryKey: [CLE, "demandes"],
-    queryFn: ({ signal }) =>
-      api.get<{ demandes: DemandeUsager[]; identite: string }>("/portail/demandes", signal),
+    queryFn: ({ signal }) => api.get<MesDemandes>("/portail/demandes", signal),
   });
 
 export const demandeQuery = (id: number) =>
   queryOptions({
     queryKey: [CLE, "demande", id],
-    queryFn: ({ signal }) => api.get<DemandeUsagerDetail>(`/portail/demandes/${id}`, signal),
+    queryFn: ({ signal }) =>
+      api.get<DemandeUsagerDetail>(`/portail/demandes/${id}`, signal),
   });
 
 export const preferencesQuery = () =>
   queryOptions({
     queryKey: [CLE, "preferences"],
-    queryFn: ({ signal }) => api.get<Preferences>("/portail/preferences", signal),
+    queryFn: ({ signal }) =>
+      api.get<Preferences>("/portail/preferences", signal),
   });
 
 export const echangesQuery = () =>
   queryOptions({
     queryKey: [CLE, "echanges"],
-    queryFn: ({ signal }) => api.get<{ echanges: Echange[] }>("/portail/echanges", signal),
+    queryFn: ({ signal }) =>
+      api.get<{ echanges: Echange[] }>("/portail/echanges", signal),
   });
 
 /* ------------------------------------------------------------------ *
@@ -148,17 +179,23 @@ function useEcriture<TCorps>(chemin: string | ((corps: TCorps) => string)) {
 
   return useMutation({
     mutationFn: (corps: TCorps) =>
-      api.post<{ id: number }>(typeof chemin === "function" ? chemin(corps) : chemin, corps),
+      api.post<{ id: number }>(
+        typeof chemin === "function" ? chemin(corps) : chemin,
+        corps,
+      ),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: [CLE] });
     },
   });
 }
 
-export const useDeposerDemande = () => useEcriture<SaisieDemandeUsager>("/portail/demandes");
+export const useDeposerDemande = () =>
+  useEcriture<SaisieDemandeUsager>("/portail/demandes");
 
 export const useRepondre = () =>
-  useEcriture<SaisieMessage>((corps) => `/portail/demandes/${corps.demandeId}/messages`);
+  useEcriture<SaisieMessage>(
+    (corps) => `/portail/demandes/${corps.demandeId}/messages`,
+  );
 
 export const useEnregistrerPreferences = () =>
   useEcriture<SaisiePreferences>("/portail/preferences");

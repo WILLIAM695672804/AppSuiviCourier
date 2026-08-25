@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
+import { EnTeteDocument, PiedDocument } from "@/components/EnTeteDocument";
 import { EnTetePage } from "@/components/EnTetePage";
 import { EtatChargement } from "@/components/ui/EtatChargement";
 import { Bouton } from "@/components/ui/Bouton";
 import { Feu } from "@/components/ui/Feu";
-import { syntheseQuery } from "@/features/pilotage/apiCockpit";
+import { adresseExportSynthese, syntheseQuery } from "@/features/pilotage/apiCockpit";
 import { formaterDate } from "@/lib/format";
 
 /**
@@ -20,7 +21,10 @@ import { formaterDate } from "@/lib/format";
  * libellé en toutes lettres pour la même raison.
  *
  * La feuille reprend l'apparence du papier institutionnel plutôt que celle de
- * l'application : ce qui sort d'ici va circuler hors de l'écran.
+ * l'application, mais **elle n'est plus la source du document** : le Word et le
+ * PDF sont écrits par le serveur depuis le gabarit officiel de la DSR
+ * (ADR 023). Cet écran sert à lire la note avant de la diffuser ; les deux
+ * boutons téléchargent le document, ils n'impriment plus la page.
  */
 export function SyntheseInstance() {
   const { data: synthese } = useQuery(syntheseQuery());
@@ -41,17 +45,21 @@ export function SyntheseInstance() {
         sousTitre={`${synthese.seance} — préparée par la ${synthese.producteur}`}
         actions={
           <>
-            <Bouton icone="imprimante" onClick={() => window.print()}>
-              Imprimer
+            <Bouton icone="exporter" href={adresseExportSynthese("docx")}>
+              Télécharger en Word
             </Bouton>
-            <Bouton variante="principal" icone="exporter" onClick={() => window.print()}>
-              Exporter en PDF
+            <Bouton variante="principal" icone="exporter" href={adresseExportSynthese("pdf")}>
+              Télécharger en PDF
             </Bouton>
           </>
         }
       />
 
       <div className="flex-1 overflow-y-auto bg-fond p-4 md:p-[26px]">
+        {/* L'en-tete institutionnel n'apparait qu'a l'impression : a l'ecran,
+            la barre de titre dit deja ou l'on est. */}
+        <EnTeteDocument impressionSeule />
+
         <article className="mx-auto flex max-w-[760px] flex-col gap-7 rounded-none border border-bordure bg-surface px-6 py-8 md:px-12 md:py-12 print:border-0 print:px-0">
           <header className="flex flex-col gap-2 border-b border-encre pb-5">
             <span className="text-[10.5px] leading-none font-bold tracking-[.6px] text-encre-tenue uppercase">
@@ -167,6 +175,8 @@ export function SyntheseInstance() {
             </p>
           </footer>
         </article>
+
+        <PiedDocument impressionSeule />
       </div>
     </>
   );

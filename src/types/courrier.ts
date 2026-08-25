@@ -10,7 +10,14 @@ export type EtapeCourrier =
   | "PARTI"
   | "CLOTURE";
 
-export type SensCourrier = "ARRIVEE" | "DEPART";
+/**
+ * Les trois sens d'un courrier.
+ *
+ * `INTERNE` manquait, et l'ecran « Courriers internes » affichait donc les
+ * arrivees : sans sens a transmettre, il retombait sur la valeur par defaut du
+ * registre. Le serveur, lui, porte les trois depuis toujours (`courrier.sens`).
+ */
+export type SensCourrier = "ARRIVEE" | "DEPART" | "INTERNE";
 
 export type PrioriteCourrier = "NORMALE" | "URGENTE" | "TRES_URGENTE";
 

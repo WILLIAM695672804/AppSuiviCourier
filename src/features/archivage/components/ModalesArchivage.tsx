@@ -55,7 +55,10 @@ export function ModaleNouvelleRegle({
   }
 
   const envoyer = handleSubmit((valeurs) => {
-    creer.mutate({ ...valeurs, dua: Number(valeurs.dua) }, { onSuccess: fermer });
+    creer.mutate(
+      { ...valeurs, dua: Number(valeurs.dua) },
+      { onSuccess: fermer },
+    );
   });
 
   return (
@@ -75,7 +78,9 @@ export function ModaleNouvelleRegle({
         libelle="Typologie documentaire"
         placeholder="Marché public et contrat"
         erreur={errors.typologie?.message}
-        {...register("typologie", { required: "La typologie est obligatoire." })}
+        {...register("typologie", {
+          required: "La typologie est obligatoire.",
+        })}
       />
 
       <ChampTexteLong
@@ -83,7 +88,9 @@ export function ModaleNouvelleRegle({
         placeholder="Quels documents relèvent de cette typologie."
         rows={3}
         erreur={errors.description?.message}
-        {...register("description", { required: "La description est obligatoire." })}
+        {...register("description", {
+          required: "La description est obligatoire.",
+        })}
       />
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -111,7 +118,9 @@ export function ModaleNouvelleRegle({
         placeholder="Texte ou instruction qui fonde la durée"
         aide="Sans fondement, la règle ne sera pas opposable en cas de contrôle."
         erreur={errors.fondementJuridique?.message}
-        {...register("fondementJuridique", { required: "Le fondement juridique est obligatoire." })}
+        {...register("fondementJuridique", {
+          required: "Le fondement juridique est obligatoire.",
+        })}
       />
     </ModaleFormulaire>
   );
@@ -162,21 +171,26 @@ export function ModaleVerser({
       sousTitre={`${versement.reference} — ${versement.objet}`}
       libelleEnvoi="Verser"
       enCours={verser.isPending}
-      erreur={verser.isError ? "Le versement n'a pas pu être enregistré." : null}
+      erreur={
+        verser.isError ? "Le versement n'a pas pu être enregistré." : null
+      }
       consequence="Le versement est irréversible et scelle une nouvelle empreinte."
       largeur={600}
     >
       <Encart ton="accent" icone="archive">
-        Le versement transfère la garde du dossier au système d'archivage. Il ne le détruit pas :
-        le sort final — {versement.sortFinal.toLowerCase()} — s'appliquera à l'échéance de la durée
-        d'utilité administrative, sur bordereau visé.
+        Le versement transfère la garde du dossier au système d'archivage. Il ne
+        le détruit pas : le sort final — {versement.sortFinal.toLowerCase()} —
+        s'appliquera à l'échéance de la durée d'utilité administrative, sur
+        bordereau visé.
       </Encart>
 
       {nonBloquantes.length > 0 && (
         <Encart ton="alerte" icone="horloge">
-          {nonBloquantes.length} anomalie{nonBloquantes.length > 1 ? "s" : ""} non bloquante
-          {nonBloquantes.length > 1 ? "s" : ""} subsiste{nonBloquantes.length > 1 ? "nt" : ""}.
-          Verser malgré elle{nonBloquantes.length > 1 ? "s" : ""} suppose de le motiver :
+          {nonBloquantes.length} anomalie{nonBloquantes.length > 1 ? "s" : ""}{" "}
+          non bloquante
+          {nonBloquantes.length > 1 ? "s" : ""} subsiste
+          {nonBloquantes.length > 1 ? "nt" : ""}. Verser malgré elle
+          {nonBloquantes.length > 1 ? "s" : ""} suppose de le motiver :
           l'observation sera conservée avec le dossier.
         </Encart>
       )}
@@ -186,7 +200,8 @@ export function ModaleVerser({
         placeholder="Ce qui a été contrôlé, et ce qui reste en écart le cas échéant."
         erreur={errors.observation?.message}
         {...register("observation", {
-          required: "Une observation est obligatoire : elle accompagne le dossier versé.",
+          required:
+            "Une observation est obligatoire : elle accompagne le dossier versé.",
         })}
       />
     </ModaleFormulaire>
@@ -221,7 +236,11 @@ export function ModalePreuveIntegrite({
 
   const envoyer = handleSubmit((valeurs) => {
     produire.mutate(
-      { versementId: versement.id, motif: valeurs.motif, destinataire: valeurs.destinataire },
+      {
+        versementId: versement.id,
+        motif: valeurs.motif,
+        destinataire: valeurs.destinataire,
+      },
       { onSuccess: (resultat) => setPreuve(resultat) },
     );
   });
@@ -236,14 +255,19 @@ export function ModalePreuveIntegrite({
       libelleEnvoi={preuve ? "Terminer" : "Produire la preuve"}
       enCours={produire.isPending}
       erreur={produire.isError ? "La preuve n'a pas pu être produite." : null}
-      consequence={preuve ? undefined : "La production est journalisée : qui, quand, pour qui."}
+      consequence={
+        preuve
+          ? undefined
+          : "La production est journalisée : qui, quand, pour qui."
+      }
       largeur={620}
     >
       {preuve ? (
         <>
           <Encart ton="succes" icone="coche">
-            Preuve produite. Elle atteste l'état du dossier à l'instant de l'horodatage, et
-            s'accompagne de la chaîne d'empreintes conservée à la fiche.
+            Preuve produite. Elle atteste l'état du dossier à l'instant de
+            l'horodatage, et s'accompagne de la chaîne d'empreintes conservée à
+            la fiche.
           </Encart>
 
           <div className="flex flex-col gap-3.5 rounded-none border border-bordure px-3.5 py-3.5">
@@ -253,8 +277,12 @@ export function ModalePreuveIntegrite({
                 {preuve.empreinte}
               </code>
             </Definition>
-            <Definition libelle="Horodatage">{formaterDateHeure(preuve.horodatage)}</Definition>
-            <Definition libelle="Autorité d'horodatage">{preuve.autorite}</Definition>
+            <Definition libelle="Horodatage">
+              {formaterDateHeure(preuve.horodatage)}
+            </Definition>
+            <Definition libelle="Autorité d'horodatage">
+              {preuve.autorite}
+            </Definition>
             <Definition libelle="Périmètre scellé">
               {preuve.nombrePieces} pièces · {preuve.taille}
             </Definition>
@@ -262,22 +290,26 @@ export function ModalePreuveIntegrite({
           </div>
 
           <Encart ton="alerte" icone="bouclier">
-            L'horodatage est interne. Pour être opposable devant une juridiction, il devra
-            provenir d'une autorité qualifiée — exigence RNF-CONF-02 du document de référence.
+            L'horodatage est interne. Pour être opposable devant une
+            juridiction, il devra provenir d'une autorité qualifiée — exigence
+            RNF-CONF-02 du document de référence.
           </Encart>
         </>
       ) : (
         <>
           <Encart ton="accent" icone="bouclier">
-            La preuve atteste qu'aucune pièce n'a été ajoutée ni retirée depuis la clôture. Elle
-            se remet à un tiers : auditeur, inspection, juridiction.
+            La preuve atteste qu'aucune pièce n'a été ajoutée ni retirée depuis
+            la clôture. Elle se remet à un tiers : auditeur, inspection,
+            juridiction.
           </Encart>
 
           <Champ
             libelle="Destinataire"
             placeholder="Division de l'audit interne"
             erreur={errors.destinataire?.message}
-            {...register("destinataire", { required: "Indiquez à qui la preuve est destinée." })}
+            {...register("destinataire", {
+              required: "Indiquez à qui la preuve est destinée.",
+            })}
           />
 
           <ChampTexteLong

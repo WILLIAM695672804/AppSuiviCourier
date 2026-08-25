@@ -6,6 +6,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Bouton } from "@/components/ui/Bouton";
 import { Carte } from "@/components/ui/Carte";
 import { Encart } from "@/components/ui/Encart";
+import { EtatChargement } from "@/components/ui/EtatChargement";
 import { Etiquette } from "@/components/ui/Etiquette";
 import { Icone } from "@/components/ui/Icone";
 import { circuitQuery, useViser } from "@/features/depart/api";
@@ -33,7 +34,15 @@ export function CircuitValidation() {
   const [modeRenvoi, setModeRenvoi] = useState(false);
 
   if (isPending || !data) {
-    return <p className="px-[26px] py-10 text-[13px] text-encre-tenue">Chargement du circuit…</p>;
+    return (
+      <>
+        <EnTetePage
+          titre="Circuit de validation"
+          miettes={[{ libelle: "Courriers départ", chemin: "/courriers/departs" }]}
+        />
+        <EtatChargement message="Chargement du circuit…" />
+      </>
+    );
   }
 
   const monTour = data.etapes.find((e) => e.etat === "attendu" && e.estMoi);
@@ -65,7 +74,7 @@ export function CircuitValidation() {
                   variante="principal"
                   icone="coche"
                   onClick={() => agir("viser")}
-                  disabled={viser.isPending}
+                  chargement={viser.isPending}
                 >
                   Apposer mon visa
                 </Bouton>

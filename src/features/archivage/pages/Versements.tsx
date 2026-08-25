@@ -7,7 +7,11 @@ import { Etiquette, type TonEtiquette } from "@/components/ui/Etiquette";
 import { Feu } from "@/components/ui/Feu";
 import { Pastilles } from "@/components/ui/Pastilles";
 import { Tableau, type Colonne } from "@/components/ui/Tableau";
-import { versementsQuery, type EtatVersement, type Versement } from "@/features/archivage/api";
+import {
+  versementsQuery,
+  type EtatVersement,
+  type Versement,
+} from "@/features/archivage/api";
 import { formaterDate } from "@/lib/format";
 
 /**
@@ -23,7 +27,13 @@ import { formaterDate } from "@/lib/format";
  * bloquantes : une pièce manquante se répare, une durée légale dépassée ne se
  * rattrape pas.
  */
-const FILTRES = ["Tous", "À verser", "Échéance dépassée", "Anomalie", "Versé"] as const;
+const FILTRES = [
+  "Tous",
+  "À verser",
+  "Échéance dépassée",
+  "Anomalie",
+  "Versé",
+] as const;
 
 const TONS_ETAT: Record<EtatVersement, TonEtiquette> = {
   "À verser": "accent",
@@ -39,11 +49,20 @@ export function Versements() {
   const { data, isPending } = useQuery(versementsQuery(filtre));
   const aujourdhui = new Date().toISOString().slice(0, 10);
 
-  const versements = [...(data?.versements ?? [])].sort((a, b) => {
-    const depasseA = a.echeanceSortFinal < aujourdhui && a.etat !== "Versé" ? 0 : 1;
-    const depasseB = b.echeanceSortFinal < aujourdhui && b.etat !== "Versé" ? 0 : 1;
-    return depasseA - depasseB || a.echeanceSortFinal.localeCompare(b.echeanceSortFinal);
-  });
+  // Un dossier sans règle de conservation n'a pas d'échéance de sort final :
+  // il passe en tête, avant les échéances dépassées. Ce n'est pas une urgence
+  // de calendrier, c'est une règle qui manque — et tant qu'elle manque, le
+  // dossier ne peut pas être versé du tout.
+  const rang = (v: Versement) => {
+    if (v.echeanceSortFinal === null) return 0;
+    return v.echeanceSortFinal < aujourdhui && v.etat !== "Versé" ? 1 : 2;
+  };
+
+  const versements = [...(data?.versements ?? [])].sort(
+    (a, b) =>
+      rang(a) - rang(b) ||
+      (a.echeanceSortFinal ?? "").localeCompare(b.echeanceSortFinal ?? ""),
+  );
 
   const colonnes: Colonne<Versement>[] = [
     {
@@ -77,7 +96,10 @@ export function Versements() {
       entete: "Échéance du sort final",
       largeur: "148px",
       rendu: (v) => {
-        const depassee = v.echeanceSortFinal < aujourdhui && v.etat !== "Versé";
+        const depassee =
+          v.echeanceSortFinal !== null &&
+          v.echeanceSortFinal < aujourdhui &&
+          v.etat !== "Versé";
         return (
           <span className="flex min-w-0 flex-col gap-1.5">
             <span
@@ -88,7 +110,9 @@ export function Versements() {
               {formaterDate(v.echeanceSortFinal)}
             </span>
             <span className="text-[10px] leading-none font-medium text-encre-tenue">
-              {depassee ? "dépassée" : `${v.sortFinal.toLowerCase()} · DUA ${v.dua} ans`}
+              {depassee
+                ? "dépassée"
+                : `${v.sortFinal.toLowerCase()} · DUA ${v.dua} ans`}
             </span>
           </span>
         );
@@ -107,7 +131,9 @@ export function Versements() {
           >
             {v.pieces} / {v.piecesAttendues}
           </span>
-          {v.pieces < v.piecesAttendues && <Feu niveau="rouge" libelle="incomplet" />}
+          {v.pieces < v.piecesAttendues && (
+            <Feu niveau="rouge" libelle="incomplet" />
+          )}
         </span>
       ),
     },
@@ -129,7 +155,10 @@ export function Versements() {
 
       <div className="flex-1 overflow-y-auto bg-fond p-4 md:p-[26px]">
         <div className="flex flex-col gap-3.5">
-          <BandeauCompteurs compteurs={data?.compteurs ?? []} chargement={isPending} />
+          <BandeauCompteurs
+            compteurs={data?.compteurs ?? []}
+            chargement={isPending}
+          />
 
           <div className="rounded-none border border-bordure bg-surface px-4 pt-4 pb-2 md:px-5">
             <Pastilles
@@ -152,8 +181,9 @@ export function Versements() {
           </div>
 
           <p className="px-1 text-[11px] leading-[1.5] font-medium text-encre-tenue">
-            Une échéance dépassée n'est pas un retard ordinaire : la durée légale de conservation
-            est opposable en cas de contrôle, et son dépassement se constate sans se rattraper.
+            Une échéance dépassée n'est pas un retard ordinaire : la durée
+            légale de conservation est opposable en cas de contrôle, et son
+            dépassement se constate sans se rattraper.
           </p>
         </div>
       </div>

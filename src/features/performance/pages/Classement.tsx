@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { EnTetePage } from "@/components/EnTetePage";
 import { BandeauCompteurs } from "@/components/ui/BandeauCompteurs";
 import { BarreProgression } from "@/components/ui/BarreProgression";
@@ -9,8 +8,8 @@ import { Encart } from "@/components/ui/Encart";
 import { Feu } from "@/components/ui/Feu";
 import { SelecteurPeriode } from "@/components/ui/SelecteurPeriode";
 import { Tableau, type Colonne } from "@/components/ui/Tableau";
-import { matriceQuery, type LigneClassement } from "@/features/performance/api";
-import { periodeCourante, type Periode } from "@/lib/periode";
+import { matriceQuery, periodeDepuisUrl, type LigneClassement } from "@/features/performance/api";
+import type { Periode } from "@/lib/periode";
 
 /**
  * Matrice de scoring administratif — le classement mensuel des structures.
@@ -27,17 +26,22 @@ import { periodeCourante, type Periode } from "@/lib/periode";
  * provisoire. Comparer des structures sur un mois en cours revient à comparer
  * des mesures prises à des moments différents.
  */
-const RANGS_MOIS = 12;
-
 export function Classement() {
   const naviguer = useNavigate();
-  const [periode, setPeriode] = useState<Periode>(() => {
-    // On ouvre sur le dernier mois clos : c'est le seul comparable.
-    const courante = periodeCourante("mois");
-    return courante.rang === 1
-      ? { granularite: "mois", annee: courante.annee - 1, rang: RANGS_MOIS }
-      : { ...courante, rang: courante.rang - 1 };
-  });
+
+  // La période vit dans l'URL et non dans un état local : la fiche d'une
+  // structure doit s'ouvrir sur le mois qu'on regardait, et un lien partagé
+  // doit rester exact. À défaut de paramètre, le dernier mois clos — le seul
+  // comparable d'une structure à l'autre.
+  const [parametres, setParametres] = useSearchParams();
+  const periode = periodeDepuisUrl(parametres);
+
+  function changerPeriode(suivante: Periode) {
+    setParametres(
+      { annee: String(suivante.annee), mois: String(suivante.rang) },
+      { replace: true },
+    );
+  }
 
   const { data, isPending } = useQuery(matriceQuery(periode.annee, periode.rang));
   const lignes = data?.lignes ?? [];
@@ -80,7 +84,9 @@ export function Classement() {
       role: "titre",
       rendu: (l) => (
         <span className="flex min-w-0 flex-col gap-1.5">
-          <span className="text-[12.5px] leading-none font-bold text-encre">{l.structureSigle}</span>
+          <span className="text-[12.5px] leading-none font-bold text-encre">
+            {l.structureSigle}
+          </span>
           <span className="truncate text-[10.5px] leading-none font-medium text-encre-tenue">
             {l.structureLibelle}
           </span>
@@ -116,10 +122,10 @@ export function Classement() {
       <EnTetePage
         titre="Matrice de scoring"
         compte={lignes.length}
-        sousTitre="Classement mensuel des structures — activités, courrier, rituels et dossiers"
+        sousTitre="Classement mensuel des structures — activités, courrier et rituels"
         actions={
           <>
-            <SelecteurPeriode periode={periode} onChange={setPeriode} />
+            <SelecteurPeriode periode={periode} onChange={changerPeriode} />
             <Bouton icone="exporter">Exporter</Bouton>
           </>
         }
@@ -131,26 +137,31 @@ export function Classement() {
 
           {data?.provisoire && (
             <Encart ton="alerte" icone="horloge">
-              La période n'est pas close : ce classement est provisoire et ne doit pas être
-              diffusé. Les structures n'ont pas toutes achevé leurs remontées du mois.
+              La période n'est pas close : ce classement est provisoire et ne doit pas être diffusé.
+              Les structures n'ont pas toutes achevé leurs remontées du mois.
             </Encart>
           )}
 
           <div className="rounded-none border border-bordure bg-surface px-4 pt-2 pb-2 md:px-5">
             <Tableau
-                chargement={isPending}
+              chargement={isPending}
               colonnes={colonnes}
               lignes={lignes}
               cleLigne={(l) => l.structureSigle}
-              onLigneClick={(l) => naviguer(`/performance/classement/${l.structureSigle}`)}
+              onLigneClick={(l) =>
+                naviguer(
+                  `/performance/classement/${l.structureSigle}?annee=${periode.annee}&mois=${periode.rang}`,
+                )
+              }
               vide="Aucune structure évaluée sur cette période."
             />
           </div>
 
           <p className="px-1 text-[11px] leading-[1.5] font-medium text-encre-tenue">
-            Le score global est la moyenne des quatre critères, pondérée par les taux affichés en
-            en-tête. Ouvrez une structure pour voir la décomposition de sa note, indicateur par
-            indicateur.
+            Le score global est la moyenne des critères mesurables, pondérée par les taux affichés
+            en en-tête. Un critère sans source — le courrier, tant que son pilier n'est pas livré —
+            sort du calcul au lieu de compter zéro. Ouvrez une structure pour voir la décomposition
+            de sa note, indicateur par indicateur.
           </p>
         </div>
       </div>

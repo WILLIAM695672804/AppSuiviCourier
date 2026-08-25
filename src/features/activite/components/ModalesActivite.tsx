@@ -11,6 +11,7 @@ import { ChampDate } from "@/components/ui/ChampDate";
 import { ChampTexteLong } from "@/components/ui/ChampTexteLong";
 import { Encart } from "@/components/ui/Encart";
 import { ModaleFormulaire } from "@/components/ui/ModaleFormulaire";
+import { SelecteurAgent } from "@/components/ui/SelecteurAgent";
 import { ZoneDepot, type FichierDepose } from "@/components/ui/ZoneDepot";
 import { OPTIONS_AXES, type LibelleAxe } from "@/lib/axesStrategiques";
 import { formaterDate } from "@/lib/format";
@@ -21,7 +22,6 @@ import {
   useCreerActivite,
   useDeclarerAvancement,
   useDeposerObligation,
-  useJoindrePiece,
   useLeverInstruction,
   useModifierActivite,
   useRattacherInstruction,
@@ -33,6 +33,7 @@ import {
   type InstructionActivite,
   type Obligation,
 } from "@/features/activite/api";
+import { useDeposerPiece } from "@/features/pieces/api";
 
 /**
  * Modales du pilier « activités ».
@@ -58,7 +59,8 @@ interface ChampsActivite {
   objectif: string;
   etatReferenceGeneral: string;
   resultatsAttendus: string;
-  responsable: string;
+  /** L'identifiant de l'agent. `<select>` rend une chaîne ; le service la convertit. */
+  responsableId: string;
   debut: string;
   fin: string;
   budgetValide: string;
@@ -102,7 +104,9 @@ function ChampsCommunsActivite({
         options={OPTIONS_AXES}
         aide="Les trois axes du plan stratégique du Port. Une activité en rejoint un seul."
         erreur={errors.axe?.message}
-        {...register("axe", { required: "Rattachez l'activité à un axe du plan stratégique." })}
+        {...register("axe", {
+          required: "Rattachez l'activité à un axe du plan stratégique.",
+        })}
       />
 
       <ChampTexteLong
@@ -118,7 +122,9 @@ function ChampsCommunsActivite({
         aide="Sans point de départ, aucun taux d'avancement ne veut dire quoi que ce soit."
         rows={3}
         erreur={errors.etatReferenceGeneral?.message}
-        {...register("etatReferenceGeneral", { required: "L'état de référence est obligatoire." })}
+        {...register("etatReferenceGeneral", {
+          required: "L'état de référence est obligatoire.",
+        })}
       />
 
       <ChampTexteLong
@@ -126,20 +132,21 @@ function ChampsCommunsActivite({
         placeholder="Ce qui permettra de dire que l'activité est réalisée."
         rows={3}
         erreur={errors.resultatsAttendus?.message}
-        {...register("resultatsAttendus", { required: "Les résultats attendus sont obligatoires." })}
+        {...register("resultatsAttendus", {
+          required: "Les résultats attendus sont obligatoires.",
+        })}
       />
 
       {/*
-        Le responsable se saisit et ne se déduit pas du compte connecté : un
+        Le responsable se choisit et ne se déduit pas du compte connecté : un
         point focal inscrit les activités de toute sa direction sans en porter
-        aucune.
+        aucune. L'annuaire n'est donc pas borné à sa structure — ADR 020.
       */}
-      <Champ
+      <SelecteurAgent
         libelle="Responsable de l'activité"
-        placeholder="S. Bamba"
         aide="La personne qui répond de l'exécution, pas celle qui saisit."
-        erreur={errors.responsable?.message}
-        {...register("responsable", { required: "Désignez un responsable." })}
+        erreur={errors.responsableId?.message}
+        {...register("responsableId", { required: "Désignez un responsable." })}
       />
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -153,7 +160,8 @@ function ChampsCommunsActivite({
           erreur={errors.fin?.message}
           {...register("fin", {
             required: "Indiquez la fin.",
-            validate: (valeur) => !debut || valeur >= debut || "La fin ne peut pas précéder le début.",
+            validate: (valeur) =>
+              !debut || valeur >= debut || "La fin ne peut pas précéder le début.",
           })}
         />
       </div>
@@ -200,7 +208,7 @@ export function ModaleNouvelleActivite({
         objectif: valeurs.objectif,
         etatReferenceGeneral: valeurs.etatReferenceGeneral,
         resultatsAttendus: valeurs.resultatsAttendus,
-        responsable: valeurs.responsable,
+        responsableId: Number(valeurs.responsableId),
         debut: valeurs.debut,
         fin: valeurs.fin,
         budgetValide: valeurs.budgetValide ? Number(valeurs.budgetValide) : null,
@@ -258,7 +266,7 @@ export function ModaleModifierActivite({
       objectif: activite.objectif,
       etatReferenceGeneral: activite.etatReferenceGeneral,
       resultatsAttendus: activite.resultatsAttendus,
-      responsable: activite.responsable,
+      responsableId: activite.responsableId === null ? "" : String(activite.responsableId),
       debut: activite.debut,
       fin: activite.fin,
       budgetValide: activite.budgetValide === null ? "" : String(activite.budgetValide),
@@ -280,7 +288,7 @@ export function ModaleModifierActivite({
         objectif: valeurs.objectif,
         etatReferenceGeneral: valeurs.etatReferenceGeneral,
         resultatsAttendus: valeurs.resultatsAttendus,
-        responsable: valeurs.responsable,
+        responsableId: Number(valeurs.responsableId),
         debut: valeurs.debut,
         fin: valeurs.fin,
         budgetValide: valeurs.budgetValide ? Number(valeurs.budgetValide) : null,
@@ -315,7 +323,8 @@ export function ModaleModifierActivite({
         rows={3}
         erreur={errors.motif?.message}
         {...register("motif", {
-          required: "Le motif est obligatoire : une modification sans motif rend le plan illisible.",
+          required:
+            "Le motif est obligatoire : une modification sans motif rend le plan illisible.",
         })}
       />
     </ModaleFormulaire>
@@ -343,7 +352,12 @@ export function ModaleIndicateurActivite({
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<{ libelle: string; unite: string; etatReference: string; cible: string }>();
+  } = useForm<{
+    libelle: string;
+    unite: string;
+    etatReference: string;
+    cible: string;
+  }>();
 
   function fermer() {
     reset();
@@ -388,7 +402,9 @@ export function ModaleIndicateurActivite({
           placeholder="38"
           aide="La valeur constatée avant de commencer."
           erreur={errors.etatReference?.message}
-          {...register("etatReference", { required: "Indiquez l'état de référence." })}
+          {...register("etatReference", {
+            required: "Indiquez l'état de référence.",
+          })}
         />
         <Champ
           libelle="Cible"
@@ -431,7 +447,11 @@ export function ModaleReleveIndicateur({
   const envoyer = handleSubmit((valeurs) => {
     if (!indicateur) return;
     relever.mutate(
-      { activiteId: activite.id, indicateurId: indicateur.id, realise: valeurs.realise },
+      {
+        activiteId: activite.id,
+        indicateurId: indicateur.id,
+        realise: valeurs.realise,
+      },
       { onSuccess: fermer },
     );
   });
@@ -484,8 +504,12 @@ export function ModaleTacheActivite({
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<{ libelle: string; echeance: string; responsable: string }>({
-    defaultValues: { responsable: activite.responsable },
+  } = useForm<{ libelle: string; echeance: string; responsableId: string }>({
+    // Le responsable de l'activité par défaut : une tâche lui revient sauf
+    // mention contraire, et le formulaire ne doit pas le faire ressaisir.
+    defaultValues: {
+      responsableId: activite.responsableId === null ? "" : String(activite.responsableId),
+    },
   });
 
   function fermer() {
@@ -495,7 +519,15 @@ export function ModaleTacheActivite({
   }
 
   const envoyer = handleSubmit((valeurs) => {
-    ajouter.mutate({ activiteId: activite.id, ...valeurs }, { onSuccess: fermer });
+    ajouter.mutate(
+      {
+        activiteId: activite.id,
+        libelle: valeurs.libelle,
+        echeance: valeurs.echeance,
+        responsableId: Number(valeurs.responsableId),
+      },
+      { onSuccess: fermer },
+    );
   });
 
   return (
@@ -525,20 +557,39 @@ export function ModaleTacheActivite({
           {...register("echeance", {
             required: "Indiquez l'échéance.",
             validate: (valeur) =>
-              valeur <= activite.fin ||
-              "L'échéance dépasse la fin d'exécution de l'activité.",
+              valeur <= activite.fin || "L'échéance dépasse la fin d'exécution de l'activité.",
           })}
         />
-        <Champ
+        <SelecteurAgent
           libelle="Responsable"
-          erreur={errors.responsable?.message}
-          {...register("responsable", { required: "Désignez un responsable." })}
+          erreur={errors.responsableId?.message}
+          {...register("responsableId", {
+            required: "Désignez un responsable.",
+          })}
         />
       </div>
     </ModaleFormulaire>
   );
 }
 
+/**
+ * Déclaration d'avancement — §18.
+ *
+ * **Deux appels, dans cet ordre, et l'ordre se justifie.** La déclaration part
+ * d'abord (`POST /activites/{id}/avancement`), les justificatifs ensuite
+ * (`POST /api/pieces`, un par fichier). L'acte métier est la déclaration ; un
+ * fichier refusé — extension hors liste, poids au-delà du plafond — ne doit pas
+ * annuler un avancement déjà saisi.
+ *
+ * Ce qui impose, en contrepartie, de ne pas mentir sur ce qui a réussi : si le
+ * versement échoue, la modale reste ouverte et dit que **la déclaration est
+ * passée** et que seules les pièces manquent. Un message unique « échec » aurait
+ * conduit à re-déclarer, donc à inscrire deux fois le même avancement.
+ *
+ * Le fichier lui-même est envoyé. Jusqu'au 17 août 2026, la modale n'envoyait
+ * que `{nom, poids}` et le serveur inscrivait une pièce sans binaire ; voir
+ * `docs/pieges.md`.
+ */
 export function ModaleAvancementActivite({
   ouverte,
   onFermer,
@@ -552,7 +603,9 @@ export function ModaleAvancementActivite({
     activite.taches.filter((t) => t.fait).map((t) => t.id),
   );
   const [fichiers, setFichiers] = useState<FichierDepose[]>([]);
+  const [erreurPieces, setErreurPieces] = useState<string | null>(null);
   const declarer = useDeclarerAvancement();
+  const deposer = useDeposerPiece("activite", activite.id);
 
   const {
     register,
@@ -570,21 +623,57 @@ export function ModaleAvancementActivite({
   function fermer() {
     reset();
     setFichiers([]);
+    setErreurPieces(null);
     declarer.reset();
+    deposer.reset();
     onFermer();
   }
 
-  const envoyer = handleSubmit((valeurs) => {
-    declarer.mutate(
-      {
+  const envoyer = handleSubmit(async (valeurs) => {
+    setErreurPieces(null);
+
+    try {
+      await declarer.mutateAsync({
         activiteId: activite.id,
         avancement: Number(valeurs.avancement),
         observation: valeurs.observation,
         tachesFaites: taches,
-        pieces: fichiers.map((f) => ({ nom: f.nom, poids: f.taille })),
-      },
-      { onSuccess: fermer },
-    );
+      });
+    } catch {
+      // `declarer.isError` porte déjà le message ; relancer ici produirait une
+      // promesse rejetée que personne n'attrape, et la console d'un agent n'est
+      // pas un canal d'erreur.
+      return;
+    }
+
+    // Séquentiel et non `Promise.all` : le plafond de taille est vérifié fichier
+    // par fichier côté serveur, et lancer cinq téléversements de front sur une
+    // liaison lente est le meilleur moyen de les faire tous expirer.
+    const refuses: string[] = [];
+    for (const fichier of fichiers) {
+      try {
+        await deposer.mutateAsync({
+          fichier: fichier.fichier,
+          nom: fichier.nom,
+          categorie: "justificatif",
+        });
+      } catch {
+        refuses.push(fichier.nom);
+      }
+    }
+
+    if (refuses.length > 0) {
+      // La déclaration, elle, est inscrite : le dire explicitement évite qu'on
+      // la resaisisse et qu'un même avancement figure deux fois à la fiche de vie.
+      setErreurPieces(
+        `L'avancement est bien déclaré, mais ${refuses.length === 1 ? "cette pièce n'a pas pu être versée" : "ces pièces n'ont pas pu être versées"} : ${refuses.join(", ")}. ` +
+          "Vérifiez le format et le poids, puis déposez-les depuis l'onglet des pièces jointes.",
+      );
+      setFichiers([]);
+      return;
+    }
+
+    fermer();
   });
 
   return (
@@ -595,8 +684,8 @@ export function ModaleAvancementActivite({
       titre="Déclarer un avancement"
       sousTitre={activite.reference}
       libelleEnvoi="Déclarer"
-      enCours={declarer.isPending}
-      erreur={declarer.isError ? "L'avancement n'a pas pu être déclaré." : null}
+      enCours={declarer.isPending || deposer.isPending}
+      erreur={erreurPieces ?? (declarer.isError ? "L'avancement n'a pas pu être déclaré." : null)}
       consequence="La déclaration est inscrite à la fiche de vie et alimente le scoring de la structure."
     >
       <Champ
@@ -615,8 +704,8 @@ export function ModaleAvancementActivite({
 
       {ecart < -10 && (
         <Encart ton="alerte" icone="horloge">
-          L'écart avec l'attendu atteint {-ecart} points. Au-delà de dix points, l'activité passe
-          en retard et la DSR en est informée. Expliquez ce qui bloque dans l'observation.
+          L'écart avec l'attendu atteint {-ecart} points. Au-delà de dix points, l'activité passe en
+          retard et la DSR en est informée. Expliquez ce qui bloque dans l'observation.
         </Encart>
       )}
 
@@ -658,7 +747,9 @@ export function ModaleAvancementActivite({
         libelle="Observation"
         placeholder="Ce qui a avancé, ce qui bloque."
         erreur={errors.observation?.message}
-        {...register("observation", { required: "Une observation est obligatoire." })}
+        {...register("observation", {
+          required: "Une observation est obligatoire.",
+        })}
       />
 
       {/* §18 : les pièces jointes font partie de la fiche de vie. Elles pendent
@@ -668,79 +759,6 @@ export function ModaleAvancementActivite({
         aide="Rapport, procès-verbal, relevé — ce qui étaye la déclaration."
         fichiers={fichiers}
         onChange={setFichiers}
-      />
-    </ModaleFormulaire>
-  );
-}
-
-/** Versement d'une pièce hors déclaration d'avancement — §18. */
-export function ModalePieceVie({
-  ouverte,
-  onFermer,
-  activite,
-}: {
-  ouverte: boolean;
-  onFermer: () => void;
-  activite: ActiviteDetail;
-}) {
-  const [fichiers, setFichiers] = useState<FichierDepose[]>([]);
-  const [erreurFichier, setErreurFichier] = useState<string>();
-  const joindre = useJoindrePiece();
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<{ commentaire: string }>();
-
-  function fermer() {
-    reset();
-    setFichiers([]);
-    setErreurFichier(undefined);
-    joindre.reset();
-    onFermer();
-  }
-
-  const envoyer = handleSubmit((valeurs) => {
-    if (fichiers.length === 0) {
-      setErreurFichier("Choisissez la pièce à verser.");
-      return;
-    }
-    setErreurFichier(undefined);
-
-    joindre.mutate(
-      {
-        activiteId: activite.id,
-        nom: fichiers[0].nom,
-        poids: fichiers[0].taille,
-        commentaire: valeurs.commentaire,
-      },
-      { onSuccess: fermer },
-    );
-  });
-
-  return (
-    <ModaleFormulaire
-      ouverte={ouverte}
-      onFermer={fermer}
-      onEnvoyer={envoyer}
-      titre="Joindre une pièce"
-      sousTitre={activite.reference}
-      libelleEnvoi="Verser"
-      enCours={joindre.isPending}
-      erreur={joindre.isError ? "La pièce n'a pas pu être versée." : null}
-      consequence="La pièce rejoint la fiche de vie, datée et attribuée à son déposant."
-      largeur={560}
-    >
-      <ZoneDepot
-        libelle="Pièce à verser"
-        multiple={false}
-        fichiers={fichiers}
-        onChange={setFichiers}
-        erreur={erreurFichier}
-      />
-
-      <ChampTexteLong
-        libelle="Ce que la pièce établit"
-        placeholder="Une pièce sans objet inscrit ne prouve rien : dites ce qu'elle justifie."
-        rows={3}
-        erreur={errors.commentaire?.message}
-        {...register("commentaire", { required: "Indiquez ce que la pièce établit." })}
       />
     </ModaleFormulaire>
   );
@@ -805,13 +823,13 @@ export function ModaleSuspensionActivite({
     >
       {action === "suspendre" ? (
         <Encart ton="confidentiel" icone="horloge">
-          Tant que la suspension dure, aucun retard n'est décompté et aucune relance n'est
-          envoyée. L'activité sort du calcul du taux d'exécution de la structure.
+          Tant que la suspension dure, aucun retard n'est décompté et aucune relance n'est envoyée.
+          L'activité sort du calcul du taux d'exécution de la structure.
         </Encart>
       ) : (
         <Encart ton="accent" icone="coche">
-          L'activité reprend son cours. Le retard se recompte à partir d'aujourd'hui, sur la
-          période d'exécution restante.
+          L'activité reprend son cours. Le retard se recompte à partir d'aujourd'hui, sur la période
+          d'exécution restante.
         </Encart>
       )}
 
@@ -863,9 +881,14 @@ export function ModaleInstructionActivite({
     origine: "Instruction verbale" | "Décision du DG";
     reference: string;
     texte: string;
-    responsable: string;
+    responsableId: string;
     echeance: string;
-  }>({ defaultValues: { origine: "Instruction verbale", responsable: activite.responsable } });
+  }>({
+    defaultValues: {
+      origine: "Instruction verbale",
+      responsableId: activite.responsableId === null ? "" : String(activite.responsableId),
+    },
+  });
 
   function fermer() {
     reset();
@@ -880,7 +903,7 @@ export function ModaleInstructionActivite({
         origine: valeurs.origine,
         reference: valeurs.reference?.trim() || null,
         texte: valeurs.texte,
-        responsable: valeurs.responsable,
+        responsableId: Number(valeurs.responsableId),
         echeance: valeurs.echeance,
       },
       { onSuccess: fermer },
@@ -903,8 +926,14 @@ export function ModaleInstructionActivite({
       <Liste
         libelle="Origine"
         options={[
-          { valeur: "Instruction verbale", libelle: "Instruction verbale du Directeur général" },
-          { valeur: "Décision du DG", libelle: "Décision d'instance (CA, CODIR, DG)" },
+          {
+            valeur: "Instruction verbale",
+            libelle: "Instruction verbale du Directeur général",
+          },
+          {
+            valeur: "Décision du DG",
+            libelle: "Décision d'instance (CA, CODIR, DG)",
+          },
         ]}
         aide="Une instruction verbale se consigne au moment où elle est donnée ; une décision porte une référence."
         {...register("origine", { required: true })}
@@ -920,14 +949,18 @@ export function ModaleInstructionActivite({
         libelle="Teneur de l'instruction"
         placeholder="Ce qui est demandé, dans les termes où cela a été dit."
         erreur={errors.texte?.message}
-        {...register("texte", { required: "La teneur de l'instruction est obligatoire." })}
+        {...register("texte", {
+          required: "La teneur de l'instruction est obligatoire.",
+        })}
       />
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Champ
+        <SelecteurAgent
           libelle="Responsable désigné"
-          erreur={errors.responsable?.message}
-          {...register("responsable", { required: "Désignez le responsable de l'exécution." })}
+          erreur={errors.responsableId?.message}
+          {...register("responsableId", {
+            required: "Désignez le responsable de l'exécution.",
+          })}
         />
         <ChampDate
           libelle="Délai"
@@ -969,14 +1002,19 @@ export function ModaleLeveeInstruction({
   const envoyer = handleSubmit((valeurs) => {
     if (!instruction) return;
     lever.mutate(
-      { activiteId, instructionId: instruction.id, commentaire: valeurs.commentaire },
+      {
+        activiteId,
+        instructionId: instruction.id,
+        commentaire: valeurs.commentaire,
+      },
       { onSuccess: fermer },
     );
   });
 
   if (!instruction) return null;
 
-  const enRetard = !instruction.levee && instruction.echeance < new Date().toISOString().slice(0, 10);
+  const enRetard =
+    !instruction.levee && instruction.echeance < new Date().toISOString().slice(0, 10);
 
   return (
     <ModaleFormulaire
@@ -1072,7 +1110,9 @@ export function ModaleRelanceActivite({
         libelle="Teneur de la relance"
         placeholder="Ce qui est attendu de la structure, et sous quel délai."
         erreur={errors.texte?.message}
-        {...register("texte", { required: "La teneur de la relance est obligatoire." })}
+        {...register("texte", {
+          required: "La teneur de la relance est obligatoire.",
+        })}
       />
     </ModaleFormulaire>
   );
@@ -1222,8 +1262,8 @@ export function ModaleEtatPlan({
 
       {action === "valider" && (
         <Encart ton="succes" icone="coche">
-          La validation rend le plan opposable : les activités qu'il contient engagent la
-          structure, et leur exécution alimente le classement mensuel.
+          La validation rend le plan opposable : les activités qu'il contient engagent la structure,
+          et leur exécution alimente le classement mensuel.
         </Encart>
       )}
 

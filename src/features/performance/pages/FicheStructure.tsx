@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import { EnTetePage } from "@/components/EnTetePage";
 import { EtatChargement } from "@/components/ui/EtatChargement";
 import { Anneau } from "@/components/ui/Anneau";
@@ -8,7 +8,7 @@ import { Bouton } from "@/components/ui/Bouton";
 import { Carte } from "@/components/ui/Carte";
 import { Feu } from "@/components/ui/Feu";
 import { GrapheBarres } from "@/components/ui/GrapheBarres";
-import { ficheStructureQuery } from "@/features/performance/api";
+import { ficheStructureQuery, periodeDepuisUrl } from "@/features/performance/api";
 import { libellePeriode } from "@/lib/periode";
 
 /**
@@ -25,14 +25,24 @@ import { libellePeriode } from "@/lib/periode";
  */
 export function FicheStructure() {
   const { sigle } = useParams();
-  const { data: fiche } = useQuery(ficheStructureQuery(sigle ?? "", 2026, 7));
+  // La période vient de l'URL, posée par le classement : sans elle, la fiche
+  // afficherait un autre mois que le tableau d'où l'on vient, et le rang
+  // affiché ne correspondrait plus à celui qu'on a cliqué.
+  const [parametres] = useSearchParams();
+  const periode = periodeDepuisUrl(parametres);
+  const { data: fiche } = useQuery(ficheStructureQuery(sigle ?? "", periode.annee, periode.rang));
 
   if (!fiche) {
     return (
       <>
         <EnTetePage
           titre="Structure"
-          miettes={[{ libelle: "Matrice de scoring", chemin: "/performance/classement" }]}
+          miettes={[
+            {
+              libelle: "Matrice de scoring",
+              chemin: `/performance/classement?annee=${periode.annee}&mois=${periode.rang}`,
+            },
+          ]}
         />
         <EtatChargement message="Calcul du score de la structure…" />
       </>
@@ -50,7 +60,10 @@ export function FicheStructure() {
         titre={fiche.structureLibelle}
         sousTitre={`${fiche.structureSigle} — ${libellePeriode(fiche.periode)}`}
         miettes={[
-          { libelle: "Matrice de scoring", chemin: "/performance/classement" },
+          {
+            libelle: "Matrice de scoring",
+            chemin: `/performance/classement?annee=${periode.annee}&mois=${periode.rang}`,
+          },
           { libelle: fiche.structureSigle },
         ]}
         actions={<Bouton icone="imprimante">Imprimer la fiche</Bouton>}
@@ -139,8 +152,9 @@ export function FicheStructure() {
                 />
               </div>
               <p className="mt-3 text-[11px] leading-[1.5] font-medium text-encre-tenue">
-                Trois mois consécutifs sous 60 font passer la structure en situation critique, et
-                inscrivent son responsable à l'ordre du jour du comité de direction.
+                Les scores sont recalculés à chaque consultation depuis les données des piliers :
+                une correction rétroactive se répercute sur toute la courbe. Aucune règle d'escalade
+                automatique n'est en vigueur à ce jour.
               </p>
             </Carte>
           </div>

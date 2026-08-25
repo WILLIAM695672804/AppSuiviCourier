@@ -1,4 +1,8 @@
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { NiveauFeu } from "@/lib/feu";
 
@@ -45,7 +49,12 @@ export interface RegleConservation {
 
 export interface Referentiel {
   regles: RegleConservation[];
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
   /** Règles en attente du visa du service des archives. */
   enAttenteValidation: number;
 }
@@ -61,8 +70,13 @@ export interface Versement {
   closLe: string;
   dua: number;
   sortFinal: SortFinal;
-  /** Date à laquelle la DUA expire et où le sort final s'applique. */
-  echeanceSortFinal: string;
+  /**
+   * Date à laquelle la DUA expire et où le sort final s'applique. `null`
+   * lorsqu'aucune règle de conservation ne couvre la typologie du dossier :
+   * il n'y a alors pas de date à calculer, et c'est cette absence qui bloque
+   * le versement.
+   */
+  echeanceSortFinal: string | null;
   etat: EtatVersement;
   /** Pièces présentes rapportées aux pièces attendues pour cette typologie. */
   pieces: number;
@@ -81,7 +95,13 @@ export interface VersementDetail extends Versement {
   verseLe: string | null;
   versePar: string | null;
   anomalies: AnomalieVersement[];
-  piecesJointes: { id: number; nom: string; format: string; taille: string; presente: boolean }[];
+  piecesJointes: {
+    id: number;
+    nom: string;
+    format: string;
+    taille: string;
+    presente: boolean;
+  }[];
   /** Chaîne d'empreintes : chaque étape scelle l'état du dossier à ce moment. */
   chaineIntegrite: { etape: string; horodatage: string; empreinte: string }[];
 }
@@ -101,12 +121,22 @@ export interface PreuveIntegrite {
 
 /** Vue de contrôle, pour l'auditeur : la conformité, sans le pouvoir d'agir. */
 export interface ConformiteArchivistique {
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
   /** Dossiers dont la DUA est dépassée sans que le sort final ait été appliqué. */
   echeancesDepassees: Versement[];
   /** Typologies sans règle de conservation validée. */
   typologiesSansRegle: string[];
-  tauxConformite: number;
+  /**
+   * `null` quand le fonds est vide : sur zéro dossier clos, 0 % et 100 % sont
+   * aussi faux l'un que l'autre, mais eux seraient recopiés dans un rapport de
+   * contrôle. Voir l'ADR 011.
+   */
+  tauxConformite: number | null;
 }
 
 const CLE = "archivage";
@@ -114,7 +144,8 @@ const CLE = "archivage";
 export const referentielQuery = () =>
   queryOptions({
     queryKey: [CLE, "referentiel"],
-    queryFn: ({ signal }) => api.get<Referentiel>("/archivage/referentiel", signal),
+    queryFn: ({ signal }) =>
+      api.get<Referentiel>("/archivage/referentiel", signal),
   });
 
 export const versementsQuery = (filtre: string) =>
@@ -131,13 +162,15 @@ export const versementsQuery = (filtre: string) =>
 export const versementQuery = (id: number) =>
   queryOptions({
     queryKey: [CLE, "versement", id],
-    queryFn: ({ signal }) => api.get<VersementDetail>(`/archivage/versements/${id}`, signal),
+    queryFn: ({ signal }) =>
+      api.get<VersementDetail>(`/archivage/versements/${id}`, signal),
   });
 
 export const conformiteQuery = () =>
   queryOptions({
     queryKey: [CLE, "conformite"],
-    queryFn: ({ signal }) => api.get<ConformiteArchivistique>("/archivage/conformite", signal),
+    queryFn: ({ signal }) =>
+      api.get<ConformiteArchivistique>("/archivage/conformite", signal),
   });
 
 /* ------------------------------------------------------------------ *
@@ -172,20 +205,28 @@ function useEcriture<TCorps, TReponse = { id: number }>(
 
   return useMutation({
     mutationFn: (corps: TCorps) =>
-      api.post<TReponse>(typeof chemin === "function" ? chemin(corps) : chemin, corps),
+      api.post<TReponse>(
+        typeof chemin === "function" ? chemin(corps) : chemin,
+        corps,
+      ),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: [CLE] });
     },
   });
 }
 
-export const useCreerRegle = () => useEcriture<SaisieRegle>("/archivage/referentiel");
+export const useCreerRegle = () =>
+  useEcriture<SaisieRegle>("/archivage/referentiel");
 
 export const useValiderRegle = () =>
-  useEcriture<{ regleId: number }>((corps) => `/archivage/referentiel/${corps.regleId}/validation`);
+  useEcriture<{ regleId: number }>(
+    (corps) => `/archivage/referentiel/${corps.regleId}/validation`,
+  );
 
 export const useVerser = () =>
-  useEcriture<SaisieVersement>((corps) => `/archivage/versements/${corps.versementId}/versement`);
+  useEcriture<SaisieVersement>(
+    (corps) => `/archivage/versements/${corps.versementId}/versement`,
+  );
 
 export const useProduirePreuve = () =>
   useEcriture<DemandePreuve, PreuveIntegrite>(

@@ -6,6 +6,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Bouton } from "@/components/ui/Bouton";
 import { Carte } from "@/components/ui/Carte";
 import { MarqueCase } from "@/components/ui/CaseACocher";
+import { EtatChargement, EtatErreur } from "@/components/ui/EtatChargement";
 import { Etiquette } from "@/components/ui/Etiquette";
 import { Icone } from "@/components/ui/Icone";
 import { JaugeDelai } from "@/features/courrier/components/JaugeDelai";
@@ -31,14 +32,20 @@ export function DossierTraitement() {
   const [note, setNote] = useState("");
 
   if (isPending) {
-    return <p className="px-[26px] py-10 text-[13px] text-encre-tenue">Chargement du dossier…</p>;
+    return (
+      <>
+        <EnTetePage titre="Dossier" miettes={[{ libelle: "Mes dossiers", chemin: "/suivi" }]} />
+        <EtatChargement message="Chargement du dossier…" />
+      </>
+    );
   }
 
   if (isError || !data) {
     return (
-      <p className="px-[26px] py-10 text-[13px] text-danger">
-        {error instanceof Error ? error.message : "Dossier introuvable."}
-      </p>
+      <>
+        <EnTetePage titre="Dossier" miettes={[{ libelle: "Mes dossiers", chemin: "/suivi" }]} />
+        <EtatErreur message={error instanceof Error ? error.message : "Dossier introuvable."} />
+      </>
     );
   }
 

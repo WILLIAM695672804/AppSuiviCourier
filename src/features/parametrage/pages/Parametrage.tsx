@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router";
+import { usePermission } from "@/lib/contexteSession";
+import { PERMISSIONS } from "@/types/habilitation";
 import { EnTeteAdmin, OngletsAdmin } from "@/components/EnTeteAdmin";
 import { Bouton } from "@/components/ui/Bouton";
 import { Carte } from "@/components/ui/Carte";
@@ -7,6 +10,7 @@ import { ChampRecherche } from "@/components/ui/ChampRecherche";
 import { Encart } from "@/components/ui/Encart";
 import { Etiquette } from "@/components/ui/Etiquette";
 import { parametrageQuery, type DonneesParametrage } from "@/features/parametrage/api";
+import { OngletReglesMetier } from "@/features/parametrage/components/OngletReglesMetier";
 import { useValeurDifferee } from "@/lib/useValeurDifferee";
 
 /**
@@ -27,11 +31,14 @@ const ONGLETS: readonly { cle: string; libelle: string }[] = [
   { cle: "engagements", libelle: "Délais et engagements" },
   { cle: "classement", libelle: "Plan de classement" },
   { cle: "seuils", libelle: "Seuils d'alerte" },
+  { cle: "reglesMetier", libelle: "Règles de gestion" },
 ];
 
 const ENTETE = "text-[9.5px] leading-none font-bold tracking-[.7px] text-encre-tenue uppercase";
 
 export function Parametrage() {
+  const naviguer = useNavigate();
+  const voitLeJournal = usePermission(PERMISSIONS.AUDIT);
   const [onglet, setOnglet] = useState("circuits");
   const [saisie, setSaisie] = useState("");
   const recherche = useValeurDifferee(saisie).trim().toLowerCase();
@@ -42,7 +49,19 @@ export function Parametrage() {
     <>
       <EnTeteAdmin
         titre="Paramétrage métier"
-        actions={<Bouton icone="horloge">Journal des modifications</Bouton>}
+        actions={
+          // Le journal vit sous AUDIT, que l'administrateur fonctionnel ne
+          // porte pas : lui montrer le bouton l'enverrait sur un refus.
+          voitLeJournal ? (
+            <Bouton
+              icone="horloge"
+              onClick={() => naviguer("/tracabilite")}
+              title="Les modifications du paramétrage sont des événements comme les autres : elles se lisent au journal."
+            >
+              Journal des modifications
+            </Bouton>
+          ) : null
+        }
       />
 
       <OngletsAdmin onglets={ONGLETS} actif={onglet} onChange={setOnglet} />
@@ -62,18 +81,32 @@ export function Parametrage() {
             {onglet === "circuits" && (
               <Carte
                 titre="Modèles de circuit"
-                aDroite={<Bouton variante="doux" icone="plus">Créer un modèle</Bouton>}
+                aDroite={
+                  <Bouton
+                    variante="doux"
+                    icone="plus"
+                    disabled
+                    title="Aucune écriture n'est ouverte sur ce référentiel : le pilier courrier qui le consomme n'est pas livré."
+                  >
+                    Créer un modèle
+                  </Bouton>
+                }
               >
                 <div className="mt-3.5 overflow-x-auto">
                   <div className="min-w-[680px]">
                     <div className="grid grid-cols-[minmax(180px,1.4fr)_minmax(140px,1fr)_90px_100px_100px_90px] items-center gap-2.5 border-y border-bordure bg-surface-tete py-2.5">
-                      {["Modèle de circuit", "S'applique à", "Étapes", "Délai cible", "Usage 2026", "État"].map(
-                        (t) => (
-                          <span key={t} className={ENTETE}>
-                            {t}
-                          </span>
-                        ),
-                      )}
+                      {[
+                        "Modèle de circuit",
+                        "S'applique à",
+                        "Étapes",
+                        "Délai cible",
+                        "Usage 2026",
+                        "État",
+                      ].map((t) => (
+                        <span key={t} className={ENTETE}>
+                          {t}
+                        </span>
+                      ))}
                     </div>
 
                     {data.circuits
@@ -113,7 +146,16 @@ export function Parametrage() {
             {onglet === "regles" && (
               <Carte
                 titre="Règles de sélection du circuit"
-                aDroite={<Bouton variante="doux" icone="plus">Ajouter une règle</Bouton>}
+                aDroite={
+                  <Bouton
+                    variante="doux"
+                    icone="plus"
+                    disabled
+                    title="Aucune écriture n'est ouverte sur ce référentiel : le pilier courrier qui le consomme n'est pas livré."
+                  >
+                    Ajouter une règle
+                  </Bouton>
+                }
               >
                 <div className="mt-2">
                   <Encart ton="accent" icone="aide">
@@ -210,7 +252,12 @@ export function Parametrage() {
               <Carte
                 titre="Correspondants"
                 aDroite={
-                  <Bouton variante="doux" icone="personnes">
+                  <Bouton
+                    variante="doux"
+                    icone="personnes"
+                    disabled
+                    title="La fusion de correspondants n'est pas ouverte : le signalement est un soupçon, jamais une fusion automatique."
+                  >
                     Examiner les doublons
                   </Bouton>
                 }
@@ -261,7 +308,16 @@ export function Parametrage() {
             {onglet === "engagements" && (
               <Carte
                 titre="Délais et engagements"
-                aDroite={<Bouton variante="doux" icone="plus">Ajouter un engagement</Bouton>}
+                aDroite={
+                  <Bouton
+                    variante="doux"
+                    icone="plus"
+                    disabled
+                    title="Aucune écriture n'est ouverte sur ce référentiel : le pilier courrier qui le consomme n'est pas livré."
+                  >
+                    Ajouter un engagement
+                  </Bouton>
+                }
               >
                 <div className="mt-3.5 overflow-x-auto">
                   <div className="min-w-[620px]">
@@ -316,6 +372,9 @@ export function Parametrage() {
             {onglet === "etapes" && <OngletEtapes data={data} />}
             {onglet === "classement" && <OngletClassement data={data} recherche={recherche} />}
             {onglet === "seuils" && <OngletSeuils data={data} />}
+            {onglet === "reglesMetier" && (
+              <OngletReglesMetier regles={data.reglesMetier} recherche={recherche} />
+            )}
           </>
         )}
       </div>
@@ -414,13 +473,7 @@ function OngletEtapes({ data }: { data: DonneesParametrage }) {
  * associées sont le pont entre les deux — c'est par elles qu'une rubrique
  * hérite d'une durée d'utilité administrative.
  */
-function OngletClassement({
-  data,
-  recherche,
-}: {
-  data: DonneesParametrage;
-  recherche: string;
-}) {
+function OngletClassement({ data, recherche }: { data: DonneesParametrage; recherche: string }) {
   const rubriques = data.classement.filter(
     (r) => !recherche || `${r.code} ${r.libelle}`.toLowerCase().includes(recherche),
   );
@@ -429,7 +482,12 @@ function OngletClassement({
     <Carte
       titre="Plan de classement"
       aDroite={
-        <Bouton variante="principal" icone="plus">
+        <Bouton
+          variante="principal"
+          icone="plus"
+          disabled
+          title="Aucune écriture n'est ouverte sur ce référentiel : le pilier courrier qui le consomme n'est pas livré."
+        >
           Ajouter une rubrique
         </Bouton>
       }
@@ -495,7 +553,12 @@ function OngletSeuils({ data }: { data: DonneesParametrage }) {
     <Carte
       titre="Seuils d'alerte"
       aDroite={
-        <Bouton variante="principal" icone="plus">
+        <Bouton
+          variante="principal"
+          icone="plus"
+          disabled
+          title="Aucune écriture n'est ouverte sur ce référentiel : le pilier courrier qui le consomme n'est pas livré."
+        >
           Ajouter un seuil
         </Bouton>
       }
@@ -503,8 +566,9 @@ function OngletSeuils({ data }: { data: DonneesParametrage }) {
       {inactifs > 0 && (
         <div className="mt-3">
           <Encart ton="alerte" icone="cloche">
-            {inactifs} seuil{inactifs > 1 ? "s sont désactivés" : " est désactivé"} : le dépassement
-            est mesuré mais n'avertit personne.
+            {inactifs} seuil
+            {inactifs > 1 ? "s sont désactivés" : " est désactivé"} : le dépassement est mesuré mais
+            n'avertit personne.
           </Encart>
         </div>
       )}
@@ -512,13 +576,18 @@ function OngletSeuils({ data }: { data: DonneesParametrage }) {
       <div className="mt-3.5 overflow-x-auto">
         <div className="min-w-[860px]">
           <div className="grid grid-cols-[minmax(0,1.6fr)_120px_128px_minmax(0,1.6fr)_128px_92px] items-center gap-3 border-y border-bordure bg-surface-tete py-2.5">
-            {["Indicateur surveillé", "Périmètre", "Déclenche si", "Destinataire", "Canal", "30 jours"].map(
-              (t) => (
-                <span key={t} className={ENTETE}>
-                  {t}
-                </span>
-              ),
-            )}
+            {[
+              "Indicateur surveillé",
+              "Périmètre",
+              "Déclenche si",
+              "Destinataire",
+              "Canal",
+              "30 jours",
+            ].map((t) => (
+              <span key={t} className={ENTETE}>
+                {t}
+              </span>
+            ))}
           </div>
 
           {data.seuils.map((seuil) => (

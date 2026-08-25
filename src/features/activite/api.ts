@@ -51,6 +51,14 @@ export interface Activite {
   structureSigle: string;
   structureLibelle: string;
   responsable: string;
+  /**
+   * L'identifiant du responsable, en plus de son nom.
+   *
+   * Le nom s'affiche, l'identifiant se renvoie : c'est lui que le sélecteur de
+   * la modale de modification repose (ADR 020). Sans lui, rouvrir une activité
+   * pour la corriger repartait d'un sélecteur vide.
+   */
+  responsableId: number | null;
   initiales: string;
   debut: string;
   fin: string;
@@ -182,7 +190,12 @@ export interface ActiviteDetail extends Activite {
 
 export interface RegistreActivites {
   activites: Activite[];
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
   total: number;
   /** Structures présentes dans le jeu, pour le filtre. */
   structures: string[];
@@ -227,10 +240,16 @@ export interface PlanResume {
 
 export interface CorbeillePlans {
   plans: PlanResume[];
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
 }
 
-export type NatureObligation = "Rapport mensuel d'activité" | "Procès-verbal de réunion" | "Rapport sectoriel";
+export type NatureObligation =
+  "Rapport mensuel d'activité" | "Procès-verbal de réunion" | "Rapport sectoriel";
 
 /**
  * Ce qu'une structure doit produire, et quand.
@@ -264,7 +283,12 @@ export interface Obligation {
 
 export interface RegistreObligations {
   obligations: Obligation[];
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
   /** Taux de dépôt dans les délais, sur les douze derniers mois. */
   ponctualite: number;
 }
@@ -310,7 +334,10 @@ export const obligationsQuery = (filtre: string) =>
   queryOptions({
     queryKey: [CLE, "obligations", filtre],
     queryFn: ({ signal }) =>
-      api.get<RegistreObligations>(`/activites/obligations?filtre=${encodeURIComponent(filtre)}`, signal),
+      api.get<RegistreObligations>(
+        `/activites/obligations?filtre=${encodeURIComponent(filtre)}`,
+        signal,
+      ),
     placeholderData: (precedent) => precedent,
   });
 
@@ -333,8 +360,11 @@ export interface SaisieActivite {
    * Un point focal inscrit les activités de toute sa direction : le déduire du
    * compte connecté aurait fait de lui le responsable de tout, et rendu la
    * colonne « responsable » du registre inutilisable.
+   *
+   * L'identifiant et non le nom : le champ était libre et le serveur comparait
+   * la saisie au nom complet caractère par caractère. Voir l'ADR 020.
    */
-  responsable: string;
+  responsableId: number;
 }
 
 /** Modification d'une activité inscrite. Le motif alimente la fiche de vie. */
@@ -362,24 +392,25 @@ export interface SaisieTacheActivite {
   activiteId: number;
   libelle: string;
   echeance: string;
-  responsable: string;
+  responsableId: number;
 }
 
+/**
+ * Déclaration d'avancement — **sans pièce**.
+ *
+ * Le champ `pieces: {nom, poids}[]` a disparu le 17 août 2026. Il n'envoyait
+ * que le nom et le poids du fichier, jamais le fichier : le serveur inscrivait
+ * une ligne de pièce jointe sans empreinte ni chemin de stockage, l'onglet des
+ * pièces la listait comme les autres, et le clic tombait sur une erreur.
+ *
+ * Les justificatifs se versent par `POST /api/pieces` (`useDeposerPiece`), qui
+ * envoie le binaire. La modale d'avancement enchaîne les deux appels.
+ */
 export interface SaisieAvancementActivite {
   activiteId: number;
   avancement: number;
   observation: string;
   tachesFaites: number[];
-  /** Pièces justifiant la déclaration. Facultatives, versées à la fiche de vie. */
-  pieces: { nom: string; poids: string }[];
-}
-
-/** Pièce versée hors déclaration d'avancement — un rapport, un compte rendu. */
-export interface SaisiePieceVie {
-  activiteId: number;
-  nom: string;
-  poids: string;
-  commentaire: string;
 }
 
 export interface SaisieSuspension {
@@ -395,7 +426,7 @@ export interface SaisieInstructionActivite {
   origine: "Instruction verbale" | "Décision du DG";
   reference: string | null;
   texte: string;
-  responsable: string;
+  responsableId: number;
   echeance: string;
 }
 
@@ -462,9 +493,6 @@ export const useAjouterTache = () =>
 
 export const useDeclarerAvancement = () =>
   useEcriture<SaisieAvancementActivite>((corps) => `/activites/${corps.activiteId}/avancement`);
-
-export const useJoindrePiece = () =>
-  useEcriture<SaisiePieceVie>((corps) => `/activites/${corps.activiteId}/pieces`);
 
 export const useSuspendreActivite = () =>
   useEcriture<SaisieSuspension>((corps) => `/activites/${corps.activiteId}/suspension`);

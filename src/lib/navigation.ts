@@ -49,7 +49,11 @@ export const MENU: EntreeMenu[][] = [
       compteur: "courriers",
       sousEntrees: [
         { libelle: "Courriers arrivés", chemin: "/courriers", permissions: [PERMISSIONS.LEC] },
-        { libelle: "Courriers départ", chemin: "/courriers/departs", permissions: [PERMISSIONS.LEC] },
+        {
+          libelle: "Courriers départ",
+          chemin: "/courriers/departs",
+          permissions: [PERMISSIONS.LEC],
+        },
         /*
          * La file de signature au menu, et non derriere un bouton du registre
          * des departs. Celui qui signe ne vient pas parcourir un registre : il
@@ -62,7 +66,11 @@ export const MENU: EntreeMenu[][] = [
           chemin: "/courriers/departs/signature",
           permissions: [PERMISSIONS.VAL],
         },
-        { libelle: "Courriers internes", chemin: "/courriers/internes", permissions: [PERMISSIONS.LEC] },
+        {
+          libelle: "Courriers internes",
+          chemin: "/courriers/internes",
+          permissions: [PERMISSIONS.LEC],
+        },
         { libelle: "Import de masse", chemin: "/courriers/import", permissions: [PERMISSIONS.ENR] },
       ],
     },
@@ -208,7 +216,7 @@ export const MENU: EntreeMenu[][] = [
       libelle: "Gouvernance",
       chemin: "/gouvernance/decisions",
       icone: "reunion",
-      permissions: [PERMISSIONS.DEC, PERMISSIONS.INST, PERMISSIONS.DISPO, PERMISSIONS.ADM_STR],
+      permissions: [PERMISSIONS.DEC, PERMISSIONS.INST, PERMISSIONS.DISPO, PERMISSIONS.REL],
       repliable: true,
       sousEntrees: [
         {
@@ -224,7 +232,10 @@ export const MENU: EntreeMenu[][] = [
         {
           libelle: "Filiales et succursales",
           chemin: "/gouvernance/filiales",
-          permissions: [PERMISSIONS.INST],
+          // DEC et non INST : les prescriptions des organes de gestion sont des
+          // engagements d'origine ORGANE_FILIALE (ADR 006), et le DG comme le
+          // CODIR portent DEC sans INST. Meme garde que la route serveur.
+          permissions: [PERMISSIONS.DEC],
         },
         {
           libelle: "Représentations extérieures",
@@ -244,7 +255,10 @@ export const MENU: EntreeMenu[][] = [
         {
           libelle: "Référentiel des structures",
           chemin: "/gouvernance/structures",
-          permissions: [PERMISSIONS.ADM_STR],
+          // En lecture, et sous REL : c'est celui qui relance les structures
+          // qui a besoin de leurs delais et de leurs encours. L'inscription
+          // d'une structure, elle, est passee en administration (ADR 021).
+          permissions: [PERMISSIONS.REL],
         },
       ],
     },
@@ -340,13 +354,30 @@ export const MENU: EntreeMenu[][] = [
       libelle: "Pilotage",
       chemin: "/statistiques",
       icone: "graphique",
-      permissions: [PERMISSIONS.STAT, PERMISSIONS.IMP],
+      // ACT_LEC ouvre la section pour les seuls rapports périodiques : un
+      // responsable de structure n'a pas les statistiques de l'institution,
+      // mais il a le rapport de la sienne.
+      permissions: [PERMISSIONS.STAT, PERMISSIONS.IMP, PERMISSIONS.ACT_LEC],
       repliable: true,
       sousEntrees: [
         { libelle: "Statistiques", chemin: "/statistiques", permissions: [PERMISSIONS.STAT] },
-        { libelle: "Analyses croisées", chemin: "/pilotage/analyses", permissions: [PERMISSIONS.STAT] },
-        { libelle: "Indicateurs du programme", chemin: "/pilotage/programme", permissions: [PERMISSIONS.STAT] },
-        { libelle: "Rapports périodiques", chemin: "/rapports", permissions: [PERMISSIONS.STAT] },
+        {
+          libelle: "Analyses croisées",
+          chemin: "/pilotage/analyses",
+          permissions: [PERMISSIONS.STAT],
+        },
+        {
+          libelle: "Indicateurs du programme",
+          chemin: "/pilotage/programme",
+          permissions: [PERMISSIONS.STAT],
+        },
+        {
+          libelle: "Rapports périodiques",
+          chemin: "/rapports",
+          // Meme garde que le serveur : le controle de gestion sort le rapport
+          // de l'institution, un responsable celui de sa structure.
+          permissions: [PERMISSIONS.STAT, PERMISSIONS.ACT_LEC],
+        },
         { libelle: "Impressions", chemin: "/impressions", permissions: [PERMISSIONS.IMP] },
       ],
     },

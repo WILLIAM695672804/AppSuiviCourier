@@ -4,10 +4,10 @@ import { Champ, Liste } from "@/components/ui/Champ";
 import { ChampDate } from "@/components/ui/ChampDate";
 import { Encart } from "@/components/ui/Encart";
 import { ModaleFormulaire } from "@/components/ui/ModaleFormulaire";
+import { SelecteurAgent } from "@/components/ui/SelecteurAgent";
 import { ZoneDepot, type FichierDepose } from "@/components/ui/ZoneDepot";
 import {
   useCreerSeance,
-  useCreerStructure,
   useDeclarerAbsence,
   useDeposerDocument,
   type DocumentSeance,
@@ -16,10 +16,9 @@ import {
 } from "@/features/gouvernance/api";
 
 /**
- * Modales des registres de la gouvernance : séances, documents, absences et
- * référentiel des structures.
+ * Modales des registres de la gouvernance : séances, documents et absences.
  *
- * Quatre formulaires courts, regroupés parce qu'aucun ne justifie son fichier.
+ * Trois formulaires courts, regroupés parce qu'aucun ne justifie son fichier.
  * Ils partagent la même enveloppe (`ModaleFormulaire`) et la même discipline :
  * les champs qui décident de quelque chose sont obligatoires, les autres non.
  */
@@ -40,8 +39,6 @@ const NATURES_DOCUMENT: DocumentSeance["nature"][] = [
   "Rapport",
 ];
 
-const NATURES_STRUCTURE = ["Direction", "Service", "Division", "Filiale", "Succursale"];
-
 const TYPES_ABSENCE: TypeAbsence[] = [
   "Congé annuel",
   "Mission",
@@ -54,7 +51,8 @@ interface ChampsSeance {
   type: TypeSeance;
   intitule: string;
   date: string;
-  president: string;
+  /** L'identifiant de l'agent ; `<select>` rend une chaîne, vide si non choisi. */
+  presidentId: string;
   structure: string;
   echeanceDepot: string;
 }
@@ -83,7 +81,16 @@ export function ModaleNouvelleSeance({
   }
 
   const envoyer = handleSubmit((valeurs) => {
-    creer.mutate({ ...valeurs, ordreDuJour: [] }, { onSuccess: fermer });
+    creer.mutate(
+      {
+        ...valeurs,
+        // La présidence se décide parfois à l'ouverture de la séance : le
+        // sélecteur vide vaut « pas encore désigné », pas une erreur de saisie.
+        presidentId: valeurs.presidentId ? Number(valeurs.presidentId) : null,
+        ordreDuJour: [],
+      },
+      { onSuccess: fermer },
+    );
   });
 
   return (
@@ -128,10 +135,10 @@ export function ModaleNouvelleSeance({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Champ
+        <SelecteurAgent
           libelle="Présidée par"
-          placeholder="N'Guessan Y."
-          {...register("president")}
+          invite="À désigner"
+          {...register("presidentId")}
         />
         <Champ
           libelle="Structure organisatrice"
@@ -234,13 +241,19 @@ export function ModaleDeposerDocument({
 }
 
 interface ChampsAbsence {
-  responsable: string;
-  poste: string;
-  structure: string;
+  /**
+   * L'agent absent, par identifiant.
+   *
+   * `poste` et `structure` ont disparu du formulaire : ils étaient saisis à la
+   * main pour un affichage que le serveur n'a jamais écrit, et rien ne
+   * garantissait qu'ils correspondent au compte désigné. Ils viennent
+   * maintenant de l'annuaire, avec l'agent.
+   */
+  responsableId: string;
   type: TypeAbsence;
   du: string;
   au: string;
-  interimaire: string;
+  interimaireId: string;
 }
 
 export function ModaleDeclarerAbsence({
@@ -260,7 +273,7 @@ export function ModaleDeclarerAbsence({
   } = useForm<ChampsAbsence>({ defaultValues: { type: "Congé annuel" } });
 
   // `useWatch` et non `watch` : voir `ModalesDecision`.
-  const interimaire = useWatch({ control, name: "interimaire" });
+  const interimaire = useWatch({ control, name: "interimaireId" });
   const du = useWatch({ control, name: "du" });
 
   function fermer() {
@@ -271,7 +284,15 @@ export function ModaleDeclarerAbsence({
 
   const envoyer = handleSubmit((valeurs) => {
     declarer.mutate(
-      { ...valeurs, interimaire: valeurs.interimaire.trim() || null },
+      {
+        type: valeurs.type,
+        du: valeurs.du,
+        au: valeurs.au,
+        responsableId: Number(valeurs.responsableId),
+        // Une absence sans intérimaire est acceptée, et c'est même le cas que
+        // la DSR doit voir : l'encart d'alerte le dit sans l'interdire.
+        interimaireId: valeurs.interimaireId ? Number(valeurs.interimaireId) : null,
+      },
       { onSuccess: fermer },
     );
   });
@@ -290,26 +311,11 @@ export function ModaleDeclarerAbsence({
       largeur={620}
     >
       <div className="grid gap-4 md:grid-cols-2">
-        <Champ
+        <SelecteurAgent
           libelle="Responsable"
-          placeholder="P. Etoundi"
-          erreur={errors.responsable?.message}
-          {...register("responsable", { required: "Indiquez le responsable concerné." })}
-        />
-        <Champ
-          libelle="Poste"
-          placeholder="Directeur des affaires financières"
-          erreur={errors.poste?.message}
-          {...register("poste", { required: "Indiquez le poste." })}
-        />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Champ
-          libelle="Structure"
-          placeholder="DAF"
-          erreur={errors.structure?.message}
-          {...register("structure", { required: "Indiquez la structure." })}
+          aide="Son poste et sa structure viennent de l'annuaire."
+          erreur={errors.responsableId?.message}
+          {...register("responsableId", { required: "Désignez le responsable concerné." })}
         />
         <Liste
           libelle="Motif"
@@ -335,118 +341,19 @@ export function ModaleDeclarerAbsence({
         />
       </div>
 
-      <Champ
+      <SelecteurAgent
         libelle="Intérim assuré par"
-        placeholder="Laisser vide si aucun intérimaire n'est désigné"
-        {...register("interimaire")}
+        invite="Aucun intérimaire désigné"
+        {...register("interimaireId")}
       />
 
-      {!interimaire?.trim() && (
+      {!interimaire && (
         <Encart ton="alerte" icone="cloche">
           Sans intérimaire désigné, les décisions et courriers revenant à ce responsable
           n'avanceront pas pendant son absence, et les relances partiront dans le vide.
           L'absence apparaîtra en rouge au registre.
         </Encart>
       )}
-    </ModaleFormulaire>
-  );
-}
-
-export function ModaleNouvelleStructure({
-  ouverte,
-  onFermer,
-}: {
-  ouverte: boolean;
-  onFermer: () => void;
-}) {
-  const creer = useCreerStructure();
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<{
-    libelle: string;
-    sigle: string;
-    nature: string;
-    niveau: number;
-    responsable: string;
-  }>({
-    defaultValues: { niveau: 1, nature: "Direction" },
-  });
-
-  function fermer() {
-    reset();
-    creer.reset();
-    onFermer();
-  }
-
-  const envoyer = handleSubmit((valeurs) => {
-    creer.mutate(
-      {
-        libelle: valeurs.libelle,
-        sigle: valeurs.sigle.toUpperCase(),
-        nature: valeurs.nature,
-        niveau: Number(valeurs.niveau),
-        responsable: valeurs.responsable.trim() || null,
-      },
-      { onSuccess: fermer },
-    );
-  });
-
-  return (
-    <ModaleFormulaire
-      ouverte={ouverte}
-      onFermer={fermer}
-      onEnvoyer={envoyer}
-      titre="Ajouter une structure"
-      sousTitre="Directions, filiales et succursales du référentiel unique"
-      libelleEnvoi="Ajouter"
-      enCours={creer.isPending}
-      erreur={creer.isError ? "La structure n'a pas pu être ajoutée." : null}
-      consequence="Le référentiel alimente tous les modules : activités, décisions, scoring."
-      largeur={560}
-    >
-      <Champ
-        libelle="Intitulé"
-        placeholder="s affaires financières"
-        erreur={errors.libelle?.message}
-        {...register("libelle", { required: "L'intitulé est obligatoire." })}
-      />
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Champ
-          libelle="Sigle"
-          placeholder="DAF"
-          maxLength={8}
-          erreur={errors.sigle?.message}
-          {...register("sigle", {
-            required: "Le sigle est obligatoire : il identifie la structure partout.",
-            maxLength: { value: 8, message: "Huit caractères au maximum." },
-          })}
-        />
-        <Liste
-          libelle="Nature"
-          options={NATURES_STRUCTURE.map((n) => ({ valeur: n, libelle: n }))}
-          aide="Une filiale ou une succursale a ses propres organes de gestion."
-          {...register("nature", { required: true })}
-        />
-      </div>
-
-      <Champ
-        libelle="Niveau hiérarchique"
-        type="number"
-        min={0}
-        max={5}
-        aide="0 pour la Direction générale, 1 pour les directions, 2 pour les services."
-        {...register("niveau", { required: true, min: 0, max: 5 })}
-      />
-
-      <Champ
-        libelle="Responsable"
-        placeholder="Laisser vide si le poste n'est pas pourvu"
-        {...register("responsable")}
-      />
     </ModaleFormulaire>
   );
 }

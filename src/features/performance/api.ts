@@ -1,7 +1,7 @@
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { NiveauFeu } from "@/lib/feu";
-import type { Periode } from "@/lib/periode";
+import { periodeCourante, type Periode } from "@/lib/periode";
 
 /**
  * Domaine « performance » — la matrice de scoring administratif.
@@ -16,12 +16,13 @@ import type { Periode } from "@/lib/periode";
  *
  *  — elle est mensuelle et se calcule sur un mois clos. Un classement du mois
  *    en cours n'est pas comparable d'une structure à l'autre ;
- *  — elle agrège quatre critères pondérés, et la pondération est un choix de
- *    gouvernance que la DSR administre. Elle vient donc du serveur, jamais du
- *    code ;
+ *  — elle agrège des critères pondérés — trois à ce jour, ceux que cite le §2 —
+ *    et la pondération est un choix de gouvernance que la DSR administre. Les
+ *    critères viennent donc du serveur, jamais du code ;
  *  — un score global sans sa décomposition est indéfendable. Un directeur
- *    classé neuvième doit pouvoir voir lequel des quatre critères l'y place,
- *    sans quoi le classement ne produit que du ressentiment.
+ *    classé neuvième doit pouvoir voir lequel des critères l'y place, sans
+ *    quoi le classement ne produit que du ressentiment. Un critère sans source
+ *    sort du calcul au lieu de compter zéro.
  */
 
 export interface CritereScore {
@@ -50,7 +51,12 @@ export interface Matrice {
   /** Vrai quand la période n'est pas close : le classement est alors indicatif. */
   provisoire: boolean;
   lignes: LigneClassement[];
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
   moyenneInstitution: number;
 }
 
@@ -118,7 +124,22 @@ export interface NiveauRisque {
   feu: NiveauFeu;
 }
 
+/**
+ * Un axe de la matrice, tel que le serveur le connaît.
+ *
+ * Les critères voyagent avec le dictionnaire pour que le formulaire de
+ * création propose les axes **existants** : une liste écrite dans le front se
+ * désynchroniserait au premier critère ajouté par la DSR, et la saisie serait
+ * alors refusée sans que l'agent comprenne pourquoi.
+ */
+export interface CritereDictionnaire {
+  code: string;
+  libelle: string;
+  poids: number;
+}
+
 export interface Dictionnaire {
+  criteres: CritereDictionnaire[];
   indicateurs: IndicateurDictionnaire[];
   risques: NiveauRisque[];
 }
@@ -150,7 +171,43 @@ export interface LigneCalendrier {
 
 export interface Calendrier {
   lignes: LigneCalendrier[];
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
+}
+
+/**
+ * Le dernier mois clos, seul mois comparable d'une structure à l'autre.
+ *
+ * Défini ici et pas dans chaque écran : le classement et la fiche d'une
+ * structure doivent ouvrir sur le même mois, sinon un responsable qui clique
+ * sur sa ligne lit une autre période que celle du tableau qu'il vient de
+ * quitter — et le rang affiché ne correspond plus.
+ */
+export function dernierMoisClos(): Periode {
+  const courante = periodeCourante("mois");
+  return courante.rang === 1
+    ? { granularite: "mois", annee: courante.annee - 1, rang: 12 }
+    : { ...courante, rang: courante.rang - 1 };
+}
+
+/**
+ * La période portée par l'URL, ou le dernier mois clos.
+ *
+ * Elle passe par l'URL pour deux raisons : un lien vers une fiche reste
+ * exact quand on le partage, et le retour arrière du navigateur ramène à la
+ * période qu'on regardait.
+ */
+export function periodeDepuisUrl(parametres: URLSearchParams): Periode {
+  const annee = Number(parametres.get("annee"));
+  const mois = Number(parametres.get("mois"));
+  if (!Number.isInteger(annee) || !Number.isInteger(mois) || mois < 1 || mois > 12 || !annee) {
+    return dernierMoisClos();
+  }
+  return { granularite: "mois", annee, rang: mois };
 }
 
 const CLE = "performance";
@@ -158,7 +215,8 @@ const CLE = "performance";
 export const matriceQuery = (annee: number, mois: number) =>
   queryOptions({
     queryKey: [CLE, "matrice", annee, mois],
-    queryFn: ({ signal }) => api.get<Matrice>(`/performance/matrice?annee=${annee}&mois=${mois}`, signal),
+    queryFn: ({ signal }) =>
+      api.get<Matrice>(`/performance/matrice?annee=${annee}&mois=${mois}`, signal),
     placeholderData: (precedent) => precedent,
   });
 
@@ -207,13 +265,24 @@ export interface SaisieIndicateur {
   critere: string | null;
 }
 
+/**
+ * Ce qu'on inscrit au calendrier.
+ *
+ * Ni `structuresAttendues` ni `responsable` : la ligne est ouverte pour les
+ * structures **réelles** qui entrent au classement, et le responsable en
+ * découle — la structure elle-même quand elle est seule concernée, la DSR
+ * quand elles sont plusieurs. Les saisir aurait produit deux chiffres qui
+ * divergent dès la création de la direction suivante.
+ *
+ * `nature` et `echeance` sont contrôlés au serveur : une nature hors
+ * référentiel ou une échéance sans jour lisible sont refusées plutôt que
+ * ramenées à une valeur par défaut.
+ */
 export interface SaisieProduction {
   production: string;
   nature: string;
   periodicite: Periodicite;
   echeance: string;
-  structuresAttendues: number;
-  responsable: string;
   relanceAutomatique: boolean;
   joursAvantRelance: number | null;
 }

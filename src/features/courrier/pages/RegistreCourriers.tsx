@@ -5,13 +5,21 @@ import { EnTetePage } from "@/components/EnTetePage";
 import { Bouton, BoutonIcone } from "@/components/ui/Bouton";
 import { CarteIndicateur } from "@/components/ui/CarteIndicateur";
 import { ChampRecherche } from "@/components/ui/ChampRecherche";
+import { ChargementComposant } from "@/components/ui/EtatChargement";
 import { Onglets, type Onglet } from "@/components/ui/Onglets";
 import { Pagination } from "@/components/ui/Pagination";
-import { indicateursQuery, registreQuery, type VueRegistre } from "@/features/courrier/api";
+import {
+  adresseExportRegistre,
+  indicateursQuery,
+  registreQuery,
+  type VueRegistre,
+} from "@/features/courrier/api";
 import { BarreSelection } from "@/features/courrier/components/BarreSelection";
+import { ModaleCotation } from "@/features/courrier/components/ModaleCotation";
 import { TableauRegistre } from "@/features/courrier/components/TableauRegistre";
 import { usePermission } from "@/lib/contexteSession";
 import { useValeurDifferee } from "@/lib/useValeurDifferee";
+import type { SensCourrier } from "@/types/courrier";
 import { PERMISSIONS } from "@/types/habilitation";
 
 /**
@@ -37,11 +45,11 @@ const ONGLETS: readonly Onglet<VueRegistre>[] = [
  */
 export function RegistreCourriers({
   titre = "Courriers arrivés",
-  sens = "ARRIVEE" as const,
+  sens = "ARRIVEE" as SensCourrier,
   vueInitiale = "tous" as VueRegistre,
 }: {
   titre?: string;
-  sens?: "ARRIVEE" | "DEPART";
+  sens?: SensCourrier;
   vueInitiale?: VueRegistre;
 } = {}) {
   const naviguer = useNavigate();
@@ -54,11 +62,21 @@ export function RegistreCourriers({
 
   const peutEnregistrer = usePermission(PERMISSIONS.ENR);
   const peutCoter = usePermission(PERMISSIONS.COT, PERMISSIONS.COT_DEL);
+  // Éditer un document est une sortie de données, et elle a sa permission : le
+  // serveur refuse l'export sans `IMP` (`courrier/documents.py`). Montrer le
+  // bouton à qui ne la porte pas ferait promettre un fichier refusé.
+  const peutImprimer = usePermission(PERMISSIONS.IMP);
+
+  const [cotationOuverte, setCotationOuverte] = useState(false);
 
   const { data, isPending, isFetching } = useQuery(registreQuery({ sens, vue, recherche, page }));
   const { data: indicateurs } = useQuery(indicateursQuery(sens));
 
   const lignes = data?.lignes ?? [];
+  // Les lignes cochées de la page courante. La sélection ne survit pas au
+  // changement d'onglet ni de page — coter en aveugle des courriers qu'on ne
+  // voit plus est exactement ce qu'une action de masse ne doit pas permettre.
+  const selectionnes = lignes.filter((ligne) => selection.has(ligne.id));
   const nombrePages = data ? Math.max(1, Math.ceil(data.total / data.taillePage)) : 1;
 
   function changerVue(nouvelle: VueRegistre) {
@@ -147,10 +165,35 @@ export function RegistreCourriers({
 
         <div className="flex-1" />
 
-        <Bouton icone="numeriser">Numériser</Bouton>
-        <Bouton icone="exporter">Exporter</Bouton>
+        {/* « Numériser » menait nulle part : la numérisation se fait à
+            l'enregistrement, où le fichier se rattache au courrier qu'il
+            documente. Le bouton y conduit plutôt que de promettre un scanner
+            que le navigateur ne pilote pas. */}
+        {peutEnregistrer && (
+          <Bouton icone="numeriser" onClick={() => naviguer("/courriers/nouveau")}>
+            Numériser
+          </Bouton>
+        )}
+        {peutImprimer && (
+          <>
+            <Bouton
+              icone="exporter"
+              href={adresseExportRegistre({ sens, vue, recherche }, "docx")}
+            >
+              Word
+            </Bouton>
+            <Bouton icone="exporter" href={adresseExportRegistre({ sens, vue, recherche }, "pdf")}>
+              Exporter
+            </Bouton>
+          </>
+        )}
         {peutCoter && (
-          <Bouton variante="doux" icone="document" disabled={selection.size === 0}>
+          <Bouton
+            variante="doux"
+            icone="document"
+            disabled={selection.size === 0}
+            onClick={() => setCotationOuverte(true)}
+          >
             Coter la sélection
           </Bouton>
         )}
@@ -158,9 +201,7 @@ export function RegistreCourriers({
 
       <div className="relative flex-1 overflow-auto">
         {isPending ? (
-          <p className="px-[26px] py-10 text-xs font-medium text-encre-tenue">
-            Chargement du registre…
-          </p>
+          <ChargementComposant message="Chargement du registre…" />
         ) : (
           <>
             <TableauRegistre
@@ -175,15 +216,40 @@ export function RegistreCourriers({
               <Pagination
                 page={page}
                 nombrePages={nombrePages}
-                onChange={setPage}
+                onChange={(suivante) => {
+                  setPage(suivante);
+                  // La sélection ne suit pas la page : elle ne porte que sur ce
+                  // qui est à l'écran, et une action de masse sur des lignes
+                  // qu'on ne voit plus est une action à l'aveugle.
+                  setSelection(new Set());
+                }}
                 resume={`${lignes.length} courriers affichés sur ${data.totalRegistre}`}
               />
             )}
           </>
         )}
 
-        <BarreSelection nombre={selection.size} onAnnuler={() => setSelection(new Set())} />
+        <BarreSelection
+          nombre={selection.size}
+          onAnnuler={() => setSelection(new Set())}
+          onCoter={() => setCotationOuverte(true)}
+        />
       </div>
+
+      {/* La même fenêtre que la fiche, avec la sélection au lieu d'un courrier.
+          Elle n'est montée que lorsqu'elle s'ouvre : elle lit l'annuaire et
+          l'organigramme, deux requêtes qu'un registre ouvert toute la journée
+          n'a pas à porter. */}
+      {cotationOuverte && (
+        <ModaleCotation
+          courriers={selectionnes}
+          ouverte
+          onFermer={() => {
+            setCotationOuverte(false);
+            setSelection(new Set());
+          }}
+        />
+      )}
     </>
   );
 }

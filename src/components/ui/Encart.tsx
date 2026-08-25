@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Icone, type NomIcone } from "@/components/ui/Icone";
 
-export type TonEncart = "accent" | "succes" | "alerte" | "danger" | "confidentiel";
+export type TonEncart = "accent" | "succes" | "alerte" | "danger" | "confidentiel" | "neutre";
 
 const TONS: Record<TonEncart, string> = {
   accent: "border-accent-trait bg-accent-voile text-accent-fonce",
@@ -9,6 +9,7 @@ const TONS: Record<TonEncart, string> = {
   alerte: "border-alerte-trait bg-alerte-voile text-alerte",
   danger: "border-danger-trait bg-danger-voile text-danger",
   confidentiel: "border-confidentiel-trait bg-confidentiel-voile text-confidentiel",
+  neutre: "border-bordure bg-surface-tete text-encre-moyenne",
 };
 
 /** Message contextuel encadre : consequence d'un choix, avertissement, controle. */

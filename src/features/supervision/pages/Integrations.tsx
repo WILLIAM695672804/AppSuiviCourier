@@ -14,6 +14,7 @@ import {
   type EtatIntegration,
   type Integration,
 } from "@/features/supervision/api";
+import { CarteFileNotifications } from "@/features/notifications/components/CarteFileNotifications";
 import { formaterDateHeure } from "@/lib/format";
 
 /**
@@ -108,7 +109,11 @@ export function Integrations() {
       rendu: (i) => (
         <span
           className={`text-[12px] leading-none font-bold tabular-nums ${
-            i.erreurs24h > 10 ? "text-danger" : i.erreurs24h > 0 ? "text-alerte" : "text-encre-tenue"
+            i.erreurs24h > 10
+              ? "text-danger"
+              : i.erreurs24h > 0
+                ? "text-alerte"
+                : "text-encre-tenue"
           }`}
         >
           {i.erreurs24h === 0 ? "—" : i.erreurs24h}
@@ -190,7 +195,7 @@ export function Integrations() {
         <Carte titre="Systèmes raccordés">
           <div className="mt-2">
             <Tableau
-                chargement={isPending}
+              chargement={isPending}
               colonnes={colonnes}
               lignes={data?.integrations ?? []}
               cleLigne={(i) => i.id}
@@ -198,6 +203,11 @@ export function Integrations() {
             />
           </div>
         </Carte>
+
+        {/* La file des notifications prolonge directement le tableau ci-dessus :
+            « Messagerie : non connecté » se lit ici en nombre de messages qui
+            n'ont nulle part où aller. */}
+        <CarteFileNotifications />
 
         {aSignaler.length > 0 && (
           <Carte titre="Ce qui appelle une intervention">

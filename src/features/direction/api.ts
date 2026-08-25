@@ -48,11 +48,27 @@ export interface VueEnsembleDirection {
    * graphique de l'ecran dont l'axe traverse le zero.
    */
   ecartExecution: SerieMensuelle[];
-  /** Les cinq structures qui portent le plus de courrier en cours. */
-  chargeParStructure: PartDirection[];
-  /** Les cinq correspondants dont le volume entrant est le plus fort. */
-  volumeParCorrespondant: PartDirection[];
-  /** Taux de courriers traites dans le delai imparti, mois par mois. */
+  /**
+   * Les cinq structures dont l'execution du plan est la plus forte.
+   *
+   * C'etait « la charge de courrier par structure » : le pilier courrier n'est
+   * pas en service, et un histogramme vide n'aurait rien appris. Ce qui le
+   * remplace est ce que l'application mesure vraiment. Voir l'ADR 011 et A30.
+   */
+  executionParStructure: PartDirection[];
+  /**
+   * Les cinq structures qui portent le plus de productions en retard.
+   *
+   * Les structures sans retard sont **absentes**, et non a zero : un
+   * histogramme de retards ne se lit que par ce qu'il montre.
+   */
+  retardsParStructure: PartDirection[];
+  /**
+   * Part des productions du mois deposees a l'echeance, mois par mois.
+   *
+   * Un mois sans obligation echue ne produit **aucun point** : zero pour cent
+   * aurait dit que rien n'a ete depose, quand rien n'etait attendu.
+   */
   respectDelais: SerieMensuelle[];
   /** Decisions d'instance executees dans le mois. */
   decisionsExecutees: SerieMensuelle[];

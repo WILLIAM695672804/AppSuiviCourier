@@ -7,8 +7,6 @@ type Props = {
   nombre: number;
   onAnnuler: () => void;
   onCoter?: () => void;
-  onAffecter?: () => void;
-  onBordereau?: () => void;
 };
 
 /**
@@ -18,10 +16,8 @@ type Props = {
  * et l'agent doit voir qu'elle repond a sa selection. Les lignes du tableau,
  * elles, ne sont jamais animees.
  */
-export function BarreSelection({ nombre, onAnnuler, onCoter, onAffecter, onBordereau }: Props) {
+export function BarreSelection({ nombre, onAnnuler, onCoter }: Props) {
   const peutCoter = usePermission(PERMISSIONS.COT, PERMISSIONS.COT_DEL);
-  const peutAffecter = usePermission(PERMISSIONS.AFF);
-  const peutTransmettre = usePermission(PERMISSIONS.TRANS);
 
   return (
     <AnimatePresence>
@@ -44,16 +40,22 @@ export function BarreSelection({ nombre, onAnnuler, onCoter, onAffecter, onBorde
                 Coter
               </Bouton>
             )}
-            {peutAffecter && (
-              <Bouton variante="fantome" icone="personneAjout" onClick={onAffecter}>
-                Affecter
-              </Bouton>
-            )}
-            {peutTransmettre && (
-              <Bouton variante="fantome" icone="imprimante" onClick={onBordereau}>
-                Bordereau
-              </Bouton>
-            )}
+            {/*
+              « Affecter » et « Bordereau » ont ete retires le 19 aout 2026.
+              Les deux etaient montes sans gestionnaire : ils s'affichaient
+              selon la permission et ne faisaient rien.
+
+              Ce n'est pas un oubli de branchement, et c'est pour cela qu'ils ne
+              reviennent pas tout de suite :
+
+               - **Affecter en lot** suppose de connaitre, pour chaque courrier,
+                 les structures cotees — l'affectation pend a la cotation
+                 (`services.affecter`). Le registre ne porte que le *libelle* des
+                 structures cotees, pas leur identifiant : la fenetre ne pourrait
+                 proposer que l'annuaire entier, donc des agents que le serveur
+                 refusera un par un.
+               - **Bordereau** est un geste du pilier depart, qui n'existe pas.
+            */}
 
             <button
               type="button"

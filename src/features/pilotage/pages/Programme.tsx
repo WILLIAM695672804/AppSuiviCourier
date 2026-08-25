@@ -103,10 +103,19 @@ export function Programme() {
       alignement: "droite",
       rendu: (i) => (
         <span className="flex min-w-0 flex-col items-end gap-1.5">
-          <span className="text-[11.5px] leading-none font-bold text-encre-douce tabular-nums">
-            {i.cibleMaximum ? "≤ " : "≥ "}
-            {i.cible} {i.unite}
-          </span>
+          {/* Une cible non fixée s'affiche comme telle. Zéro aurait été une
+              cible atteinte d'avance ; un chiffre plausible aurait été lu
+              comme un engagement de l'institution. Voir A32. */}
+          {i.cible === null ? (
+            <span className="text-[11px] leading-none font-semibold text-encre-tenue">
+              Non fixée
+            </span>
+          ) : (
+            <span className="text-[11.5px] leading-none font-bold text-encre-douce tabular-nums">
+              {i.cibleMaximum ? "≤ " : "≥ "}
+              {i.cible} {i.unite}
+            </span>
+          )}
           <span className="text-[10px] leading-none font-medium text-encre-tenue">
             {i.echeance}
           </span>
@@ -123,11 +132,16 @@ export function Programme() {
           libelle={
             i.valeurN === null
               ? "Aucune donnée"
-              : i.feu === "vert"
-                ? "Cible atteinte"
-                : i.feu === "orange"
-                  ? "Cible à portée"
-                  : "Cible hors d'atteinte"
+              : // Une valeur sans cible ne se juge pas : c'est le sens même
+                // d'un indicateur *cible*. La colorer aurait inventé
+                // l'engagement que le programme n'a pas fixé.
+                i.cible === null
+                ? "Cible non fixée"
+                : i.feu === "vert"
+                  ? "Cible atteinte"
+                  : i.feu === "orange"
+                    ? "Cible à portée"
+                    : "Cible hors d'atteinte"
           }
         />
       ),
@@ -174,10 +188,11 @@ export function Programme() {
           </div>
 
           <p className="px-1 text-[11px] leading-[1.5] font-medium text-encre-tenue">
-            « Non mesuré » n'est pas zéro. Trois indicateurs — automatisation par l'intelligence
-            artificielle, satisfaction usager, taux d'adoption — n'ont pas de dispositif de mesure
-            en place. Les afficher à zéro laisserait croire à un échec là où il n'y a qu'une
-            absence de donnée.
+            « Non mesuré » n'est pas zéro, et « cible non fixée » n'est pas une cible de zéro. Un
+            indicateur sans dispositif de mesure — le traitement du courrier, dont le pilier n'est
+            pas en service — s'affiche à ce titre plutôt qu'à zéro, qui se lirait comme un échec.
+            Les cibles chiffrées du programme n'ont pas été communiquées ; elles s'administrent, et
+            l'écran les montre absentes tant qu'elles le sont.
           </p>
         </div>
       </div>

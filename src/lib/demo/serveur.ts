@@ -1,4 +1,5 @@
 import type { CourrierDetail } from "@/types/courrier";
+import type { SaisieStructure } from "@/features/organisation/api";
 import type {
   SaisieAbsence,
   SaisieAvancement,
@@ -6,7 +7,6 @@ import type {
   SaisieDocument,
   SaisieRelance,
   SaisieSeance,
-  SaisieStructure,
 } from "@/features/gouvernance/api";
 import type {
   ActiviteDetail,
@@ -17,19 +17,25 @@ import type {
   SaisieInstructionActivite,
   SaisieLeveeInstruction,
   SaisieModificationActivite,
-  SaisiePieceVie,
   SaisieRelanceActivite,
   SaisieReleveIndicateur,
   SaisieSuspension,
   SaisieTacheActivite,
 } from "@/features/activite/api";
-import type { SaisieIndicateur, SaisieProduction } from "@/features/performance/api";
+import type {
+  SaisieIndicateur,
+  SaisieProduction,
+} from "@/features/performance/api";
 import type {
   Delegation,
   DelegationPossible,
   SaisieDelegation,
 } from "@/features/habilitation/api";
-import type { SaisieRegle, Versement, VersementDetail } from "@/features/archivage/api";
+import type {
+  SaisieRegle,
+  Versement,
+  VersementDetail,
+} from "@/features/archivage/api";
 import { REGLES_DEMO, VERSEMENTS_DEMO } from "@/lib/demo/donneesArchivage";
 import {
   EVOLUTION_CHENAL_DEMO,
@@ -39,8 +45,11 @@ import {
   RECOUVREMENTS_DEMO,
   RELEVES_CHENAL_DEMO,
 } from "@/lib/demo/donneesExploitation";
-import type { SaisieRecouvrement, SaisieReleveChenal } from "@/features/exploitation/api";
-import { garantieDuPoint } from "@/lib/chenal";
+import type {
+  SaisieRecouvrement,
+  SaisieReleveChenal,
+} from "@/features/exploitation/api";
+import { garantieDuPoint, POINTS_CHENAL } from "@/lib/chenal";
 import { SECTEURS_PORTUAIRES } from "@/lib/secteursPortuaires";
 import { PERMISSIONS } from "@/types/habilitation";
 import type {
@@ -90,6 +99,8 @@ import {
   NATURES_DEMO,
   REFERENTIEL_DEMO,
   ACCES_DEMO,
+  HISTORIQUE_DEMO,
+  TABLES_TRACEES_DEMO,
   DETENTEURS_DEMO,
   EVENEMENTS_DEMO,
   ETAPES_VIE_DEMO,
@@ -99,6 +110,7 @@ import {
   type CourrierDemo,
 } from "@/lib/demo/donnees";
 import {
+  COMPTES_DEMO,
   compteActifDemo,
   fermerSessionDemo,
   ouvrirSessionDemo,
@@ -113,6 +125,7 @@ import {
 } from "@/lib/demo/donneesActivite";
 import {
   CALENDRIER_DEMO,
+  CRITERES,
   GRILLE_RISQUES,
   INDICATEURS_DICTIONNAIRE,
   classement,
@@ -166,7 +179,9 @@ function registre(parametres: URLSearchParams) {
 
   if (recherche) {
     lignes = lignes.filter((c) =>
-      [c.numero, c.correspondant, c.objet].some((champ) => champ.toLowerCase().includes(recherche)),
+      [c.numero, c.correspondant, c.objet].some((champ) =>
+        champ.toLowerCase().includes(recherche),
+      ),
     );
   }
 
@@ -210,14 +225,20 @@ function chronologie(courrier: CourrierDemo): CourrierDetail["chronologie"] {
       horodatage: `${jour(courrier)}T11:40:00`,
       auteur: "Par A. Kouassi — Cabinet",
       precision: `délai imparti ${courrier.delai?.joursAlloues ?? 5} jours`,
-      instruction: "Vérifier la conformité des pièces avant admission au paiement.",
+      instruction:
+        "Vérifier la conformité des pièces avant admission au paiement.",
       etat: "faite",
     });
   }
 
-  const affecte = ["AFFECTE", "EN_TRAITEMENT", "EN_VALIDATION", "SIGNE", "PARTI", "CLOTURE"].includes(
-    courrier.etape,
-  );
+  const affecte = [
+    "AFFECTE",
+    "EN_TRAITEMENT",
+    "EN_VALIDATION",
+    "SIGNE",
+    "PARTI",
+    "CLOTURE",
+  ].includes(courrier.etape);
 
   if (affecte) {
     etapes.push({
@@ -264,7 +285,9 @@ function fiche(id: number): CourrierDetail | null {
   if (!courrier) return null;
 
   const cote = courrier.structuresCotees.length > 0;
-  const enTraitement = ["EN_TRAITEMENT", "EN_VALIDATION", "SIGNE"].includes(courrier.etape);
+  const enTraitement = ["EN_TRAITEMENT", "EN_VALIDATION", "SIGNE"].includes(
+    courrier.etape,
+  );
 
   return {
     ...courrier,
@@ -274,7 +297,12 @@ function fiche(id: number): CourrierDetail | null {
     nombrePages: 3,
     nombreAnnexes: 1,
     delaiJours: courrier.delai?.joursAlloues ?? 5,
-    modeCotation: courrier.structuresCotees.length > 1 ? "CASCADE" : cote ? "PARALLELE" : null,
+    modeCotation:
+      courrier.structuresCotees.length > 1
+        ? "CASCADE"
+        : cote
+          ? "PARALLELE"
+          : null,
     cotations: cote
       ? [
           {
@@ -284,7 +312,11 @@ function fiche(id: number): CourrierDetail | null {
             delaiFixe: "2026-08-11",
             decidePar: { id: 2, nomComplet: "Le Directeur général" },
             decideLe: `${jour(courrier)}T09:15:00`,
-            saisiPar: { id: 1, nomComplet: compteActifDemo()?.utilisateur.nomComplet ?? "Agent de session" },
+            saisiPar: {
+              id: 1,
+              nomComplet:
+                compteActifDemo()?.utilisateur.nomComplet ?? "Agent de session",
+            },
             saisiLe: `${jour(courrier)}T10:02:00`,
             structures: courrier.structuresCotees.map((libelle, i) => ({
               structureId: i + 1,
@@ -322,20 +354,34 @@ function fiche(id: number): CourrierDetail | null {
             initiales: "MD",
             fonction: "DAF",
             horodatage: `${jour(courrier)}T16:24:00`,
-            texte: "Pièces complètes. Projet de réponse rédigé et soumis au visa.",
+            texte:
+              "Pièces complètes. Projet de réponse rédigé et soumis au visa.",
           },
         ]
       : [],
     piecesJointes: [
-      { id: 1, nom: "Facture-214-scan.pdf", format: "PDF", taille: "1,2 Mo", precision: "3 pages" },
-      { id: 2, nom: "Bon-de-commande.jpg", format: "JPG", taille: "480 Ko", precision: "annexe" },
+      {
+        id: 1,
+        nom: "Facture-214-scan.pdf",
+        format: "PDF",
+        taille: "1,2 Mo",
+        precision: "3 pages",
+      },
+      {
+        id: 2,
+        nom: "Bon-de-commande.jpg",
+        format: "JPG",
+        taille: "480 Ko",
+        precision: "annexe",
+      },
     ],
     reponses: enTraitement
       ? [
           {
             id: 187,
             numero: "D-2026-0187",
-            objet: "Règlement de la facture n° 214 du prestataire de maintenance",
+            objet:
+              "Règlement de la facture n° 214 du prestataire de maintenance",
             version: 3,
             redigePar: "M. Diallo",
             etape: "EN_VALIDATION",
@@ -343,9 +389,21 @@ function fiche(id: number): CourrierDetail | null {
         ]
       : [],
     derniersEvenements: [
-      { id: 1, libelle: "Consulté par S. Bamba", horodatage: `${jour(courrier)}T17:10:00` },
-      { id: 2, libelle: "Projet de réponse créé", horodatage: `${jour(courrier)}T16:24:00` },
-      { id: 3, libelle: "Accusé de réception envoyé", horodatage: `${jour(courrier)}T09:40:00` },
+      {
+        id: 1,
+        libelle: "Consulté par S. Bamba",
+        horodatage: `${jour(courrier)}T17:10:00`,
+      },
+      {
+        id: 2,
+        libelle: "Projet de réponse créé",
+        horodatage: `${jour(courrier)}T16:24:00`,
+      },
+      {
+        id: 3,
+        libelle: "Accusé de réception envoyé",
+        horodatage: `${jour(courrier)}T09:40:00`,
+      },
     ],
     actionsPossibles: cote
       ? ["affecter", "traiter", "transmettre", "relancer", "imprimer"]
@@ -382,14 +440,30 @@ function dossier(id: number) {
         faite: true,
         faiteLe: `${jour(courrier)}T15:10:00`,
       },
-      { id: 3, libelle: "Soumettre le projet de réponse au visa", faite: false, faiteLe: null },
-      { id: 4, libelle: "Classer le dossier après départ de la réponse", faite: false, faiteLe: null },
-      { id: 5, libelle: "Rendre compte au chef de service", faite: false, faiteLe: null },
+      {
+        id: 3,
+        libelle: "Soumettre le projet de réponse au visa",
+        faite: false,
+        faiteLe: null,
+      },
+      {
+        id: 4,
+        libelle: "Classer le dossier après départ de la réponse",
+        faite: false,
+        faiteLe: null,
+      },
+      {
+        id: 5,
+        libelle: "Rendre compte au chef de service",
+        faite: false,
+        faiteLe: null,
+      },
     ],
     notes: [
       {
         id: 1,
-        texte: "Le prestataire a fourni le PV de réception le 3 août. Pièces désormais complètes.",
+        texte:
+          "Le prestataire a fourni le PV de réception le 3 août. Pièces désormais complètes.",
         horodatage: `${jour(courrier)}T15:20:00`,
         privee: true,
       },
@@ -418,9 +492,39 @@ const aujourdhui = () => new Date().toISOString().slice(0, 10);
  * prouver.
  */
 const DELEGATIONS_DEMO: Delegation[] = [
-  { id: 1, titulaire: "N'Guessan Y.", delegataire: "A. Kouassi", poste: "Directeur général", etendue: "Signature", debut: "2026-08-01", fin: "2026-08-15", motif: "Mission à l'extérieur", etat: "active" },
-  { id: 2, titulaire: "S. Bamba", delegataire: "M. Diallo", poste: "Chef de service", etendue: "Visa et affectation", debut: "2026-08-10", fin: "2026-08-24", motif: "Congé annuel", etat: "programmee" },
-  { id: 3, titulaire: "F. Koné", delegataire: "M. Cissé", poste: "Directrice", etendue: "Cotation", debut: "2026-07-01", fin: "2026-07-20", motif: "Congé annuel", etat: "close" },
+  {
+    id: 1,
+    titulaire: "N'Guessan Y.",
+    delegataire: "A. Kouassi",
+    poste: "Directeur général",
+    etendue: "Signature",
+    debut: "2026-08-01",
+    fin: "2026-08-15",
+    motif: "Mission à l'extérieur",
+    etat: "active",
+  },
+  {
+    id: 2,
+    titulaire: "S. Bamba",
+    delegataire: "M. Diallo",
+    poste: "Chef de service",
+    etendue: "Visa et affectation",
+    debut: "2026-08-10",
+    fin: "2026-08-24",
+    motif: "Congé annuel",
+    etat: "programmee",
+  },
+  {
+    id: 3,
+    titulaire: "F. Koné",
+    delegataire: "M. Cissé",
+    poste: "Directrice",
+    etendue: "Cotation",
+    debut: "2026-07-01",
+    fin: "2026-07-20",
+    motif: "Congé annuel",
+    etat: "close",
+  },
 ];
 
 /** Ce que le poste connecte peut deleguer, et aux agents de son perimetre. */
@@ -430,15 +534,50 @@ const DELEGATION_POSSIBLE_DEMO: DelegationPossible = {
     { id: 17, nomComplet: "L. Mbarga", poste: "Point focal de la direction" },
     { id: 11, nomComplet: "K. Traoré", poste: "Agent de session courrier" },
   ],
-  etendues: ["Visa et affectation", "Cotation", "Signature", "Instruction des dossiers"],
+  etendues: [
+    "Visa et affectation",
+    "Cotation",
+    "Signature",
+    "Instruction des dossiers",
+  ],
 };
 
 /** « F. Ngo Bell » donne « FN ». Le vrai serveur les tiendra en base. */
 function initialesDe(nomComplet: string): string {
-  const mots = nomComplet.trim().split(/[\s-]+/).filter(Boolean);
+  const mots = nomComplet
+    .trim()
+    .split(/[\s-]+/)
+    .filter(Boolean);
   if (mots.length === 0) return "?";
   if (mots.length === 1) return mots[0].slice(0, 2).toUpperCase();
   return (mots[0][0] + mots[mots.length - 1][0]).toUpperCase();
+}
+
+/**
+ * Le nom d'un agent, depuis son identifiant.
+ *
+ * Depuis l'ADR 020, les saisies designent les personnes par `id` et non plus
+ * par leur nom : le vrai serveur relit l'annuaire, celui-ci se contente des
+ * comptes de demonstration. Un identifiant inconnu rend un libelle visible
+ * plutot qu'une chaine vide — c'est une donnee simulee, elle doit se
+ * reconnaitre comme telle.
+ */
+function nomAgentDemo(identifiant: number | null | undefined): string {
+  if (identifiant === null || identifiant === undefined) return "";
+  const compte = COMPTES_DEMO.find((c) => c.utilisateur.id === identifiant);
+  return compte?.utilisateur.nomComplet ?? `Agent #${identifiant}`;
+}
+
+/** Le poste et la structure d'un agent, pour les ecrans qui les affichent. */
+function qualiteAgentDemo(identifiant: number | null | undefined) {
+  const compte =
+    identifiant === null || identifiant === undefined
+      ? undefined
+      : COMPTES_DEMO.find((c) => c.utilisateur.id === identifiant);
+  return {
+    poste: compte?.utilisateur.posteLibelle ?? "Poste",
+    structure: compte?.utilisateur.structureLibelle ?? "—",
+  };
 }
 
 /** Qui ecrit. En demonstration, c'est le compte ouvert dans l'onglet. */
@@ -462,7 +601,13 @@ function partEcoulee(debut: string, fin: string): number {
   const arrivee = new Date(fin).getTime();
   const maintenant = Date.now();
   if (arrivee <= depart) return 0;
-  return Math.max(0, Math.min(100, Math.round(((maintenant - depart) / (arrivee - depart)) * 100)));
+  return Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(((maintenant - depart) / (arrivee - depart)) * 100),
+    ),
+  );
 }
 
 /*
@@ -489,11 +634,19 @@ function structuresAccessibles(): { sigle: string; libelle: string }[] {
   const sigle = structureDeLaSession();
 
   if (compte?.perimetre.portee === "institution") {
-    return PLANS_DEMO.map((p) => ({ sigle: p.structureSigle, libelle: p.structureLibelle }));
+    return PLANS_DEMO.map((p) => ({
+      sigle: p.structureSigle,
+      libelle: p.structureLibelle,
+    }));
   }
 
   const sien = PLANS_DEMO.find((p) => p.structureSigle === sigle);
-  return [{ sigle, libelle: sien?.structureLibelle ?? compte?.structureLibelle ?? sigle }];
+  return [
+    {
+      sigle,
+      libelle: sien?.structureLibelle ?? compte?.structureLibelle ?? sigle,
+    },
+  ];
 }
 
 /* ------------------------------------------------------------------ *
@@ -504,16 +657,27 @@ const trouverActivite = (id: number) => ACTIVITES_DEMO.find((a) => a.id === id);
 
 /** Les identifiants sont uniques dans tout le jeu, pas seulement par activite. */
 const prochainIdIndicateur = () =>
-  Math.max(0, ...ACTIVITES_DEMO.flatMap((a) => a.indicateurs.map((i) => i.id))) + 1;
+  Math.max(
+    0,
+    ...ACTIVITES_DEMO.flatMap((a) => a.indicateurs.map((i) => i.id)),
+  ) + 1;
 
 const prochainIdTache = () =>
   Math.max(0, ...ACTIVITES_DEMO.flatMap((a) => a.taches.map((t) => t.id))) + 1;
 
 const prochainIdInstruction = () =>
-  Math.max(0, ...ACTIVITES_DEMO.flatMap((a) => a.instructionsRattachees.map((i) => i.id))) + 1;
+  Math.max(
+    0,
+    ...ACTIVITES_DEMO.flatMap((a) => a.instructionsRattachees.map((i) => i.id)),
+  ) + 1;
 
 const prochainIdPiece = () =>
-  Math.max(0, ...ACTIVITES_DEMO.flatMap((a) => a.vie.flatMap((e) => e.pieces.map((p) => p.id)))) + 1;
+  Math.max(
+    0,
+    ...ACTIVITES_DEMO.flatMap((a) =>
+      a.vie.flatMap((e) => e.pieces.map((p) => p.id)),
+    ),
+  ) + 1;
 
 /**
  * Tout evenement de la fiche de vie passe par ici — §18.
@@ -557,7 +721,8 @@ function recalculerEtat(activite: ActiviteDetail): void {
   if (activite.etat === "Suspendue") return;
 
   if (activite.avancement >= 100) activite.etat = "Réalisée";
-  else if (activite.avancement < activite.avancementAttendu - 10) activite.etat = "En retard";
+  else if (activite.avancement < activite.avancementAttendu - 10)
+    activite.etat = "En retard";
   else if (activite.avancement > 0) activite.etat = "En cours";
   else activite.etat = "Programmée";
 
@@ -578,8 +743,14 @@ function recalculerEtat(activite: ActiviteDetail): void {
  * baisser, un taux de couverture doit monter. Rapporter le realise a la seule
  * cible aurait donne 207 % a un delai ramene de 38 a 31 jours.
  */
-function tauxIndicateur(reference: string, cible: string, realise: string): number | null {
-  const [r, c, v] = [reference, cible, realise].map((x) => Number(String(x).replace(",", ".")));
+function tauxIndicateur(
+  reference: string,
+  cible: string,
+  realise: string,
+): number | null {
+  const [r, c, v] = [reference, cible, realise].map((x) =>
+    Number(String(x).replace(",", ".")),
+  );
   if ([r, c, v].some(Number.isNaN)) return null;
   if (c === r) return v === c ? 100 : 0;
   return Math.max(0, Math.min(100, Math.round(((v - r) / (c - r)) * 100)));
@@ -596,7 +767,8 @@ function tauxIndicateur(reference: string, cible: string, realise: string): numb
 /** Nombre de jours entre deux dates ISO. Negatif si la seconde est passee. */
 function joursEntre(depuis: string, jusqua: string): number {
   return Math.round(
-    (new Date(jusqua).getTime() - new Date(depuis).getTime()) / (1000 * 60 * 60 * 24),
+    (new Date(jusqua).getTime() - new Date(depuis).getTime()) /
+      (1000 * 60 * 60 * 24),
   );
 }
 
@@ -644,7 +816,8 @@ function versementListe(v: VersementDetail): Versement {
 
 function empreinteSimulee(graine: string): string {
   let etat = 0;
-  for (const caractere of graine) etat = (etat * 31 + caractere.charCodeAt(0)) >>> 0;
+  for (const caractere of graine)
+    etat = (etat * 31 + caractere.charCodeAt(0)) >>> 0;
 
   let resultat = "";
   while (resultat.length < 64) {
@@ -673,12 +846,18 @@ export function repondreEnDemo(
    */
   if (methode === "POST" && route === "/connexion") {
     const saisie = corps as { identifiant?: string; motDePasse?: string };
-    const compte = verifierIdentifiants(saisie?.identifiant ?? "", saisie?.motDePasse ?? "");
+    const compte = verifierIdentifiants(
+      saisie?.identifiant ?? "",
+      saisie?.motDePasse ?? "",
+    );
 
     if (!compte) {
       return new Promise((_, rejeter) =>
         setTimeout(
-          () => rejeter(new ErreurApi(401, "Identifiant ou mot de passe incorrect.")),
+          () =>
+            rejeter(
+              new ErreurApi(401, "Identifiant ou mot de passe incorrect."),
+            ),
           LATENCE_MS,
         ),
       );
@@ -700,7 +879,9 @@ export function repondreEnDemo(
   }
 
   if (methode === "POST" && route === "/departs/signatures") {
-    return attendre({ signes: DEPARTS_DEMO.filter((d) => d.etape === "A_SIGNER") });
+    return attendre({
+      signes: DEPARTS_DEMO.filter((d) => d.etape === "A_SIGNER"),
+    });
   }
 
   if (methode === "POST" && route === "/suivi/recherche") {
@@ -758,10 +939,14 @@ export function repondreEnDemo(
     return attendre({ id });
   }
 
-  const avancementDemande = route.match(/^\/gouvernance\/decisions\/(\d+)\/avancement$/);
+  const avancementDemande = route.match(
+    /^\/gouvernance\/decisions\/(\d+)\/avancement$/,
+  );
   if (methode === "POST" && avancementDemande) {
     const saisie = corps as SaisieAvancement;
-    const decision = DECISIONS_DEMO.find((d) => d.id === Number(avancementDemande[1]));
+    const decision = DECISIONS_DEMO.find(
+      (d) => d.id === Number(avancementDemande[1]),
+    );
     if (!decision) return null;
 
     decision.avancement = saisie.avancement;
@@ -785,10 +970,14 @@ export function repondreEnDemo(
     return attendre({ id: decision.id });
   }
 
-  const relanceDemandee = route.match(/^\/gouvernance\/decisions\/(\d+)\/relance$/);
+  const relanceDemandee = route.match(
+    /^\/gouvernance\/decisions\/(\d+)\/relance$/,
+  );
   if (methode === "POST" && relanceDemandee) {
     const saisie = corps as SaisieRelance;
-    const decision = DECISIONS_DEMO.find((d) => d.id === Number(relanceDemandee[1]));
+    const decision = DECISIONS_DEMO.find(
+      (d) => d.id === Number(relanceDemandee[1]),
+    );
     if (!decision) return null;
 
     decision.relances += 1;
@@ -815,7 +1004,7 @@ export function repondreEnDemo(
       type: saisie.type,
       intitule: saisie.intitule,
       date: saisie.date,
-      president: saisie.president || "—",
+      president: nomAgentDemo(saisie.presidentId) || "—",
       participants: 0,
       depot: "En attente",
       dateDepot: null,
@@ -826,7 +1015,7 @@ export function repondreEnDemo(
         id: rang + 1,
         rang: rang + 1,
         point: point.point,
-        rapporteur: point.rapporteur,
+        rapporteur: nomAgentDemo(point.rapporteurId),
       })),
       documents: [],
       presents: [],
@@ -836,10 +1025,14 @@ export function repondreEnDemo(
     return attendre({ id });
   }
 
-  const documentDemande = route.match(/^\/gouvernance\/seances\/(\d+)\/documents$/);
+  const documentDemande = route.match(
+    /^\/gouvernance\/seances\/(\d+)\/documents$/,
+  );
   if (methode === "POST" && documentDemande) {
     const saisie = corps as SaisieDocument;
-    const seance = SEANCES_DEMO.find((s) => s.id === Number(documentDemande[1]));
+    const seance = SEANCES_DEMO.find(
+      (s) => s.id === Number(documentDemande[1]),
+    );
     if (!seance) return null;
 
     const jour = aujourdhui();
@@ -870,24 +1063,29 @@ export function repondreEnDemo(
     const jours = Math.max(
       1,
       Math.round(
-        (new Date(saisie.au).getTime() - new Date(saisie.du).getTime()) / (1000 * 60 * 60 * 24),
+        (new Date(saisie.au).getTime() - new Date(saisie.du).getTime()) /
+          (1000 * 60 * 60 * 24),
       ),
     );
 
     DISPONIBILITES_DEMO.push({
       id,
-      responsable: saisie.responsable,
-      initiales: initialesDe(saisie.responsable),
-      poste: saisie.poste,
-      structure: saisie.structure,
+      responsable: nomAgentDemo(saisie.responsableId),
+      initiales: initialesDe(nomAgentDemo(saisie.responsableId)),
+      poste: qualiteAgentDemo(saisie.responsableId).poste,
+      structure: qualiteAgentDemo(saisie.responsableId).structure,
       type: saisie.type,
       du: saisie.du,
       au: saisie.au,
       jours,
-      interimaire: saisie.interimaire,
-      interimaireInitiales: saisie.interimaire ? initialesDe(saisie.interimaire) : null,
+      interimaire: saisie.interimaireId
+        ? nomAgentDemo(saisie.interimaireId)
+        : null,
+      interimaireInitiales: saisie.interimaireId
+        ? initialesDe(nomAgentDemo(saisie.interimaireId))
+        : null,
       // Sans interimaire, l'absence en cours est le point que la DSR doit voir.
-      feu: saisie.interimaire ? "vert" : enCours ? "rouge" : "orange",
+      feu: saisie.interimaireId ? "vert" : enCours ? "rouge" : "orange",
       enCours,
       saisiPar: auteurCourant().nom,
     });
@@ -895,7 +1093,7 @@ export function repondreEnDemo(
     return attendre({ id });
   }
 
-  if (methode === "POST" && route === "/gouvernance/structures") {
+  if (methode === "POST" && route === "/organisation/structures") {
     const saisie = corps as SaisieStructure;
     const id = Math.max(0, ...STRUCTURES_DEMO.map((s) => s.id)) + 1;
 
@@ -905,7 +1103,8 @@ export function repondreEnDemo(
       sigle: saisie.sigle,
       nature: saisie.nature as (typeof STRUCTURES_DEMO)[number]["nature"],
       niveau: saisie.niveau,
-      responsable: saisie.responsable,
+      // Vacant : le serveur reel ouvre le poste responsable sans l'occuper.
+      responsable: null,
       delaiMoyenJours: null,
       courriersEnCours: 0,
     });
@@ -927,7 +1126,9 @@ export function repondreEnDemo(
     const ecart = Math.round((saisie.cote - garantie) * 100) / 100;
     const id = Math.max(0, ...RELEVES_CHENAL_DEMO.map((r) => r.id)) + 1;
 
-    const precedent = RELEVES_CHENAL_DEMO.findIndex((r) => r.point === saisie.point);
+    const precedent = RELEVES_CHENAL_DEMO.findIndex(
+      (r) => r.point === saisie.point,
+    );
     const releve = {
       id,
       point: saisie.point,
@@ -938,7 +1139,9 @@ export function repondreEnDemo(
       feu: feuChenal(ecart),
       observation: saisie.observation.trim() === "" ? null : saisie.observation,
       releveParStructure:
-        (compteActifDemo()?.utilisateur.structureLibelle ?? "").split(" — ")[0] || "RDD",
+        (compteActifDemo()?.utilisateur.structureLibelle ?? "").split(
+          " — ",
+        )[0] || "RDD",
     };
 
     if (precedent >= 0) RELEVES_CHENAL_DEMO[precedent] = releve;
@@ -949,14 +1152,20 @@ export function repondreEnDemo(
 
   if (methode === "POST" && route === "/exploitation/recouvrements") {
     const saisie = corps as SaisieRecouvrement;
-    const secteur = SECTEURS_PORTUAIRES.find((s) => s.code === saisie.secteurCode);
-    const taux = saisie.emis === 0 ? 0 : Math.round((saisie.recouvre / saisie.emis) * 1000) / 10;
+    const secteur = SECTEURS_PORTUAIRES.find(
+      (s) => s.code === saisie.secteurCode,
+    );
+    const taux =
+      saisie.emis === 0
+        ? 0
+        : Math.round((saisie.recouvre / saisie.emis) * 1000) / 10;
     const id = Math.max(0, ...RECOUVREMENTS_DEMO.map((l) => l.id)) + 1;
 
     // Un secteur n'a qu'une ligne par periode : saisir deux fois corrige, ce
     // qui est le cas courant en fin de mois.
     const precedent = RECOUVREMENTS_DEMO.findIndex(
-      (l) => l.secteurCode === saisie.secteurCode && l.periode === saisie.periode,
+      (l) =>
+        l.secteurCode === saisie.secteurCode && l.periode === saisie.periode,
     );
     const ligne = {
       id,
@@ -998,8 +1207,9 @@ export function repondreEnDemo(
       structureLibelle: compte?.structureLibelle ?? "Structure",
       // Le responsable est saisi, jamais deduit de qui saisit : un point focal
       // inscrit les activites de toute sa direction sans en porter aucune.
-      responsable: saisie.responsable,
-      initiales: initialesDe(saisie.responsable),
+      responsable: nomAgentDemo(saisie.responsableId),
+      responsableId: saisie.responsableId,
+      initiales: initialesDe(nomAgentDemo(saisie.responsableId)),
       debut: saisie.debut,
       fin: saisie.fin,
       etat: "Programmée",
@@ -1054,8 +1264,10 @@ export function repondreEnDemo(
     const change: string[] = [];
     if (activite.intitule !== saisie.intitule) change.push("intitulé");
     if (activite.axe !== saisie.axe) change.push("axe stratégique");
-    if (activite.responsable !== saisie.responsable) {
-      change.push(`responsable (${activite.responsable} → ${saisie.responsable})`);
+    if (activite.responsableId !== saisie.responsableId) {
+      change.push(
+        `responsable (${activite.responsable} → ${nomAgentDemo(saisie.responsableId)})`,
+      );
     }
     if (activite.debut !== saisie.debut || activite.fin !== saisie.fin) {
       change.push("période d'exécution");
@@ -1067,8 +1279,9 @@ export function repondreEnDemo(
     activite.objectif = saisie.objectif;
     activite.etatReferenceGeneral = saisie.etatReferenceGeneral;
     activite.resultatsAttendus = saisie.resultatsAttendus;
-    activite.responsable = saisie.responsable;
-    activite.initiales = initialesDe(saisie.responsable);
+    activite.responsable = nomAgentDemo(saisie.responsableId);
+    activite.responsableId = saisie.responsableId;
+    activite.initiales = initialesDe(nomAgentDemo(saisie.responsableId));
     activite.debut = saisie.debut;
     activite.fin = saisie.fin;
     activite.budgetValide = saisie.budgetValide;
@@ -1107,19 +1320,31 @@ export function repondreEnDemo(
       releveLe: null,
     });
 
-    inscrireVie(activite, "Modification", `Indicateur ajouté : ${saisie.libelle}.`);
+    inscrireVie(
+      activite,
+      "Modification",
+      `Indicateur ajouté : ${saisie.libelle}.`,
+    );
     return attendre({ id });
   }
 
-  const releveIndicateur = route.match(/^\/activites\/(\d+)\/indicateurs\/(\d+)\/releve$/);
+  const releveIndicateur = route.match(
+    /^\/activites\/(\d+)\/indicateurs\/(\d+)\/releve$/,
+  );
   if (methode === "POST" && releveIndicateur) {
     const saisie = corps as SaisieReleveIndicateur;
     const activite = trouverActivite(Number(releveIndicateur[1]));
-    const indicateur = activite?.indicateurs.find((i) => i.id === Number(releveIndicateur[2]));
+    const indicateur = activite?.indicateurs.find(
+      (i) => i.id === Number(releveIndicateur[2]),
+    );
     if (!activite || !indicateur) return null;
 
     indicateur.realise = saisie.realise;
-    indicateur.taux = tauxIndicateur(indicateur.etatReference, indicateur.cible, saisie.realise);
+    indicateur.taux = tauxIndicateur(
+      indicateur.etatReference,
+      indicateur.cible,
+      saisie.realise,
+    );
     indicateur.releveLe = aujourdhui();
 
     inscrireVie(
@@ -1144,7 +1369,7 @@ export function repondreEnDemo(
       echeance: saisie.echeance,
       fait: false,
       dateRealisation: null,
-      responsable: saisie.responsable,
+      responsable: nomAgentDemo(saisie.responsableId),
     });
     activite.tachesTotal = activite.taches.length;
 
@@ -1182,25 +1407,9 @@ export function repondreEnDemo(
 
     recalculerEtat(activite);
 
-    inscrireVie(
-      activite,
-      "Observation",
-      saisie.observation,
-      saisie.pieces.map((p) => ({ nom: p.nom, poids: p.poids })),
-    );
-
-    return attendre({ id: activite.id });
-  }
-
-  const pieceActivite = route.match(/^\/activites\/(\d+)\/pieces$/);
-  if (methode === "POST" && pieceActivite) {
-    const saisie = corps as SaisiePieceVie;
-    const activite = trouverActivite(Number(pieceActivite[1]));
-    if (!activite) return null;
-
-    inscrireVie(activite, "Pièce jointe", saisie.commentaire, [
-      { nom: saisie.nom, poids: saisie.poids },
-    ]);
+    // Sans pièce : la déclaration n'en porte plus. Les justificatifs passent
+    // par `POST /api/pieces`, qui envoie le binaire — voir docs/pieges.md.
+    inscrireVie(activite, "Observation", saisie.observation, []);
 
     return attendre({ id: activite.id });
   }
@@ -1265,7 +1474,7 @@ export function repondreEnDemo(
       texte: saisie.texte,
       date: aujourdhui(),
       auteur: auteurCourant().nom,
-      responsable: saisie.responsable,
+      responsable: nomAgentDemo(saisie.responsableId),
       echeance: saisie.echeance,
       levee: false,
       dateLevee: null,
@@ -1275,14 +1484,16 @@ export function repondreEnDemo(
     inscrireVie(
       activite,
       saisie.origine,
-      `${saisie.reference ? `${saisie.reference} : ` : ""}${saisie.texte} Délai au ${saisie.echeance}, sous la responsabilité de ${saisie.responsable}.`,
+      `${saisie.reference ? `${saisie.reference} : ` : ""}${saisie.texte} Délai au ${saisie.echeance}, sous la responsabilité de ${nomAgentDemo(saisie.responsableId)}.`,
     );
     recalculerCriticite(activite, aujourdhui());
 
     return attendre({ id });
   }
 
-  const leveeInstruction = route.match(/^\/activites\/(\d+)\/instructions\/(\d+)\/levee$/);
+  const leveeInstruction = route.match(
+    /^\/activites\/(\d+)\/instructions\/(\d+)\/levee$/,
+  );
   if (methode === "POST" && leveeInstruction) {
     const saisie = corps as SaisieLeveeInstruction;
     const activite = trouverActivite(Number(leveeInstruction[1]));
@@ -1294,7 +1505,11 @@ export function repondreEnDemo(
     instruction.levee = true;
     instruction.dateLevee = aujourdhui();
 
-    inscrireVie(activite, "Validation", `Instruction levée : ${saisie.commentaire}`);
+    inscrireVie(
+      activite,
+      "Validation",
+      `Instruction levée : ${saisie.commentaire}`,
+    );
     recalculerCriticite(activite, aujourdhui());
 
     return attendre({ id: instruction.id });
@@ -1312,16 +1527,21 @@ export function repondreEnDemo(
     return attendre({ id: activite.id });
   }
 
-  const depotObligation = route.match(/^\/activites\/obligations\/(\d+)\/depot$/);
+  const depotObligation = route.match(
+    /^\/activites\/obligations\/(\d+)\/depot$/,
+  );
   if (methode === "POST" && depotObligation) {
-    const obligation = OBLIGATIONS_DEMO.find((o) => o.id === Number(depotObligation[1]));
+    const obligation = OBLIGATIONS_DEMO.find(
+      (o) => o.id === Number(depotObligation[1]),
+    );
     if (!obligation) return null;
 
     const jour = aujourdhui();
     obligation.depose = true;
     obligation.dateDepot = jour;
     // Le retard constate au depot ne s'efface pas : il est arrete, pas annule.
-    obligation.retardJours = jour > obligation.echeance ? obligation.retardJours ?? 1 : null;
+    obligation.retardJours =
+      jour > obligation.echeance ? (obligation.retardJours ?? 1) : null;
     obligation.feu = obligation.retardJours === null ? "vert" : "orange";
 
     return attendre({ id: obligation.id });
@@ -1329,7 +1549,9 @@ export function repondreEnDemo(
 
   if (methode === "POST" && route === "/activites/plan/etat") {
     const saisie = corps as SaisieEtatPlan;
-    const plan = PLANS_DEMO.find((p) => p.structureSigle === saisie.structureSigle);
+    const plan = PLANS_DEMO.find(
+      (p) => p.structureSigle === saisie.structureSigle,
+    );
     if (!plan) return null;
 
     if (saisie.action === "soumettre") {
@@ -1353,7 +1575,9 @@ export function repondreEnDemo(
     // La validation engage la structure : elle s'inscrit sur chaque activite
     // du plan, sinon la fiche de vie ne porte pas la trace de l'engagement.
     if (saisie.action !== "soumettre") {
-      ACTIVITES_DEMO.filter((a) => a.structureSigle === saisie.structureSigle).forEach((a) =>
+      ACTIVITES_DEMO.filter(
+        (a) => a.structureSigle === saisie.structureSigle,
+      ).forEach((a) =>
         inscrireVie(
           a,
           "Validation",
@@ -1390,6 +1614,10 @@ export function repondreEnDemo(
     CALENDRIER_DEMO.push({
       id,
       ...saisie,
+      // Ni le nombre de structures ni le responsable ne se saisissent : ils
+      // decoulent du referentiel, comme au serveur reel.
+      structuresAttendues: STRUCTURES_DEMO.length,
+      responsable: "DSR",
       // Aucun cycle clos : la ligne reste non evaluee jusqu'a la premiere echeance.
       recus: 0,
       feu: "inconnu",
@@ -1421,7 +1649,9 @@ export function repondreEnDemo(
     return attendre({ id });
   }
 
-  const validationRegle = route.match(/^\/archivage\/referentiel\/(\d+)\/validation$/);
+  const validationRegle = route.match(
+    /^\/archivage\/referentiel\/(\d+)\/validation$/,
+  );
   if (methode === "POST" && validationRegle) {
     const regle = REGLES_DEMO.find((r) => r.id === Number(validationRegle[1]));
     if (!regle) return null;
@@ -1431,9 +1661,13 @@ export function repondreEnDemo(
     return attendre({ id: regle.id });
   }
 
-  const versementDemande = route.match(/^\/archivage\/versements\/(\d+)\/versement$/);
+  const versementDemande = route.match(
+    /^\/archivage\/versements\/(\d+)\/versement$/,
+  );
   if (methode === "POST" && versementDemande) {
-    const versement = VERSEMENTS_DEMO.find((v) => v.id === Number(versementDemande[1]));
+    const versement = VERSEMENTS_DEMO.find(
+      (v) => v.id === Number(versementDemande[1]),
+    );
     if (!versement) return null;
 
     const jour = aujourdhui();
@@ -1450,9 +1684,13 @@ export function repondreEnDemo(
     return attendre({ id: versement.id });
   }
 
-  const preuveDemandee = route.match(/^\/archivage\/versements\/(\d+)\/preuve$/);
+  const preuveDemandee = route.match(
+    /^\/archivage\/versements\/(\d+)\/preuve$/,
+  );
   if (methode === "POST" && preuveDemandee) {
-    const versement = VERSEMENTS_DEMO.find((v) => v.id === Number(preuveDemandee[1]));
+    const versement = VERSEMENTS_DEMO.find(
+      (v) => v.id === Number(preuveDemandee[1]),
+    );
     if (!versement) return null;
 
     return attendre({
@@ -1496,14 +1734,45 @@ export function repondreEnDemo(
       courrierOrigine: courrier?.numero ?? null,
       courrierOrigineId: saisie.courrierId,
       contexte: courrier?.objet ?? saisie.objet,
-      regleAffectation: "Affectation manuelle depuis la fiche du courrier d'origine.",
+      regleAffectation:
+        "Affectation manuelle depuis la fiche du courrier d'origine.",
       seuil: null,
       etapes: [
-        { code: "Qualification", libelle: "Qualification et affectation", franchie: false, date: null, acteur: auteurCourant().nom },
-        { code: "Instruction", libelle: "Instruction du dossier", franchie: false, date: null, acteur: null },
-        { code: "Validation", libelle: "Validation hiérarchique", franchie: false, date: null, acteur: null },
-        { code: "Notification", libelle: "Notification au demandeur", franchie: false, date: null, acteur: null },
-        { code: "Clos", libelle: "Clôture et archivage", franchie: false, date: null, acteur: null },
+        {
+          code: "Qualification",
+          libelle: "Qualification et affectation",
+          franchie: false,
+          date: null,
+          acteur: auteurCourant().nom,
+        },
+        {
+          code: "Instruction",
+          libelle: "Instruction du dossier",
+          franchie: false,
+          date: null,
+          acteur: null,
+        },
+        {
+          code: "Validation",
+          libelle: "Validation hiérarchique",
+          franchie: false,
+          date: null,
+          acteur: null,
+        },
+        {
+          code: "Notification",
+          libelle: "Notification au demandeur",
+          franchie: false,
+          date: null,
+          acteur: null,
+        },
+        {
+          code: "Clos",
+          libelle: "Clôture et archivage",
+          franchie: false,
+          date: null,
+          acteur: null,
+        },
       ],
       pieces: [],
       complements: [],
@@ -1530,7 +1799,9 @@ export function repondreEnDemo(
   const complementDemande = route.match(/^\/dossiers\/(\d+)\/complements$/);
   if (methode === "POST" && complementDemande) {
     const saisie = corps as SaisieComplement;
-    const dossier = DOSSIERS_DEMO.find((d) => d.id === Number(complementDemande[1]));
+    const dossier = DOSSIERS_DEMO.find(
+      (d) => d.id === Number(complementDemande[1]),
+    );
     if (!dossier) return null;
 
     const jour = aujourdhui();
@@ -1565,7 +1836,9 @@ export function repondreEnDemo(
   const retourDemande = route.match(/^\/dossiers\/(\d+)\/retour$/);
   if (methode === "POST" && retourDemande) {
     const saisie = corps as SaisieRetour;
-    const dossier = DOSSIERS_DEMO.find((d) => d.id === Number(retourDemande[1]));
+    const dossier = DOSSIERS_DEMO.find(
+      (d) => d.id === Number(retourDemande[1]),
+    );
     if (!dossier) return null;
 
     const etapeAvant = dossier.etape;
@@ -1606,7 +1879,9 @@ export function repondreEnDemo(
   const fusionDemandee = route.match(/^\/dossiers\/(\d+)\/fusion$/);
   if (methode === "POST" && fusionDemandee) {
     const saisie = corps as SaisieFusion;
-    const dossier = DOSSIERS_DEMO.find((d) => d.id === Number(fusionDemandee[1]));
+    const dossier = DOSSIERS_DEMO.find(
+      (d) => d.id === Number(fusionDemandee[1]),
+    );
     const modele = MODELES_DEMO.find((m) => m.id === saisie.modeleId);
     if (!dossier || !modele) return null;
 
@@ -1619,7 +1894,13 @@ export function repondreEnDemo(
       nom: `${modele.code}-${dossier.reference}.pdf`,
       format: "PDF",
       versions: [
-        { version: 1, deposeLe: jour, deposePar: auteurCourant().nom, taille: "180 Ko", courante: true },
+        {
+          version: 1,
+          deposeLe: jour,
+          deposePar: auteurCourant().nom,
+          taille: "180 Ko",
+          courante: true,
+        },
       ],
     });
 
@@ -1664,10 +1945,33 @@ export function repondreEnDemo(
       contexte: saisie.contexte,
       complementAttendu: null,
       etapes: [
-        { libelle: "Demande reçue", franchie: true, date: jour, explication: "Votre demande a été enregistrée et va être transmise au service compétent." },
-        { libelle: "À l'étude", franchie: false, date: null, explication: "Le service examinera votre dossier. Vous serez averti si une pièce complémentaire est nécessaire." },
-        { libelle: "Décision", franchie: false, date: null, explication: "La décision vous sera notifiée par le canal que vous avez choisi." },
-        { libelle: "Dossier clos", franchie: false, date: null, explication: "Votre dossier sera archivé et restera consultable ici." },
+        {
+          libelle: "Demande reçue",
+          franchie: true,
+          date: jour,
+          explication:
+            "Votre demande a été enregistrée et va être transmise au service compétent.",
+        },
+        {
+          libelle: "À l'étude",
+          franchie: false,
+          date: null,
+          explication:
+            "Le service examinera votre dossier. Vous serez averti si une pièce complémentaire est nécessaire.",
+        },
+        {
+          libelle: "Décision",
+          franchie: false,
+          date: null,
+          explication:
+            "La décision vous sera notifiée par le canal que vous avez choisi.",
+        },
+        {
+          libelle: "Dossier clos",
+          franchie: false,
+          date: null,
+          explication: "Votre dossier sera archivé et restera consultable ici.",
+        },
       ],
       messages: [],
       pieces: saisie.pieces.map((piece, index) => ({
@@ -1685,7 +1989,9 @@ export function repondreEnDemo(
   const messagePortail = route.match(/^\/portail\/demandes\/(\d+)\/messages$/);
   if (methode === "POST" && messagePortail) {
     const saisie = corps as SaisieMessage;
-    const demande = DEMANDES_PORTAIL_DEMO.find((d) => d.id === Number(messagePortail[1]));
+    const demande = DEMANDES_PORTAIL_DEMO.find(
+      (d) => d.id === Number(messagePortail[1]),
+    );
     if (!demande) return null;
 
     const jour = aujourdhui();
@@ -1766,7 +2072,9 @@ export function repondreEnDemo(
 
   const delegationAClore = route.match(/^\/habilitations\/delegations\/(\d+)$/);
   if (methode === "DELETE" && delegationAClore) {
-    const delegation = DELEGATIONS_DEMO.find((d) => d.id === Number(delegationAClore[1]));
+    const delegation = DELEGATIONS_DEMO.find(
+      (d) => d.id === Number(delegationAClore[1]),
+    );
     if (delegation) {
       delegation.etat = "close";
       delegation.fin = aujourdhui();
@@ -1780,7 +2088,10 @@ export function repondreEnDemo(
     const compte = compteActifDemo();
     if (!compte) {
       return new Promise((_, rejeter) =>
-        setTimeout(() => rejeter(new ErreurApi(401, "Aucune session ouverte.")), LATENCE_MS),
+        setTimeout(
+          () => rejeter(new ErreurApi(401, "Aucune session ouverte.")),
+          LATENCE_MS,
+        ),
       );
     }
     return attendre(compte.utilisateur);
@@ -1793,7 +2104,9 @@ export function repondreEnDemo(
   if (route === "/referentiels/correspondants") {
     const q = (parametres.get("q") ?? "").trim().toLowerCase();
     return attendre(
-      CORRESPONDANTS_DEMO.filter((c) => c.libelle.toLowerCase().includes(q)).slice(0, 8),
+      CORRESPONDANTS_DEMO.filter((c) =>
+        c.libelle.toLowerCase().includes(q),
+      ).slice(0, 8),
     );
   }
 
@@ -1812,14 +2125,21 @@ export function repondreEnDemo(
 
   if (route === "/accuses") {
     const vue = parametres.get("vue");
-    const filtres: Record<string, string> = { attente: "En attente", nonRetourne: "Non retourné" };
+    const filtres: Record<string, string> = {
+      attente: "En attente",
+      nonRetourne: "Non retourné",
+    };
     const etat = vue ? filtres[vue] : undefined;
-    return attendre(etat ? ACCUSES_DEMO.filter((a) => a.etat === etat) : ACCUSES_DEMO);
+    return attendre(
+      etat ? ACCUSES_DEMO.filter((a) => a.etat === etat) : ACCUSES_DEMO,
+    );
   }
 
   const vieDemandee = route.match(/^\/courriers\/(\d+)\/fiche-de-vie$/);
   if (vieDemandee) {
-    const courrier = COURRIERS_DEMO.find((c) => c.id === Number(vieDemandee[1]));
+    const courrier = COURRIERS_DEMO.find(
+      (c) => c.id === Number(vieDemandee[1]),
+    );
     if (!courrier) return null;
     return attendre({
       numero: courrier.numero,
@@ -1827,20 +2147,44 @@ export function repondreEnDemo(
       etapes: ETAPES_VIE_DEMO,
       resume: [
         { libelle: "Âge du courrier", valeur: "5 j 06 h", ton: "neutre" },
-        { libelle: "Étapes franchies", valeur: String(ETAPES_VIE_DEMO.length), ton: "neutre" },
-        { libelle: "Délai imparti", valeur: `${courrier.delai?.joursAlloues ?? 5} j ouvrés`, ton: "neutre" },
+        {
+          libelle: "Étapes franchies",
+          valeur: String(ETAPES_VIE_DEMO.length),
+          ton: "neutre",
+        },
+        {
+          libelle: "Délai imparti",
+          valeur: `${courrier.delai?.joursAlloues ?? 5} j ouvrés`,
+          ton: "neutre",
+        },
         {
           libelle: "Dépassement",
-          valeur: (courrier.delai?.joursDepassement ?? 0) > 0 ? `${courrier.delai?.joursDepassement} j` : "aucun",
-          ton: (courrier.delai?.joursDepassement ?? 0) > 0 ? "alerte" : "succes",
+          valeur:
+            (courrier.delai?.joursDepassement ?? 0) > 0
+              ? `${courrier.delai?.joursDepassement} j`
+              : "aucun",
+          ton:
+            (courrier.delai?.joursDepassement ?? 0) > 0 ? "alerte" : "succes",
         },
         { libelle: "Signalements", valeur: "1 ouvert", ton: "alerte" },
       ],
       detenteurs: DETENTEURS_DEMO,
       lies: [
-        { reference: "A-2026-0368", titre: "Facture initiale du prestataire", chemin: "/courriers/368" },
-        { reference: "D-2026-0207", titre: "Projet de réponse au Trésor public", chemin: "/courriers/207" },
-        { reference: "EC-2026-0087", titre: "Signalement de pièce manquante", chemin: "/courriers" },
+        {
+          reference: "A-2026-0368",
+          titre: "Facture initiale du prestataire",
+          chemin: "/courriers/368",
+        },
+        {
+          reference: "D-2026-0207",
+          titre: "Projet de réponse au Trésor public",
+          chemin: "/courriers/207",
+        },
+        {
+          reference: "EC-2026-0087",
+          titre: "Signalement de pièce manquante",
+          chemin: "/courriers",
+        },
       ],
     });
   }
@@ -1861,7 +2205,9 @@ export function repondreEnDemo(
     if (etapes[vue]) lignes = lignes.filter((d) => d.etape === etapes[vue]);
     if (q) {
       lignes = lignes.filter((d) =>
-        [d.numero ?? "", d.destinataire, d.objet].some((c) => c.toLowerCase().includes(q)),
+        [d.numero ?? "", d.destinataire, d.objet].some((c) =>
+          c.toLowerCase().includes(q),
+        ),
       );
     }
 
@@ -1888,10 +2234,50 @@ export function repondreEnDemo(
       redacteur: depart.redacteur,
       mode: "CASCADE",
       etapes: [
-        { ordre: 1, nomComplet: depart.redacteur, initiales: "MD", fonction: `Rédacteur — ${depart.structure}`, etat: "soumis", horodatage: "2026-08-03T16:24:00", depuis: null, observation: null, estMoi: false },
-        { ordre: 2, nomComplet: "S. Bamba", initiales: "SB", fonction: "Chef de service comptabilité", etat: "vise", horodatage: "2026-08-04T08:51:00", depuis: null, observation: "Pièces vérifiées, montant conforme au bon de commande.", estMoi: false },
-        { ordre: 3, nomComplet: "A. Kouassi", initiales: "AK", fonction: "Directeur", etat: "attendu", horodatage: null, depuis: "6 h", observation: null, estMoi: true },
-        { ordre: 4, nomComplet: "N'Guessan Y.", initiales: "NY", fonction: "Directeur général — signature", etat: "attendu", horodatage: null, depuis: null, observation: null, estMoi: false },
+        {
+          ordre: 1,
+          nomComplet: depart.redacteur,
+          initiales: "MD",
+          fonction: `Rédacteur — ${depart.structure}`,
+          etat: "soumis",
+          horodatage: "2026-08-03T16:24:00",
+          depuis: null,
+          observation: null,
+          estMoi: false,
+        },
+        {
+          ordre: 2,
+          nomComplet: "S. Bamba",
+          initiales: "SB",
+          fonction: "Chef de service comptabilité",
+          etat: "vise",
+          horodatage: "2026-08-04T08:51:00",
+          depuis: null,
+          observation: "Pièces vérifiées, montant conforme au bon de commande.",
+          estMoi: false,
+        },
+        {
+          ordre: 3,
+          nomComplet: "A. Kouassi",
+          initiales: "AK",
+          fonction: "Directeur",
+          etat: "attendu",
+          horodatage: null,
+          depuis: "6 h",
+          observation: null,
+          estMoi: true,
+        },
+        {
+          ordre: 4,
+          nomComplet: "N'Guessan Y.",
+          initiales: "NY",
+          fonction: "Directeur général — signature",
+          etat: "attendu",
+          horodatage: null,
+          depuis: null,
+          observation: null,
+          estMoi: false,
+        },
       ],
     });
   }
@@ -1899,7 +2285,11 @@ export function repondreEnDemo(
   if (route === "/departs/file-signature") {
     return attendre({
       lignes: DEPARTS_DEMO.filter((d) => d.etape === "A_SIGNER"),
-      signataire: { nomComplet: "N'Guessan Y.", fonction: "Directeur général", initiales: "NY" },
+      signataire: {
+        nomComplet: "N'Guessan Y.",
+        fonction: "Directeur général",
+        initiales: "NY",
+      },
     });
   }
 
@@ -1911,78 +2301,589 @@ export function repondreEnDemo(
       // Etapes du circuit standard — arrivee (circuit 1), avec leurs delais et
       // ce qui se passe a l'echeance.
       etapes: [
-        { id: 1, circuitId: 1, rang: 1, libelle: "Enregistrement au bureau d'ordre", acteur: "Agent de session courrier", delaiJours: 1, escalade: "Relance automatique", alerteAvant: 1, bloquante: true },
-        { id: 2, circuitId: 1, rang: 2, libelle: "Cotation par l'autorité", acteur: "Directeur général", delaiJours: 1, escalade: "Relance automatique", alerteAvant: 1, bloquante: true },
-        { id: 3, circuitId: 1, rang: 3, libelle: "Transmission à la structure cotée", acteur: "Service du courrier central", delaiJours: 1, escalade: "Escalade au supérieur", alerteAvant: 1, bloquante: true },
-        { id: 4, circuitId: 1, rang: 4, libelle: "Traitement par la structure", acteur: "Structure chef de file", delaiJours: 5, escalade: "Escalade au supérieur", alerteAvant: 2, bloquante: true },
-        { id: 5, circuitId: 1, rang: 5, libelle: "Accusé de réception physique", acteur: "Structure destinataire", delaiJours: 2, escalade: "Aucune", alerteAvant: null, bloquante: false },
+        {
+          id: 1,
+          circuitId: 1,
+          rang: 1,
+          libelle: "Enregistrement au bureau d'ordre",
+          acteur: "Agent de session courrier",
+          delaiJours: 1,
+          escalade: "Relance automatique",
+          alerteAvant: 1,
+          bloquante: true,
+        },
+        {
+          id: 2,
+          circuitId: 1,
+          rang: 2,
+          libelle: "Cotation par l'autorité",
+          acteur: "Directeur général",
+          delaiJours: 1,
+          escalade: "Relance automatique",
+          alerteAvant: 1,
+          bloquante: true,
+        },
+        {
+          id: 3,
+          circuitId: 1,
+          rang: 3,
+          libelle: "Transmission à la structure cotée",
+          acteur: "Service du courrier central",
+          delaiJours: 1,
+          escalade: "Escalade au supérieur",
+          alerteAvant: 1,
+          bloquante: true,
+        },
+        {
+          id: 4,
+          circuitId: 1,
+          rang: 4,
+          libelle: "Traitement par la structure",
+          acteur: "Structure chef de file",
+          delaiJours: 5,
+          escalade: "Escalade au supérieur",
+          alerteAvant: 2,
+          bloquante: true,
+        },
+        {
+          id: 5,
+          circuitId: 1,
+          rang: 5,
+          libelle: "Accusé de réception physique",
+          acteur: "Structure destinataire",
+          delaiJours: 2,
+          escalade: "Aucune",
+          alerteAvant: null,
+          bloquante: false,
+        },
       ],
       // Plan de classement — RF-GED-07.
       classement: [
-        { id: 1, code: "10", libelle: "Gouvernance et instances", niveau: 0, parentId: null, documents: 486, typologiesAssociees: ["Délibération du Conseil d'administration"] },
-        { id: 2, code: "10.1", libelle: "Conseil d'administration", niveau: 1, parentId: 1, documents: 214, typologiesAssociees: ["Délibération du Conseil d'administration"] },
-        { id: 3, code: "10.2", libelle: "Comité de direction", niveau: 1, parentId: 1, documents: 178, typologiesAssociees: [] },
-        { id: 4, code: "10.3", libelle: "Filiales et succursales", niveau: 1, parentId: 1, documents: 94, typologiesAssociees: [] },
-        { id: 5, code: "20", libelle: "Affaires financières", niveau: 0, parentId: null, documents: 1_204, typologiesAssociees: ["Marché public et contrat"] },
-        { id: 6, code: "20.1", libelle: "Marchés et contrats", niveau: 1, parentId: 5, documents: 486, typologiesAssociees: ["Marché public et contrat"] },
-        { id: 7, code: "20.2", libelle: "Budget et exécution", niveau: 1, parentId: 5, documents: 512, typologiesAssociees: [] },
-        { id: 8, code: "20.3", libelle: "Recouvrement et redevances", niveau: 1, parentId: 5, documents: 206, typologiesAssociees: [] },
-        { id: 9, code: "30", libelle: "Domaine et exploitation portuaire", niveau: 0, parentId: null, documents: 842, typologiesAssociees: [] },
-        { id: 10, code: "30.1", libelle: "Occupations du domaine", niveau: 1, parentId: 9, documents: 418, typologiesAssociees: [] },
-        { id: 11, code: "30.2", libelle: "Travaux et ouvrages", niveau: 1, parentId: 9, documents: 424, typologiesAssociees: [] },
-        { id: 12, code: "40", libelle: "Affaires juridiques", niveau: 0, parentId: null, documents: 218, typologiesAssociees: ["Dossier contentieux"] },
-        { id: 13, code: "40.1", libelle: "Contentieux", niveau: 1, parentId: 12, documents: 57, typologiesAssociees: ["Dossier contentieux"] },
-        { id: 14, code: "40.2", libelle: "Réclamations d'usagers", niveau: 1, parentId: 12, documents: 161, typologiesAssociees: ["Réclamation d'usager"] },
-        { id: 15, code: "50", libelle: "Administration générale", niveau: 0, parentId: null, documents: 1_842, typologiesAssociees: ["Courrier d'administration générale", "Note de service"] },
+        {
+          id: 1,
+          code: "10",
+          libelle: "Gouvernance et instances",
+          niveau: 0,
+          parentId: null,
+          documents: 486,
+          typologiesAssociees: ["Délibération du Conseil d'administration"],
+        },
+        {
+          id: 2,
+          code: "10.1",
+          libelle: "Conseil d'administration",
+          niveau: 1,
+          parentId: 1,
+          documents: 214,
+          typologiesAssociees: ["Délibération du Conseil d'administration"],
+        },
+        {
+          id: 3,
+          code: "10.2",
+          libelle: "Comité de direction",
+          niveau: 1,
+          parentId: 1,
+          documents: 178,
+          typologiesAssociees: [],
+        },
+        {
+          id: 4,
+          code: "10.3",
+          libelle: "Filiales et succursales",
+          niveau: 1,
+          parentId: 1,
+          documents: 94,
+          typologiesAssociees: [],
+        },
+        {
+          id: 5,
+          code: "20",
+          libelle: "Affaires financières",
+          niveau: 0,
+          parentId: null,
+          documents: 1_204,
+          typologiesAssociees: ["Marché public et contrat"],
+        },
+        {
+          id: 6,
+          code: "20.1",
+          libelle: "Marchés et contrats",
+          niveau: 1,
+          parentId: 5,
+          documents: 486,
+          typologiesAssociees: ["Marché public et contrat"],
+        },
+        {
+          id: 7,
+          code: "20.2",
+          libelle: "Budget et exécution",
+          niveau: 1,
+          parentId: 5,
+          documents: 512,
+          typologiesAssociees: [],
+        },
+        {
+          id: 8,
+          code: "20.3",
+          libelle: "Recouvrement et redevances",
+          niveau: 1,
+          parentId: 5,
+          documents: 206,
+          typologiesAssociees: [],
+        },
+        {
+          id: 9,
+          code: "30",
+          libelle: "Domaine et exploitation portuaire",
+          niveau: 0,
+          parentId: null,
+          documents: 842,
+          typologiesAssociees: [],
+        },
+        {
+          id: 10,
+          code: "30.1",
+          libelle: "Occupations du domaine",
+          niveau: 1,
+          parentId: 9,
+          documents: 418,
+          typologiesAssociees: [],
+        },
+        {
+          id: 11,
+          code: "30.2",
+          libelle: "Travaux et ouvrages",
+          niveau: 1,
+          parentId: 9,
+          documents: 424,
+          typologiesAssociees: [],
+        },
+        {
+          id: 12,
+          code: "40",
+          libelle: "Affaires juridiques",
+          niveau: 0,
+          parentId: null,
+          documents: 218,
+          typologiesAssociees: ["Dossier contentieux"],
+        },
+        {
+          id: 13,
+          code: "40.1",
+          libelle: "Contentieux",
+          niveau: 1,
+          parentId: 12,
+          documents: 57,
+          typologiesAssociees: ["Dossier contentieux"],
+        },
+        {
+          id: 14,
+          code: "40.2",
+          libelle: "Réclamations d'usagers",
+          niveau: 1,
+          parentId: 12,
+          documents: 161,
+          typologiesAssociees: ["Réclamation d'usager"],
+        },
+        {
+          id: 15,
+          code: "50",
+          libelle: "Administration générale",
+          niveau: 0,
+          parentId: null,
+          documents: 1_842,
+          typologiesAssociees: [
+            "Courrier d'administration générale",
+            "Note de service",
+          ],
+        },
       ],
       // Seuils d'alerte — RF-BI-05.
       seuils: [
-        { id: 1, indicateur: "Courriers hors délai", perimetre: "Par structure", operateur: "supérieur à", valeur: 10, unite: "courriers", destinataire: "Responsable de structure et DSR", canal: "Les deux", actif: true, declenchements30j: 7 },
-        { id: 2, indicateur: "Délai moyen de traitement", perimetre: "Institution", operateur: "supérieur à", valeur: 8, unite: "jours", destinataire: "DSR", canal: "Notification interne", actif: true, declenchements30j: 2 },
-        { id: 3, indicateur: "Taux d'exécution du plan d'actions", perimetre: "Par structure", operateur: "inférieur à", valeur: 60, unite: "%", destinataire: "Responsable de structure, DSR et contrôle de gestion", canal: "Les deux", actif: true, declenchements30j: 4 },
-        { id: 4, indicateur: "Score global de la matrice", perimetre: "Par structure", operateur: "inférieur à", valeur: 60, unite: "points", destinataire: "Directeur général et CODIR", canal: "Courriel", actif: true, declenchements30j: 2 },
-        { id: 5, indicateur: "Décisions arrivées à échéance sans exécution", perimetre: "Institution", operateur: "supérieur à", valeur: 3, unite: "décisions", destinataire: "DSR", canal: "Notification interne", actif: true, declenchements30j: 5 },
-        { id: 6, indicateur: "Rapports mensuels non déposés", perimetre: "Institution", operateur: "supérieur à", valeur: 2, unite: "structures", destinataire: "DSR", canal: "Notification interne", actif: true, declenchements30j: 3 },
-        { id: 7, indicateur: "Absences sans intérimaire désigné", perimetre: "Institution", operateur: "supérieur à", valeur: 0, unite: "responsables", destinataire: "DSR et direction des ressources humaines", canal: "Les deux", actif: false, declenchements30j: 0 },
+        {
+          id: 1,
+          indicateur: "Courriers hors délai",
+          perimetre: "Par structure",
+          operateur: "supérieur à",
+          valeur: 10,
+          unite: "courriers",
+          destinataire: "Responsable de structure et DSR",
+          canal: "Les deux",
+          actif: true,
+          declenchements30j: 7,
+        },
+        {
+          id: 2,
+          indicateur: "Délai moyen de traitement",
+          perimetre: "Institution",
+          operateur: "supérieur à",
+          valeur: 8,
+          unite: "jours",
+          destinataire: "DSR",
+          canal: "Notification interne",
+          actif: true,
+          declenchements30j: 2,
+        },
+        {
+          id: 3,
+          indicateur: "Taux d'exécution du plan d'actions",
+          perimetre: "Par structure",
+          operateur: "inférieur à",
+          valeur: 60,
+          unite: "%",
+          destinataire: "Responsable de structure, DSR et contrôle de gestion",
+          canal: "Les deux",
+          actif: true,
+          declenchements30j: 4,
+        },
+        {
+          id: 4,
+          indicateur: "Score global de la matrice",
+          perimetre: "Par structure",
+          operateur: "inférieur à",
+          valeur: 60,
+          unite: "points",
+          destinataire: "Directeur général et CODIR",
+          canal: "Courriel",
+          actif: true,
+          declenchements30j: 2,
+        },
+        {
+          id: 5,
+          indicateur: "Décisions arrivées à échéance sans exécution",
+          perimetre: "Institution",
+          operateur: "supérieur à",
+          valeur: 3,
+          unite: "décisions",
+          destinataire: "DSR",
+          canal: "Notification interne",
+          actif: true,
+          declenchements30j: 5,
+        },
+        {
+          id: 6,
+          indicateur: "Rapports mensuels non déposés",
+          perimetre: "Institution",
+          operateur: "supérieur à",
+          valeur: 2,
+          unite: "structures",
+          destinataire: "DSR",
+          canal: "Notification interne",
+          actif: true,
+          declenchements30j: 3,
+        },
+        {
+          id: 7,
+          indicateur: "Absences sans intérimaire désigné",
+          perimetre: "Institution",
+          operateur: "supérieur à",
+          valeur: 0,
+          unite: "responsables",
+          destinataire: "DSR et direction des ressources humaines",
+          canal: "Les deux",
+          actif: false,
+          declenchements30j: 0,
+        },
       ],
       circuits: [
-        { id: 1, libelle: "Circuit standard — arrivée", sappliqueA: "Tout courrier arrivé", nombreEtapes: 4, delaiCible: 5, usage: 211, actif: true },
-        { id: 2, libelle: "Circuit court — réclamation", sappliqueA: "Nature « Réclamation »", nombreEtapes: 3, delaiCible: 3, usage: 96, actif: true },
-        { id: 3, libelle: "Circuit direction", sappliqueA: "Priorité très urgente", nombreEtapes: 5, delaiCible: 2, usage: 34, actif: true },
-        { id: 4, libelle: "Circuit confidentiel", sappliqueA: "Session confidentielle", nombreEtapes: 3, delaiCible: 3, usage: 18, actif: true },
-        { id: 5, libelle: "Circuit facture — ancien", sappliqueA: "Nature « Facture »", nombreEtapes: 4, delaiCible: 10, usage: 0, actif: false },
+        {
+          id: 1,
+          libelle: "Circuit standard — arrivée",
+          sappliqueA: "Tout courrier arrivé",
+          nombreEtapes: 4,
+          delaiCible: 5,
+          usage: 211,
+          actif: true,
+        },
+        {
+          id: 2,
+          libelle: "Circuit court — réclamation",
+          sappliqueA: "Nature « Réclamation »",
+          nombreEtapes: 3,
+          delaiCible: 3,
+          usage: 96,
+          actif: true,
+        },
+        {
+          id: 3,
+          libelle: "Circuit direction",
+          sappliqueA: "Priorité très urgente",
+          nombreEtapes: 5,
+          delaiCible: 2,
+          usage: 34,
+          actif: true,
+        },
+        {
+          id: 4,
+          libelle: "Circuit confidentiel",
+          sappliqueA: "Session confidentielle",
+          nombreEtapes: 3,
+          delaiCible: 3,
+          usage: 18,
+          actif: true,
+        },
+        {
+          id: 5,
+          libelle: "Circuit facture — ancien",
+          sappliqueA: "Nature « Facture »",
+          nombreEtapes: 4,
+          delaiCible: 10,
+          usage: 0,
+          actif: false,
+        },
       ],
       regles: [
-        { id: 1, ordre: 1, condition: "Session = Confidentiel", circuit: "Circuit confidentiel", declenchements: 18, repli: false },
-        { id: 2, ordre: 2, condition: "Priorité = Très urgente", circuit: "Circuit direction", declenchements: 34, repli: false },
-        { id: 3, ordre: 3, condition: "Nature = Réclamation", circuit: "Circuit court — réclamation", declenchements: 96, repli: false },
-        { id: 4, ordre: 4, condition: "Aucune règle ne correspond", circuit: "Circuit standard — arrivée", declenchements: 211, repli: true },
+        {
+          id: 1,
+          ordre: 1,
+          condition: "Session = Confidentiel",
+          circuit: "Circuit confidentiel",
+          declenchements: 18,
+          repli: false,
+        },
+        {
+          id: 2,
+          ordre: 2,
+          condition: "Priorité = Très urgente",
+          circuit: "Circuit direction",
+          declenchements: 34,
+          repli: false,
+        },
+        {
+          id: 3,
+          ordre: 3,
+          condition: "Nature = Réclamation",
+          circuit: "Circuit court — réclamation",
+          declenchements: 96,
+          repli: false,
+        },
+        {
+          id: 4,
+          ordre: 4,
+          condition: "Aucune règle ne correspond",
+          circuit: "Circuit standard — arrivée",
+          declenchements: 211,
+          repli: true,
+        },
       ],
       mentions: [
-        { id: 1, libelle: "Pour attribution", delaiAssocie: 5, comportement: "Confie le traitement à la structure", niveauxAutorises: ["Direction générale", "Direction"], active: true },
-        { id: 2, libelle: "Pour information", delaiAssocie: null, comportement: "N'ouvre aucun délai", niveauxAutorises: ["Direction générale", "Direction", "Service"], active: true },
-        { id: 3, libelle: "Pour avis", delaiAssocie: 3, comportement: "Attend une réponse écrite", niveauxAutorises: ["Direction générale", "Direction"], active: true },
-        { id: 4, libelle: "Pour suite à donner", delaiAssocie: 5, comportement: "Confie le traitement à la structure", niveauxAutorises: ["Direction"], active: true },
-        { id: 5, libelle: "Me rendre compte", delaiAssocie: 5, comportement: "Exige un compte rendu au cotant", niveauxAutorises: ["Direction générale"], active: true },
-        { id: 6, libelle: "À classer", delaiAssocie: null, comportement: "Clôt le courrier sans traitement", niveauxAutorises: ["Direction générale", "Direction"], active: true },
-        { id: 7, libelle: "En urgence", delaiAssocie: 1, comportement: "Confie le traitement à la structure", niveauxAutorises: ["Direction générale"], active: true },
-        { id: 8, libelle: "Pour signature", delaiAssocie: 2, comportement: "Attend une réponse écrite", niveauxAutorises: ["Direction"], active: true },
-        { id: 9, libelle: "Pour exécution", delaiAssocie: 5, comportement: "Confie le traitement à la structure", niveauxAutorises: ["Direction"], active: false },
+        {
+          id: 1,
+          libelle: "Pour attribution",
+          delaiAssocie: 5,
+          comportement: "Confie le traitement à la structure",
+          niveauxAutorises: ["Direction générale", "Direction"],
+          active: true,
+        },
+        {
+          id: 2,
+          libelle: "Pour information",
+          delaiAssocie: null,
+          comportement: "N'ouvre aucun délai",
+          niveauxAutorises: ["Direction générale", "Direction", "Service"],
+          active: true,
+        },
+        {
+          id: 3,
+          libelle: "Pour avis",
+          delaiAssocie: 3,
+          comportement: "Attend une réponse écrite",
+          niveauxAutorises: ["Direction générale", "Direction"],
+          active: true,
+        },
+        {
+          id: 4,
+          libelle: "Pour suite à donner",
+          delaiAssocie: 5,
+          comportement: "Confie le traitement à la structure",
+          niveauxAutorises: ["Direction"],
+          active: true,
+        },
+        {
+          id: 5,
+          libelle: "Me rendre compte",
+          delaiAssocie: 5,
+          comportement: "Exige un compte rendu au cotant",
+          niveauxAutorises: ["Direction générale"],
+          active: true,
+        },
+        {
+          id: 6,
+          libelle: "À classer",
+          delaiAssocie: null,
+          comportement: "Clôt le courrier sans traitement",
+          niveauxAutorises: ["Direction générale", "Direction"],
+          active: true,
+        },
+        {
+          id: 7,
+          libelle: "En urgence",
+          delaiAssocie: 1,
+          comportement: "Confie le traitement à la structure",
+          niveauxAutorises: ["Direction générale"],
+          active: true,
+        },
+        {
+          id: 8,
+          libelle: "Pour signature",
+          delaiAssocie: 2,
+          comportement: "Attend une réponse écrite",
+          niveauxAutorises: ["Direction"],
+          active: true,
+        },
+        {
+          id: 9,
+          libelle: "Pour exécution",
+          delaiAssocie: 5,
+          comportement: "Confie le traitement à la structure",
+          niveauxAutorises: ["Direction"],
+          active: false,
+        },
       ],
       correspondants: [
-        { id: 1, libelle: "Conseil régional", categorie: "Institution", ville: "Abidjan", nombreCourriers: 628, doublonPresume: false },
-        { id: 2, libelle: "Ministère de tutelle", categorie: "Institution", ville: "Abidjan", nombreCourriers: 412, doublonPresume: false },
-        { id: 3, libelle: "Ministère de Tutelle", categorie: "Institution", ville: "Abidjan", nombreCourriers: 7, doublonPresume: true },
-        { id: 4, libelle: "Trésor public", categorie: "Institution", ville: "Abidjan", nombreCourriers: 96, doublonPresume: false },
-        { id: 5, libelle: "Société Ivoire BTP", categorie: "Entreprise", ville: "Yopougon", nombreCourriers: 34, doublonPresume: false },
-        { id: 6, libelle: "Sotra Services", categorie: "Entreprise", ville: "Abidjan", nombreCourriers: 21, doublonPresume: false },
+        {
+          id: 1,
+          libelle: "Conseil régional",
+          categorie: "Institution",
+          ville: "Abidjan",
+          nombreCourriers: 628,
+          doublonPresume: false,
+        },
+        {
+          id: 2,
+          libelle: "Ministère de tutelle",
+          categorie: "Institution",
+          ville: "Abidjan",
+          nombreCourriers: 412,
+          doublonPresume: false,
+        },
+        {
+          id: 3,
+          libelle: "Ministère de Tutelle",
+          categorie: "Institution",
+          ville: "Abidjan",
+          nombreCourriers: 7,
+          doublonPresume: true,
+        },
+        {
+          id: 4,
+          libelle: "Trésor public",
+          categorie: "Institution",
+          ville: "Abidjan",
+          nombreCourriers: 96,
+          doublonPresume: false,
+        },
+        {
+          id: 5,
+          libelle: "Société Ivoire BTP",
+          categorie: "Entreprise",
+          ville: "Yopougon",
+          nombreCourriers: 34,
+          doublonPresume: false,
+        },
+        {
+          id: 6,
+          libelle: "Sotra Services",
+          categorie: "Entreprise",
+          ville: "Abidjan",
+          nombreCourriers: 21,
+          doublonPresume: false,
+        },
       ],
       engagements: [
-        { id: 1, libelle: "Accusé de réception au correspondant", delaiCible: 2, premiereAlerte: 1, respect90j: 91 },
-        { id: 2, libelle: "Cotation d'un courrier enregistré", delaiCible: 1, premiereAlerte: 1, respect90j: 78 },
-        { id: 3, libelle: "Traitement d'un dossier affecté", delaiCible: 5, premiereAlerte: 4, respect90j: 68 },
-        { id: 4, libelle: "Visa d'un projet de réponse", delaiCible: 2, premiereAlerte: 1, respect90j: 54 },
-        { id: 5, libelle: "Départ après signature", delaiCible: 1, premiereAlerte: 1, respect90j: 86 },
+        {
+          id: 1,
+          libelle: "Accusé de réception au correspondant",
+          delaiCible: 2,
+          premiereAlerte: 1,
+          respect90j: 91,
+        },
+        {
+          id: 2,
+          libelle: "Cotation d'un courrier enregistré",
+          delaiCible: 1,
+          premiereAlerte: 1,
+          respect90j: 78,
+        },
+        {
+          id: 3,
+          libelle: "Traitement d'un dossier affecté",
+          delaiCible: 5,
+          premiereAlerte: 4,
+          respect90j: 68,
+        },
+        {
+          id: 4,
+          libelle: "Visa d'un projet de réponse",
+          delaiCible: 2,
+          premiereAlerte: 1,
+          respect90j: 54,
+        },
+        {
+          id: 5,
+          libelle: "Départ après signature",
+          delaiCible: 1,
+          premiereAlerte: 1,
+          respect90j: 86,
+        },
+      ],
+      // Les regles de gestion — zone H. Le jeu de demonstration en montre
+      // quatre, dont trois hypotheses : c'est la proportion reelle en base, et
+      // la montrer est tout l'interet de cet onglet. Un jeu de demonstration
+      // ou tout serait acte donnerait de l'application une image ou plus
+      // aucune question n'est ouverte, ce qui est faux.
+      reglesMetier: [
+        {
+          cle: "portail.delai_reponse_jours",
+          libelle:
+            "Delai de reponse annonce a l'usager avant le depot de sa demande",
+          valeur: "30",
+          typeValeur: "entier",
+          domaine: "portail",
+          statut: "hypothese",
+          estHypothese: true,
+          source: null,
+          aTrancherPar: "Direction générale",
+          modifieLe: null,
+        },
+        {
+          cle: "activite.seuil_retard_points",
+          libelle:
+            "Ecart en points a partir duquel une activite est dite en retard",
+          valeur: "15",
+          typeValeur: "entier",
+          domaine: "activite",
+          statut: "hypothese",
+          estHypothese: true,
+          source: null,
+          aTrancherPar: "Contrôle de gestion",
+          modifieLe: null,
+        },
+        {
+          cle: "supervision.sso_fournisseur",
+          libelle: "Fournisseur d'identite de l'annuaire d'entreprise",
+          valeur: "",
+          typeValeur: "texte",
+          domaine: "supervision",
+          statut: "hypothese",
+          estHypothese: true,
+          source: null,
+          aTrancherPar: "Direction des systèmes d'information",
+          modifieLe: null,
+        },
+        {
+          cle: "supervision.reprise_cible_minutes",
+          libelle:
+            "Duree maximale de reprise apres incident majeur, en minutes",
+          valeur: "240",
+          typeValeur: "entier",
+          domaine: "supervision",
+          statut: "acte",
+          estHypothese: false,
+          source: "BRD, RNF-DISP-02 — reprise en moins de 4 heures",
+          aTrancherPar: null,
+          modifieLe: null,
+        },
       ],
     });
   }
@@ -1998,16 +2899,19 @@ export function repondreEnDemo(
   if (route === "/administration/tableau-de-bord") {
     const periode = parametres.get("periode") ?? "30j";
 
-    const jeux: Record<string, {
-      total: number;
-      variation: string;
-      precedent: string;
-      ratioActifs: number;
-      /** Acces de la periode. Le journal, lui, ne montre que les derniers. */
-      acces: { signales: number; refuses: number; confidentiels: number };
-      activite: { periode: string; operations: number }[];
-      parType: { libelle: string; valeur: number; part: number }[];
-    }> = {
+    const jeux: Record<
+      string,
+      {
+        total: number;
+        variation: string;
+        precedent: string;
+        ratioActifs: number;
+        /** Acces de la periode. Le journal, lui, ne montre que les derniers. */
+        acces: { signales: number; refuses: number; confidentiels: number };
+        activite: { periode: string; operations: number }[];
+        parType: { libelle: string; valeur: number; part: number }[];
+      }
+    > = {
       "30j": {
         total: 12480,
         variation: "▲ 18,2 %",
@@ -2131,7 +3035,8 @@ export function repondreEnDemo(
       operationsVariation: jeu.variation,
       parType: jeu.parType,
       adoption,
-      structuresInactives: adoption.filter((s) => s.derniereActivite === null).length,
+      structuresInactives: adoption.filter((s) => s.derniereActivite === null)
+        .length,
       referentiel: REFERENTIEL_DEMO,
       anomalies: ANOMALIES_DEMO,
       acces: {
@@ -2151,13 +3056,35 @@ export function repondreEnDemo(
 
   if (route === "/tracabilite/evenements") {
     const type = parametres.get("type") ?? "Tous";
-    const evenements = EVENEMENTS_DEMO.filter((e) => type === "Tous" || e.type === type);
+    const evenements = EVENEMENTS_DEMO.filter(
+      (e) => type === "Tous" || e.type === type,
+    );
     return attendre({
       compteurs: [
-        { libelle: "Événements enregistrés", valeur: "1 284", note: "sur les 7 derniers jours", ton: "neutre" },
-        { libelle: "Actions de paramétrage", valeur: "17", note: "dont 4 sur les habilitations", ton: "neutre" },
-        { libelle: "Corrections après validation", valeur: "9", note: "toutes dans la fenêtre de 24 h", ton: "alerte" },
-        { libelle: "Accès signalés", valeur: "4", note: "à examiner par l'administrateur", ton: "danger" },
+        {
+          libelle: "Événements enregistrés",
+          valeur: "1 284",
+          note: "sur les 7 derniers jours",
+          ton: "neutre",
+        },
+        {
+          libelle: "Actions de paramétrage",
+          valeur: "17",
+          note: "dont 4 sur les habilitations",
+          ton: "neutre",
+        },
+        {
+          libelle: "Corrections après validation",
+          valeur: "9",
+          note: "toutes dans la fenêtre de 24 h",
+          ton: "alerte",
+        },
+        {
+          libelle: "Accès signalés",
+          valeur: "4",
+          note: "à examiner par l'administrateur",
+          ton: "danger",
+        },
       ],
       evenements,
     });
@@ -2168,81 +3095,385 @@ export function repondreEnDemo(
     const acces = ACCES_DEMO.filter((a) => {
       if (filtre === "Tous") return true;
       if (filtre === "Signalé") return a.controle === "Signalé";
-      if (filtre === "Session confidentielle") return a.session === "Session confidentielle";
+      if (filtre === "Session confidentielle")
+        return a.session === "Session confidentielle";
       return a.action === filtre;
     });
-    return attendre({ acces, signales: ACCES_DEMO.filter((a) => a.controle === "Signalé").length });
+    return attendre({
+      acces,
+      signales: ACCES_DEMO.filter((a) => a.controle === "Signalé").length,
+    });
+  }
+
+  if (route === "/tracabilite/historique") {
+    const table = parametres.get("tableCible");
+    const isolees = parametres.get("horsApplication") === "true";
+    const modifications = HISTORIQUE_DEMO.filter(
+      (m) => (!table || m.table === table) && (!isolees || m.horsApplication),
+    );
+    return attendre({
+      tables: TABLES_TRACEES_DEMO,
+      modifications,
+      horsApplication: modifications.filter((m) => m.horsApplication).length,
+    });
   }
 
   if (route === "/organisation/niveaux") {
     return attendre([
-      { id: 1, rang: 1, libelle: "Direction générale", nombreStructures: 1, nombrePostes: 3, peutCoter: true, peutRecevoirCotation: true, porteSignature: true, ligneStatistiques: true, niveauParentId: null },
-      { id: 2, rang: 2, libelle: "Direction", nombreStructures: 6, nombrePostes: 18, peutCoter: true, peutRecevoirCotation: true, porteSignature: false, ligneStatistiques: true, niveauParentId: 1 },
-      { id: 3, rang: 3, libelle: "Service", nombreStructures: 14, nombrePostes: 42, peutCoter: true, peutRecevoirCotation: true, porteSignature: false, ligneStatistiques: true, niveauParentId: 2 },
-      { id: 4, rang: 4, libelle: "Bureau", nombreStructures: 22, nombrePostes: 61, peutCoter: false, peutRecevoirCotation: true, porteSignature: false, ligneStatistiques: false, niveauParentId: 3 },
+      {
+        id: 1,
+        rang: 1,
+        libelle: "Direction générale",
+        nombreStructures: 1,
+        nombrePostes: 3,
+        peutCoter: true,
+        peutRecevoirCotation: true,
+        porteSignature: true,
+        ligneStatistiques: true,
+        niveauParentId: null,
+      },
+      {
+        id: 2,
+        rang: 2,
+        libelle: "Direction",
+        nombreStructures: 6,
+        nombrePostes: 18,
+        peutCoter: true,
+        peutRecevoirCotation: true,
+        porteSignature: false,
+        ligneStatistiques: true,
+        niveauParentId: 1,
+      },
+      {
+        id: 3,
+        rang: 3,
+        libelle: "Service",
+        nombreStructures: 14,
+        nombrePostes: 42,
+        peutCoter: true,
+        peutRecevoirCotation: true,
+        porteSignature: false,
+        ligneStatistiques: true,
+        niveauParentId: 2,
+      },
+      {
+        id: 4,
+        rang: 4,
+        libelle: "Bureau",
+        nombreStructures: 22,
+        nombrePostes: 61,
+        peutCoter: false,
+        peutRecevoirCotation: true,
+        porteSignature: false,
+        ligneStatistiques: false,
+        niveauParentId: 3,
+      },
     ]);
   }
 
   if (route === "/organisation/postes") {
     return attendre([
-      { id: 1, libelle: "Chef du bureau d'ordre", structure: "DSR", niveau: "Service", profilParDefaut: "Enregistrement", titulaires: 1, postesPrevus: 1 },
-      { id: 2, libelle: "Agent d'enregistrement", structure: "DSR", niveau: "Bureau", profilParDefaut: "Enregistrement", titulaires: 3, postesPrevus: 4 },
-      { id: 3, libelle: "Chef de service comptabilité", structure: "DAF", niveau: "Service", profilParDefaut: "Responsable", titulaires: 1, postesPrevus: 1 },
-      { id: 4, libelle: "Gestionnaire de dossiers", structure: "DAF · Comptabilité", niveau: "Bureau", profilParDefaut: "Agent", titulaires: 4, postesPrevus: 6 },
-      { id: 5, libelle: "Coursier", structure: "DSR", niveau: "Bureau", profilParDefaut: "Agent", titulaires: 2, postesPrevus: 2 },
-      { id: 6, libelle: "Directeur général", structure: "Direction générale", niveau: "Direction générale", profilParDefaut: "Signataire", titulaires: 1, postesPrevus: 1 },
+      {
+        id: 1,
+        libelle: "Chef du bureau d'ordre",
+        structure: "DSR",
+        niveau: "Service",
+        profilParDefaut: "Enregistrement",
+        titulaires: 1,
+        postesPrevus: 1,
+      },
+      {
+        id: 2,
+        libelle: "Agent d'enregistrement",
+        structure: "DSR",
+        niveau: "Bureau",
+        profilParDefaut: "Enregistrement",
+        titulaires: 3,
+        postesPrevus: 4,
+      },
+      {
+        id: 3,
+        libelle: "Chef de service comptabilité",
+        structure: "DAF",
+        niveau: "Service",
+        profilParDefaut: "Responsable",
+        titulaires: 1,
+        postesPrevus: 1,
+      },
+      {
+        id: 4,
+        libelle: "Gestionnaire de dossiers",
+        structure: "DAF · Comptabilité",
+        niveau: "Bureau",
+        profilParDefaut: "Agent",
+        titulaires: 4,
+        postesPrevus: 6,
+      },
+      {
+        id: 5,
+        libelle: "Coursier",
+        structure: "DSR",
+        niveau: "Bureau",
+        profilParDefaut: "Agent",
+        titulaires: 2,
+        postesPrevus: 2,
+      },
+      {
+        id: 6,
+        libelle: "Directeur général",
+        structure: "Direction générale",
+        niveau: "Direction générale",
+        profilParDefaut: "Signataire",
+        titulaires: 1,
+        postesPrevus: 1,
+      },
     ]);
   }
 
   if (route === "/habilitations/utilisateurs") {
     const vue = parametres.get("vue") ?? "tous";
-    const etats: Record<string, string> = { actifs: "actif", suspendus: "suspendu", invitations: "invite" };
+    const etats: Record<string, string> = {
+      actifs: "actif",
+      suspendus: "suspendu",
+      invitations: "invite",
+    };
     const utilisateurs = [
-      { id: 1, nomComplet: "A. Kouassi", initiales: "AK", identifiant: "a.kouassi@suivicourrier.ci", structure: "Cabinet", poste: "Chef de cabinet", profil: "Administrateur", etat: "actif" },
-      { id: 2, nomComplet: "S. Bamba", initiales: "SB", identifiant: "s.bamba@suivicourrier.ci", structure: "DAF", poste: "Chef de service comptabilité", profil: "Responsable", etat: "actif" },
-      { id: 3, nomComplet: "M. Diallo", initiales: "MD", identifiant: "m.diallo@suivicourrier.ci", structure: "DAF", poste: "Gestionnaire de dossiers", profil: "Agent", etat: "actif" },
-      { id: 4, nomComplet: "K. Traoré", initiales: "KT", identifiant: "k.traore@suivicourrier.ci", structure: "DSR", poste: "Chef du bureau d'ordre", profil: "Enregistrement", etat: "actif" },
-      { id: 5, nomComplet: "N'Guessan Y.", initiales: "NY", identifiant: "dg@suivicourrier.ci", structure: "Direction générale", poste: "Directeur général", profil: "Signataire", etat: "actif" },
-      { id: 6, nomComplet: "A. Yao", initiales: "AY", identifiant: "a.yao@suivicourrier.ci", structure: "DCG", poste: "Gestionnaire de dossiers", profil: "Agent", etat: "suspendu" },
-      { id: 7, nomComplet: "I. Ouattara", initiales: "IO", identifiant: "i.ouattara@suivicourrier.ci", structure: "DSR", poste: "Coursier", profil: "Agent", etat: "invite" },
-      { id: 8, nomComplet: "F. Koné", initiales: "FK", identifiant: "f.kone@suivicourrier.ci", structure: "Direction du Foncier", poste: "Directrice", profil: "Responsable", etat: "actif" },
+      {
+        id: 1,
+        nomComplet: "A. Kouassi",
+        initiales: "AK",
+        identifiant: "a.kouassi@suivicourrier.ci",
+        structure: "Cabinet",
+        poste: "Chef de cabinet",
+        profil: "Administrateur",
+        etat: "actif",
+      },
+      {
+        id: 2,
+        nomComplet: "S. Bamba",
+        initiales: "SB",
+        identifiant: "s.bamba@suivicourrier.ci",
+        structure: "DAF",
+        poste: "Chef de service comptabilité",
+        profil: "Responsable",
+        etat: "actif",
+      },
+      {
+        id: 3,
+        nomComplet: "M. Diallo",
+        initiales: "MD",
+        identifiant: "m.diallo@suivicourrier.ci",
+        structure: "DAF",
+        poste: "Gestionnaire de dossiers",
+        profil: "Agent",
+        etat: "actif",
+      },
+      {
+        id: 4,
+        nomComplet: "K. Traoré",
+        initiales: "KT",
+        identifiant: "k.traore@suivicourrier.ci",
+        structure: "DSR",
+        poste: "Chef du bureau d'ordre",
+        profil: "Enregistrement",
+        etat: "actif",
+      },
+      {
+        id: 5,
+        nomComplet: "N'Guessan Y.",
+        initiales: "NY",
+        identifiant: "dg@suivicourrier.ci",
+        structure: "Direction générale",
+        poste: "Directeur général",
+        profil: "Signataire",
+        etat: "actif",
+      },
+      {
+        id: 6,
+        nomComplet: "A. Yao",
+        initiales: "AY",
+        identifiant: "a.yao@suivicourrier.ci",
+        structure: "DCG",
+        poste: "Gestionnaire de dossiers",
+        profil: "Agent",
+        etat: "suspendu",
+      },
+      {
+        id: 7,
+        nomComplet: "I. Ouattara",
+        initiales: "IO",
+        identifiant: "i.ouattara@suivicourrier.ci",
+        structure: "DSR",
+        poste: "Coursier",
+        profil: "Agent",
+        etat: "invite",
+      },
+      {
+        id: 8,
+        nomComplet: "F. Koné",
+        initiales: "FK",
+        identifiant: "f.kone@suivicourrier.ci",
+        structure: "Direction du Foncier",
+        poste: "Directrice",
+        profil: "Responsable",
+        etat: "actif",
+      },
     ];
-    return attendre(etats[vue] ? utilisateurs.filter((u) => u.etat === etats[vue]) : utilisateurs);
+    return attendre(
+      etats[vue]
+        ? utilisateurs.filter((u) => u.etat === etats[vue])
+        : utilisateurs,
+    );
   }
 
   if (route === "/habilitations/profils") {
     return attendre([
-      { id: 1, libelle: "Agent", nombreAgents: 18, verrouille: false, permissions: ["LEC", "TRA"] },
-      { id: 2, libelle: "Enregistrement", nombreAgents: 6, verrouille: false, permissions: ["LEC", "ENR", "COT_DEL", "TRANS", "IMP"] },
-      { id: 3, libelle: "Responsable", nombreAgents: 9, verrouille: false, permissions: ["LEC", "COT", "AFF", "TRA", "REL", "STAT", "IMP"] },
-      { id: 4, libelle: "Signataire", nombreAgents: 2, verrouille: false, permissions: ["LEC", "COT", "VAL", "CLO", "STAT", "CONF"] },
-      { id: 5, libelle: "Administrateur", nombreAgents: 1, verrouille: true, permissions: ["LEC", "ADM_ORG", "ADM_HAB", "ADM_PAR", "AUDIT", "STAT"] },
+      {
+        id: 1,
+        libelle: "Agent",
+        nombreAgents: 18,
+        verrouille: false,
+        permissions: ["LEC", "TRA"],
+      },
+      {
+        id: 2,
+        libelle: "Enregistrement",
+        nombreAgents: 6,
+        verrouille: false,
+        permissions: ["LEC", "ENR", "COT_DEL", "TRANS", "IMP"],
+      },
+      {
+        id: 3,
+        libelle: "Responsable",
+        nombreAgents: 9,
+        verrouille: false,
+        permissions: ["LEC", "COT", "AFF", "TRA", "REL", "STAT", "IMP"],
+      },
+      {
+        id: 4,
+        libelle: "Signataire",
+        nombreAgents: 2,
+        verrouille: false,
+        permissions: ["LEC", "COT", "VAL", "CLO", "STAT", "CONF"],
+      },
+      {
+        id: 5,
+        libelle: "Administrateur",
+        nombreAgents: 1,
+        verrouille: true,
+        permissions: ["LEC", "ADM_ORG", "ADM_HAB", "ADM_PAR", "AUDIT", "STAT"],
+      },
     ]);
   }
 
   if (route === "/habilitations/perimetres") {
     return attendre([
-      { id: 1, libelle: "Institution", assise: "Direction générale", etendue: "Tous les courriers de l'institution", nombreAgents: 4, inclureDescendants: true, voirConfidentiel: true, lectureClotures: true, statistiquesAgregees: true },
-      { id: 2, libelle: "Direction et services", assise: "Direction", etendue: "Sa structure et ses descendantes", nombreAgents: 12, inclureDescendants: true, voirConfidentiel: false, lectureClotures: true, statistiquesAgregees: true },
-      { id: 3, libelle: "Service seul", assise: "Service", etendue: "Sa structure uniquement", nombreAgents: 16, inclureDescendants: false, voirConfidentiel: false, lectureClotures: true, statistiquesAgregees: false },
-      { id: 4, libelle: "Poste", assise: "Poste de travail", etendue: "Les dossiers qui lui sont affectés", nombreAgents: 22, inclureDescendants: false, voirConfidentiel: false, lectureClotures: false, statistiquesAgregees: false },
+      {
+        id: 1,
+        libelle: "Institution",
+        assise: "Direction générale",
+        etendue: "Tous les courriers de l'institution",
+        nombreAgents: 4,
+        inclureDescendants: true,
+        voirConfidentiel: true,
+        lectureClotures: true,
+        statistiquesAgregees: true,
+      },
+      {
+        id: 2,
+        libelle: "Direction et services",
+        assise: "Direction",
+        etendue: "Sa structure et ses descendantes",
+        nombreAgents: 12,
+        inclureDescendants: true,
+        voirConfidentiel: false,
+        lectureClotures: true,
+        statistiquesAgregees: true,
+      },
+      {
+        id: 3,
+        libelle: "Service seul",
+        assise: "Service",
+        etendue: "Sa structure uniquement",
+        nombreAgents: 16,
+        inclureDescendants: false,
+        voirConfidentiel: false,
+        lectureClotures: true,
+        statistiquesAgregees: false,
+      },
+      {
+        id: 4,
+        libelle: "Poste",
+        assise: "Poste de travail",
+        etendue: "Les dossiers qui lui sont affectés",
+        nombreAgents: 22,
+        inclureDescendants: false,
+        voirConfidentiel: false,
+        lectureClotures: false,
+        statistiquesAgregees: false,
+      },
     ]);
   }
 
   if (route === "/habilitations/sessions") {
     return attendre([
-      { id: 1, libelle: "Arrivé — bureau d'ordre", courriersEnCours: 128, agents: [
-        { id: 1, nomComplet: "K. Traoré", poste: "Chef du bureau d'ordre", rattacheLe: "2026-01-05" },
-        { id: 2, nomComplet: "A. Kouassi", poste: "Agent d'enregistrement", rattacheLe: "2026-01-05" },
-        { id: 3, nomComplet: "M. Koffi", poste: "Agent d'enregistrement", rattacheLe: "2026-03-12" },
-      ] },
-      { id: 2, libelle: "Départ — bureau d'ordre", courriersEnCours: 42, agents: [
-        { id: 1, nomComplet: "K. Traoré", poste: "Chef du bureau d'ordre", rattacheLe: "2026-01-05" },
-      ] },
-      { id: 3, libelle: "Confidentiel — cabinet", courriersEnCours: 7, agents: [
-        { id: 4, nomComplet: "F. Konaté", poste: "Secrétaire particulière", rattacheLe: "2026-02-01" },
-      ] },
-      { id: 4, libelle: "Interne — états DSR", courriersEnCours: 19, agents: [] },
+      {
+        id: 1,
+        libelle: "Arrivé — bureau d'ordre",
+        courriersEnCours: 128,
+        agents: [
+          {
+            id: 1,
+            nomComplet: "K. Traoré",
+            poste: "Chef du bureau d'ordre",
+            rattacheLe: "2026-01-05",
+          },
+          {
+            id: 2,
+            nomComplet: "A. Kouassi",
+            poste: "Agent d'enregistrement",
+            rattacheLe: "2026-01-05",
+          },
+          {
+            id: 3,
+            nomComplet: "M. Koffi",
+            poste: "Agent d'enregistrement",
+            rattacheLe: "2026-03-12",
+          },
+        ],
+      },
+      {
+        id: 2,
+        libelle: "Départ — bureau d'ordre",
+        courriersEnCours: 42,
+        agents: [
+          {
+            id: 1,
+            nomComplet: "K. Traoré",
+            poste: "Chef du bureau d'ordre",
+            rattacheLe: "2026-01-05",
+          },
+        ],
+      },
+      {
+        id: 3,
+        libelle: "Confidentiel — cabinet",
+        courriersEnCours: 7,
+        agents: [
+          {
+            id: 4,
+            nomComplet: "F. Konaté",
+            poste: "Secrétaire particulière",
+            rattacheLe: "2026-02-01",
+          },
+        ],
+      },
+      {
+        id: 4,
+        libelle: "Interne — états DSR",
+        courriersEnCours: 19,
+        agents: [],
+      },
     ]);
   }
 
@@ -2259,7 +3490,9 @@ export function repondreEnDemo(
    */
   if (methode === "GET" && route === "/habilitations/delegations/miennes") {
     const moi = compteActifDemo()?.utilisateur.nomComplet;
-    return attendre(DELEGATIONS_DEMO.filter((d) => d.titulaire === moi && d.etat !== "close"));
+    return attendre(
+      DELEGATIONS_DEMO.filter((d) => d.titulaire === moi && d.etat !== "close"),
+    );
   }
 
   if (methode === "GET" && route === "/habilitations/delegations/possible") {
@@ -2287,10 +3520,20 @@ export function repondreEnDemo(
       parStructure: [
         { structure: "Cabinet", volume: 2104, delaiMoyen: 2.6, respect: 82 },
         { structure: "DAF", volume: 1862, delaiMoyen: 4.1, respect: 61 },
-        { structure: "Direction du Foncier", volume: 1468, delaiMoyen: 5.3, respect: 47 },
+        {
+          structure: "Direction du Foncier",
+          volume: 1468,
+          delaiMoyen: 5.3,
+          respect: 47,
+        },
         { structure: "DSR", volume: 1042, delaiMoyen: 2.2, respect: 88 },
         { structure: "DCG", volume: 908, delaiMoyen: 3.0, respect: 74 },
-        { structure: "Service juridique", volume: 642, delaiMoyen: 6.8, respect: 38 },
+        {
+          structure: "Service juridique",
+          volume: 642,
+          delaiMoyen: 6.8,
+          respect: 38,
+        },
       ],
     });
   }
@@ -2298,24 +3541,105 @@ export function repondreEnDemo(
   if (route === "/pilotage/tableau-de-bord") {
     const perimetre = parametres.get("perimetre") ?? "institution";
 
-    const jeux: Record<string, { libelle: string; valeur: string; variation: string | null; ton: string; note: string | null }[]> = {
+    const jeux: Record<
+      string,
+      {
+        libelle: string;
+        valeur: string;
+        variation: string | null;
+        ton: string;
+        note: string | null;
+      }[]
+    > = {
       institution: [
-        { libelle: "Courriers en cours", valeur: "1 284", variation: "▲ 15,5 %", ton: "succes", note: "vs. 1 112 période précédente" },
-        { libelle: "Délais dépassés", valeur: "96", variation: "▲ 8,4 %", ton: "danger", note: "dont 31 au-delà de 5 jours" },
-        { libelle: "Délai moyen de traitement", valeur: "3,4 j", variation: "▼ 6,2 %", ton: "succes", note: "vs. 3,6 j période précédente" },
-        { libelle: "Courriers clôturés", valeur: "1 042", variation: "▲ 4,4 %", ton: "succes", note: "vs. 998 période précédente" },
+        {
+          libelle: "Courriers en cours",
+          valeur: "1 284",
+          variation: "▲ 15,5 %",
+          ton: "succes",
+          note: "vs. 1 112 période précédente",
+        },
+        {
+          libelle: "Délais dépassés",
+          valeur: "96",
+          variation: "▲ 8,4 %",
+          ton: "danger",
+          note: "dont 31 au-delà de 5 jours",
+        },
+        {
+          libelle: "Délai moyen de traitement",
+          valeur: "3,4 j",
+          variation: "▼ 6,2 %",
+          ton: "succes",
+          note: "vs. 3,6 j période précédente",
+        },
+        {
+          libelle: "Courriers clôturés",
+          valeur: "1 042",
+          variation: "▲ 4,4 %",
+          ton: "succes",
+          note: "vs. 998 période précédente",
+        },
       ],
       structure: [
-        { libelle: "À coter", valeur: "18", variation: "▲ 3", ton: "alerte", note: "circuit en mode cascade" },
-        { libelle: "En cours dans ma structure", valeur: "148", variation: "▲ 6,1 %", ton: "accent", note: "dont 42 chez les structures filles" },
-        { libelle: "Délais dépassés", valeur: "12", variation: "▼ 2", ton: "danger", note: "3 escaladés au niveau supérieur" },
-        { libelle: "À valider", valeur: "7", variation: "2 urgents", ton: "alerte", note: "projets de réponse soumis" },
+        {
+          libelle: "À coter",
+          valeur: "18",
+          variation: "▲ 3",
+          ton: "alerte",
+          note: "circuit en mode cascade",
+        },
+        {
+          libelle: "En cours dans ma structure",
+          valeur: "148",
+          variation: "▲ 6,1 %",
+          ton: "accent",
+          note: "dont 42 chez les structures filles",
+        },
+        {
+          libelle: "Délais dépassés",
+          valeur: "12",
+          variation: "▼ 2",
+          ton: "danger",
+          note: "3 escaladés au niveau supérieur",
+        },
+        {
+          libelle: "À valider",
+          valeur: "7",
+          variation: "2 urgents",
+          ton: "alerte",
+          note: "projets de réponse soumis",
+        },
       ],
       mesDossiers: [
-        { libelle: "Mes dossiers en cours", valeur: "23", variation: "4 urgents", ton: "alerte", note: "affectés par ma hiérarchie" },
-        { libelle: "Échéance sous 48 h", valeur: "5", variation: null, ton: "alerte", note: "dont 1 en dépassement" },
-        { libelle: "En attente de validation", valeur: "3", variation: null, ton: "accent", note: "projets soumis au responsable" },
-        { libelle: "Traités ce mois", valeur: "41", variation: "▲ 12 %", ton: "succes", note: "délai moyen 2,8 j" },
+        {
+          libelle: "Mes dossiers en cours",
+          valeur: "23",
+          variation: "4 urgents",
+          ton: "alerte",
+          note: "affectés par ma hiérarchie",
+        },
+        {
+          libelle: "Échéance sous 48 h",
+          valeur: "5",
+          variation: null,
+          ton: "alerte",
+          note: "dont 1 en dépassement",
+        },
+        {
+          libelle: "En attente de validation",
+          valeur: "3",
+          variation: null,
+          ton: "accent",
+          note: "projets soumis au responsable",
+        },
+        {
+          libelle: "Traités ce mois",
+          valeur: "41",
+          variation: "▲ 12 %",
+          ton: "succes",
+          note: "délai moyen 2,8 j",
+        },
       ],
     };
 
@@ -2333,11 +3657,46 @@ export function repondreEnDemo(
       volumeVariation: "▲ 24,4 %",
       confidentiels: 116,
       retards: [
-        { id: 412, numero: "A-2026-0412", objet: "Demande d'audience du Conseil régional", structure: "DAF", etape: "Traitement", retardJours: 9 },
-        { id: 397, numero: "A-2026-0397", objet: "Réclamation sur le délai de paiement", structure: "Direction du Foncier", etape: "Validation", retardJours: 7 },
-        { id: 388, numero: "A-2026-0388", objet: "Transmission du rapport trimestriel", structure: "DCG", etape: "Cotation cascade", retardJours: 5 },
-        { id: 376, numero: "A-2026-0376", objet: "Convocation à la réunion de coordination", structure: "Cabinet", etape: "Affectation", retardJours: 4 },
-        { id: 361, numero: "A-2026-0361", objet: "Facture du prestataire de maintenance", structure: "DAF", etape: "Traitement", retardJours: 3 },
+        {
+          id: 412,
+          numero: "A-2026-0412",
+          objet: "Demande d'audience du Conseil régional",
+          structure: "DAF",
+          etape: "Traitement",
+          retardJours: 9,
+        },
+        {
+          id: 397,
+          numero: "A-2026-0397",
+          objet: "Réclamation sur le délai de paiement",
+          structure: "Direction du Foncier",
+          etape: "Validation",
+          retardJours: 7,
+        },
+        {
+          id: 388,
+          numero: "A-2026-0388",
+          objet: "Transmission du rapport trimestriel",
+          structure: "DCG",
+          etape: "Cotation cascade",
+          retardJours: 5,
+        },
+        {
+          id: 376,
+          numero: "A-2026-0376",
+          objet: "Convocation à la réunion de coordination",
+          structure: "Cabinet",
+          etape: "Affectation",
+          retardJours: 4,
+        },
+        {
+          id: 361,
+          numero: "A-2026-0361",
+          objet: "Facture du prestataire de maintenance",
+          structure: "DAF",
+          etape: "Traitement",
+          retardJours: 3,
+        },
       ],
       totalRetards: 96,
       chargeParJour: [
@@ -2356,9 +3715,51 @@ export function repondreEnDemo(
 
   if (route === "/suivi/recherches") {
     return attendre([
-      { id: 1, libelle: "Factures en attente — DAF", nombre: 24, criteres: { motsCles: "facture", du: "", au: "", sessions: ["ARRIVE"], statuts: ["enCours"], structureId: "3", natureId: "4", inclureArchives: false } },
-      { id: 2, libelle: "Réclamations d'usagers 2026", nombre: 118, criteres: { motsCles: "", du: "2026-01-01", au: "", sessions: [], statuts: [], structureId: "", natureId: "3", inclureArchives: false } },
-      { id: 3, libelle: "Conseil régional — tout l'historique", nombre: 628, criteres: { motsCles: "Conseil régional", du: "", au: "", sessions: [], statuts: [], structureId: "", natureId: "", inclureArchives: true } },
+      {
+        id: 1,
+        libelle: "Factures en attente — DAF",
+        nombre: 24,
+        criteres: {
+          motsCles: "facture",
+          du: "",
+          au: "",
+          sessions: ["ARRIVE"],
+          statuts: ["enCours"],
+          structureId: "3",
+          natureId: "4",
+          inclureArchives: false,
+        },
+      },
+      {
+        id: 2,
+        libelle: "Réclamations d'usagers 2026",
+        nombre: 118,
+        criteres: {
+          motsCles: "",
+          du: "2026-01-01",
+          au: "",
+          sessions: [],
+          statuts: [],
+          structureId: "",
+          natureId: "3",
+          inclureArchives: false,
+        },
+      },
+      {
+        id: 3,
+        libelle: "Conseil régional — tout l'historique",
+        nombre: 628,
+        criteres: {
+          motsCles: "Conseil régional",
+          du: "",
+          au: "",
+          sessions: [],
+          statuts: [],
+          structureId: "",
+          natureId: "",
+          inclureArchives: true,
+        },
+      },
     ]);
   }
 
@@ -2368,22 +3769,34 @@ export function repondreEnDemo(
     const filtres: Record<string, (c: CourrierDemo) => boolean> = {
       horsDelai: enRetard,
       sous48h: (c) =>
-        !enRetard(c) && (c.delai?.joursAlloues ?? 0) - (c.delai?.joursEcoules ?? 0) <= 2,
+        !enRetard(c) &&
+        (c.delai?.joursAlloues ?? 0) - (c.delai?.joursEcoules ?? 0) <= 2,
       sansAccuse: (c) => c.etape === "TRANSMIS" || c.etape === "COTE",
       dejaRelances: (c) => c.id % 2 === 0,
       tous: (c) => c.etape !== "CLOTURE",
     };
 
-    const lignes = COURRIERS_DEMO.filter(filtres[vue] ?? filtres.tous).map((c) => ({
-      id: c.id,
-      numero: c.numero,
-      objet: c.objet,
-      structure: c.structuresCotees[0] ?? "Non cotée",
-      agent: c.affecteAMoi ? "M. Diallo" : c.structuresCotees.length > 0 ? "F. Koné" : null,
-      delai: c.delai,
-      derniereRelance: c.id % 2 === 0 ? "2026-07-31" : null,
-      niveauEscalade: (c.delai?.joursDepassement ?? 0) > 8 ? 2 : (c.delai?.joursDepassement ?? 0) > 0 ? 1 : 0,
-    }));
+    const lignes = COURRIERS_DEMO.filter(filtres[vue] ?? filtres.tous).map(
+      (c) => ({
+        id: c.id,
+        numero: c.numero,
+        objet: c.objet,
+        structure: c.structuresCotees[0] ?? "Non cotée",
+        agent: c.affecteAMoi
+          ? "M. Diallo"
+          : c.structuresCotees.length > 0
+            ? "F. Koné"
+            : null,
+        delai: c.delai,
+        derniereRelance: c.id % 2 === 0 ? "2026-07-31" : null,
+        niveauEscalade:
+          (c.delai?.joursDepassement ?? 0) > 8
+            ? 2
+            : (c.delai?.joursDepassement ?? 0) > 0
+              ? 1
+              : 0,
+      }),
+    );
 
     return attendre({
       lignes,
@@ -2404,7 +3817,8 @@ export function repondreEnDemo(
     return attendre({
       dossiers,
       aRendre: dossiers.length,
-      horsDelai: dossiers.filter((c) => (c.delai?.joursDepassement ?? 0) > 0).length,
+      horsDelai: dossiers.filter((c) => (c.delai?.joursDepassement ?? 0) > 0)
+        .length,
       enVisa: 1,
     });
   }
@@ -2424,7 +3838,9 @@ export function repondreEnDemo(
 
     const enRetard = decisions.filter((d) => d.etat === "En retard");
     const enSouffrance = seances.filter((s) => s.depot !== "Déposé");
-    const sansInterim = DISPONIBILITES_DEMO.filter((d) => d.enCours && d.interimaire === null);
+    const sansInterim = DISPONIBILITES_DEMO.filter(
+      (d) => d.enCours && d.interimaire === null,
+    );
 
     const instances = [...new Set(decisions.map((d) => d.instance))];
 
@@ -2433,19 +3849,31 @@ export function repondreEnDemo(
         {
           libelle: "Décisions hors délai",
           valeur: enRetard.length,
-          note: enRetard.length > 0 ? "à relancer aujourd'hui" : "aucune en retard",
+          note:
+            enRetard.length > 0 ? "à relancer aujourd'hui" : "aucune en retard",
           feu: enRetard.length > 0 ? "rouge" : "vert",
         },
         {
           libelle: "Comptes rendus manquants",
           valeur: enSouffrance.length,
-          note: enSouffrance.length > 0 ? "séances non documentées" : "tout est déposé",
-          feu: enSouffrance.length > 1 ? "rouge" : enSouffrance.length > 0 ? "orange" : "vert",
+          note:
+            enSouffrance.length > 0
+              ? "séances non documentées"
+              : "tout est déposé",
+          feu:
+            enSouffrance.length > 1
+              ? "rouge"
+              : enSouffrance.length > 0
+                ? "orange"
+                : "vert",
         },
         {
           libelle: "Absences sans intérim",
           valeur: sansInterim.length,
-          note: sansInterim.length > 0 ? "structures sans suppléance" : "toutes couvertes",
+          note:
+            sansInterim.length > 0
+              ? "structures sans suppléance"
+              : "toutes couvertes",
           feu: sansInterim.length > 0 ? "rouge" : "vert",
         },
         {
@@ -2458,13 +3886,19 @@ export function repondreEnDemo(
       // Les plus critiques d'abord : en retard, puis les plus relancees.
       aRelancer: decisions
         .filter((d) => d.etat === "En retard" || d.relances > 0)
-        .sort((a, b) => (b.etat === "En retard" ? 1 : 0) - (a.etat === "En retard" ? 1 : 0) || b.relances - a.relances),
+        .sort(
+          (a, b) =>
+            (b.etat === "En retard" ? 1 : 0) -
+              (a.etat === "En retard" ? 1 : 0) || b.relances - a.relances,
+        ),
       depotsEnSouffrance: enSouffrance,
       absencesSansInterim: sansInterim,
       parInstance: instances.map((instance) => ({
         instance,
         total: decisions.filter((d) => d.instance === instance).length,
-        enRetard: decisions.filter((d) => d.instance === instance && d.etat === "En retard").length,
+        enRetard: decisions.filter(
+          (d) => d.instance === instance && d.etat === "En retard",
+        ).length,
       })),
     });
   }
@@ -2474,7 +3908,8 @@ export function repondreEnDemo(
     const etat = parametres.get("etat") ?? "Tous";
 
     let lignes = decisionsListe();
-    if (instance !== "Toutes") lignes = lignes.filter((d) => d.instance === instance);
+    if (instance !== "Toutes")
+      lignes = lignes.filter((d) => d.instance === instance);
     if (etat !== "Tous") lignes = lignes.filter((d) => d.etat === etat);
 
     const toutes = decisionsListe();
@@ -2491,8 +3926,18 @@ export function repondreEnDemo(
           note: "en cours d'exécution",
           feu: "inconnu",
         },
-        { libelle: "Hors délai", valeur: enRetard, note: "échéance dépassée", feu: enRetard > 0 ? "rouge" : "vert" },
-        { libelle: "Relancées", valeur: relancees, note: "au moins une relance", feu: relancees > 1 ? "orange" : "vert" },
+        {
+          libelle: "Hors délai",
+          valeur: enRetard,
+          note: "échéance dépassée",
+          feu: enRetard > 0 ? "rouge" : "vert",
+        },
+        {
+          libelle: "Relancées",
+          valeur: relancees,
+          note: "au moins une relance",
+          feu: relancees > 1 ? "orange" : "vert",
+        },
         {
           libelle: "Exécutées",
           valeur: toutes.filter((d) => d.etat === "Exécutée").length,
@@ -2505,14 +3950,17 @@ export function repondreEnDemo(
 
   const decisionDemandee = route.match(/^\/gouvernance\/decisions\/(\d+)$/);
   if (decisionDemandee) {
-    const trouvee = DECISIONS_DEMO.find((d) => d.id === Number(decisionDemandee[1]));
+    const trouvee = DECISIONS_DEMO.find(
+      (d) => d.id === Number(decisionDemandee[1]),
+    );
     return trouvee ? attendre(trouvee) : null;
   }
 
   if (route === "/gouvernance/seances") {
     const type = parametres.get("type") ?? "Toutes";
     const toutes = seancesListe();
-    const lignes = type === "Toutes" ? toutes : toutes.filter((s) => s.type === type);
+    const lignes =
+      type === "Toutes" ? toutes : toutes.filter((s) => s.type === type);
     const horsDelai = toutes.filter((s) => s.depot === "Hors délai").length;
     const attendus = toutes.filter((s) => s.depot === "En attente").length;
 
@@ -2520,7 +3968,12 @@ export function repondreEnDemo(
       seances: lignes,
       total: toutes.length,
       compteurs: [
-        { libelle: "Séances et rapports", valeur: toutes.length, note: "sur la période", feu: "inconnu" },
+        {
+          libelle: "Séances et rapports",
+          valeur: toutes.length,
+          note: "sur la période",
+          feu: "inconnu",
+        },
         {
           libelle: "Comptes rendus attendus",
           valeur: attendus,
@@ -2545,7 +3998,9 @@ export function repondreEnDemo(
 
   const seanceDemandee = route.match(/^\/gouvernance\/seances\/(\d+)$/);
   if (seanceDemandee) {
-    const trouvee = SEANCES_DEMO.find((s) => s.id === Number(seanceDemandee[1]));
+    const trouvee = SEANCES_DEMO.find(
+      (s) => s.id === Number(seanceDemandee[1]),
+    );
     return trouvee ? attendre(trouvee) : null;
   }
 
@@ -2553,10 +4008,14 @@ export function repondreEnDemo(
     const filtre = parametres.get("filtre") ?? "Toutes";
     let lignes = DISPONIBILITES_DEMO;
     if (filtre === "En cours") lignes = lignes.filter((d) => d.enCours);
-    else if (filtre === "Sans intérim") lignes = lignes.filter((d) => d.interimaire === null);
-    else if (filtre !== "Toutes") lignes = lignes.filter((d) => d.type === filtre);
+    else if (filtre === "Sans intérim")
+      lignes = lignes.filter((d) => d.interimaire === null);
+    else if (filtre !== "Toutes")
+      lignes = lignes.filter((d) => d.type === filtre);
 
-    const sansInterim = DISPONIBILITES_DEMO.filter((d) => d.enCours && d.interimaire === null).length;
+    const sansInterim = DISPONIBILITES_DEMO.filter(
+      (d) => d.enCours && d.interimaire === null,
+    ).length;
 
     return attendre({
       disponibilites: lignes,
@@ -2596,6 +4055,9 @@ export function repondreEnDemo(
   if (route === "/portail/demandes") {
     return attendre({
       identite: compteActifDemo()?.utilisateur.nomComplet ?? "Déposant",
+      // Le délai est réglé en base côté serveur (`portail.delai_reponse_jours`).
+      // Trente jours est la valeur semée ; le jeu de démo la recopie.
+      delaiReponseJours: 30,
       demandes: DEMANDES_PORTAIL_DEMO.map((d) => ({
         id: d.id,
         reference: d.reference,
@@ -2612,7 +4074,9 @@ export function repondreEnDemo(
 
   const demandePortail = route.match(/^\/portail\/demandes\/(\d+)$/);
   if (demandePortail) {
-    const trouvee = DEMANDES_PORTAIL_DEMO.find((d) => d.id === Number(demandePortail[1]));
+    const trouvee = DEMANDES_PORTAIL_DEMO.find(
+      (d) => d.id === Number(demandePortail[1]),
+    );
     return trouvee ? attendre(trouvee) : null;
   }
 
@@ -2632,16 +4096,85 @@ export function repondreEnDemo(
      * etre qualifie automatiquement.
      */
     const messages = [
-      { id: 1, objet: "Demande d'autorisation d'accès au terminal — société Camrail", expediteur: "contact@camrail.cm", recuLe: "2026-08-06T08:12:00", pieces: 2, naturePresumee: "Demande", confiance: 92, etat: "À qualifier" as const, motif: null, traitePar: null },
-      { id: 2, objet: "Transmission du rapport trimestriel de la tutelle", expediteur: "sg@mintransports.cm", recuLe: "2026-08-06T07:48:00", pieces: 1, naturePresumee: "Transmission", confiance: 88, etat: "À qualifier" as const, motif: null, traitePar: null },
-      { id: 3, objet: "RE: RE: TR: suivi du dossier", expediteur: "j.mbappe@sotrans.cm", recuLe: "2026-08-06T07:20:00", pieces: 0, naturePresumee: null, confiance: 34, etat: "À qualifier" as const, motif: "Sous le seuil de confiance : qualification manuelle obligatoire", traitePar: null },
-      { id: 4, objet: "Demande d'autorisation d'accès au terminal — société Camrail", expediteur: "contact@camrail.cm", recuLe: "2026-08-06T08:14:00", pieces: 2, naturePresumee: "Demande", confiance: 92, etat: "Doublon" as const, motif: "Identique au message reçu à 08:12", traitePar: null },
-      { id: 5, objet: "Réclamation sur la facturation des redevances", expediteur: "compta@sotrans.cm", recuLe: "2026-08-05T16:30:00", pieces: 3, naturePresumee: "Réclamation", confiance: 95, etat: "Qualifié" as const, motif: null, traitePar: "K. Traoré" },
-      { id: 6, objet: "Newsletter — Association des ports d'Afrique centrale", expediteur: "info@agpaoc.org", recuLe: "2026-08-05T11:02:00", pieces: 0, naturePresumee: null, confiance: 12, etat: "Écarté" as const, motif: "Message de diffusion, sans objet administratif", traitePar: "K. Traoré" },
+      {
+        id: 1,
+        objet: "Demande d'autorisation d'accès au terminal — société Camrail",
+        expediteur: "contact@camrail.cm",
+        recuLe: "2026-08-06T08:12:00",
+        pieces: 2,
+        naturePresumee: "Demande",
+        confiance: 92,
+        etat: "À qualifier" as const,
+        motif: null,
+        traitePar: null,
+      },
+      {
+        id: 2,
+        objet: "Transmission du rapport trimestriel de la tutelle",
+        expediteur: "sg@mintransports.cm",
+        recuLe: "2026-08-06T07:48:00",
+        pieces: 1,
+        naturePresumee: "Transmission",
+        confiance: 88,
+        etat: "À qualifier" as const,
+        motif: null,
+        traitePar: null,
+      },
+      {
+        id: 3,
+        objet: "RE: RE: TR: suivi du dossier",
+        expediteur: "j.mbappe@sotrans.cm",
+        recuLe: "2026-08-06T07:20:00",
+        pieces: 0,
+        naturePresumee: null,
+        confiance: 34,
+        etat: "À qualifier" as const,
+        motif:
+          "Sous le seuil de confiance : qualification manuelle obligatoire",
+        traitePar: null,
+      },
+      {
+        id: 4,
+        objet: "Demande d'autorisation d'accès au terminal — société Camrail",
+        expediteur: "contact@camrail.cm",
+        recuLe: "2026-08-06T08:14:00",
+        pieces: 2,
+        naturePresumee: "Demande",
+        confiance: 92,
+        etat: "Doublon" as const,
+        motif: "Identique au message reçu à 08:12",
+        traitePar: null,
+      },
+      {
+        id: 5,
+        objet: "Réclamation sur la facturation des redevances",
+        expediteur: "compta@sotrans.cm",
+        recuLe: "2026-08-05T16:30:00",
+        pieces: 3,
+        naturePresumee: "Réclamation",
+        confiance: 95,
+        etat: "Qualifié" as const,
+        motif: null,
+        traitePar: "K. Traoré",
+      },
+      {
+        id: 6,
+        objet: "Newsletter — Association des ports d'Afrique centrale",
+        expediteur: "info@agpaoc.org",
+        recuLe: "2026-08-05T11:02:00",
+        pieces: 0,
+        naturePresumee: null,
+        confiance: 12,
+        etat: "Écarté" as const,
+        motif: "Message de diffusion, sans objet administratif",
+        traitePar: "K. Traoré",
+      },
     ];
 
     const aQualifier = messages.filter((m) => m.etat === "À qualifier").length;
-    const sousSeuil = messages.filter((m) => m.confiance !== null && m.confiance < 60).length;
+    const sousSeuil = messages.filter(
+      (m) => m.confiance !== null && m.confiance < 60,
+    ).length;
     const doublons = messages.filter((m) => m.etat === "Doublon").length;
 
     return attendre({
@@ -2686,7 +4219,9 @@ export function repondreEnDemo(
 
     const disponibilite =
       Math.round(
-        (SERVICES_DEMO.reduce((somme, s) => somme + s.disponibilite, 0) / SERVICES_DEMO.length) * 10,
+        (SERVICES_DEMO.reduce((somme, s) => somme + s.disponibilite, 0) /
+          SERVICES_DEMO.length) *
+          10,
       ) / 10;
 
     const ouverts = INCIDENTS_DEMO.filter((i) => i.fin === null);
@@ -2695,7 +4230,9 @@ export function repondreEnDemo(
 
     // Le dernier incident majeur sert de test grandeur nature du plan de
     // reprise : sa duree se compare au RTO contractuel.
-    const dernierMajeur = INCIDENTS_DEMO.find((i) => i.gravite === "Majeur" && i.fin !== null);
+    const dernierMajeur = INCIDENTS_DEMO.find(
+      (i) => i.gravite === "Majeur" && i.fin !== null,
+    );
 
     return attendre({
       disponibilite30j: disponibilite,
@@ -2708,7 +4245,8 @@ export function repondreEnDemo(
         dureeRepriseMinutes: dernierMajeur?.dureeMinutes ?? null,
         cibleMinutes: CIBLE_REPRISE_MINUTES,
         feu:
-          dernierMajeur?.dureeMinutes === undefined || dernierMajeur?.dureeMinutes === null
+          dernierMajeur?.dureeMinutes === undefined ||
+          dernierMajeur?.dureeMinutes === null
             ? "inconnu"
             : dernierMajeur.dureeMinutes <= CIBLE_REPRISE_MINUTES
               ? "vert"
@@ -2724,7 +4262,10 @@ export function repondreEnDemo(
         {
           libelle: "Services dégradés",
           valeur: String(degrades.length),
-          note: degrades.length > 0 ? degrades.map((s) => s.nom).join(", ") : "aucun",
+          note:
+            degrades.length > 0
+              ? degrades.map((s) => s.nom).join(", ")
+              : "aucun",
           feu: degrades.length > 0 ? "orange" : "vert",
         },
         {
@@ -2736,7 +4277,8 @@ export function repondreEnDemo(
         {
           libelle: "Écrans au-delà de 2 s",
           valeur: String(lents.length),
-          note: lents.length > 0 ? "95ᵉ centile hors engagement" : "tous conformes",
+          note:
+            lents.length > 0 ? "95ᵉ centile hors engagement" : "tous conformes",
           feu: lents.length > 0 ? "rouge" : "vert",
         },
       ],
@@ -2754,7 +4296,10 @@ export function repondreEnDemo(
     const enDefaut = INTEGRATIONS_DEMO.filter(
       (i) => i.etat === "Dégradé" || i.etat === "Non connecté",
     );
-    const erreurs = INTEGRATIONS_DEMO.reduce((somme, i) => somme + i.erreurs24h, 0);
+    const erreurs = INTEGRATIONS_DEMO.reduce(
+      (somme, i) => somme + i.erreurs24h,
+      0,
+    );
 
     return attendre({
       sso: {
@@ -2769,7 +4314,12 @@ export function repondreEnDemo(
         connexionsLocales7j: CONNEXIONS_LOCALES,
         // Tant qu'il reste des comptes locaux, la politique de mot de passe de
         // l'annuaire ne s'applique pas a tout le monde.
-        feu: COMPTES_LOCAUX === 0 ? "vert" : COMPTES_LOCAUX > 20 ? "rouge" : "orange",
+        feu:
+          COMPTES_LOCAUX === 0
+            ? "vert"
+            : COMPTES_LOCAUX > 20
+              ? "rouge"
+              : "orange",
       },
       integrations: INTEGRATIONS_DEMO,
       compteurs: [
@@ -2777,13 +4327,23 @@ export function repondreEnDemo(
           libelle: "Systèmes raccordés",
           valeur: `${INTEGRATIONS_DEMO.filter((i) => i.etat === "Connecté").length} / ${INTEGRATIONS_DEMO.length}`,
           note: "connecteurs opérationnels",
-          feu: enDefaut.length > 1 ? "rouge" : enDefaut.length > 0 ? "orange" : "vert",
+          feu:
+            enDefaut.length > 1
+              ? "rouge"
+              : enDefaut.length > 0
+                ? "orange"
+                : "vert",
         },
         {
           libelle: "Comptes hors annuaire",
           valeur: String(COMPTES_LOCAUX),
           note: "mot de passe applicatif local",
-          feu: COMPTES_LOCAUX > 20 ? "rouge" : COMPTES_LOCAUX > 0 ? "orange" : "vert",
+          feu:
+            COMPTES_LOCAUX > 20
+              ? "rouge"
+              : COMPTES_LOCAUX > 0
+                ? "orange"
+                : "vert",
         },
         {
           libelle: "Connexions hors SSO",
@@ -2806,9 +4366,12 @@ export function repondreEnDemo(
   // ------------------------------------------------------------------
   if (route === "/gouvernance/filiales") {
     const aPreparer = ORGANES_DEMO.filter(
-      (o) => o.etatPreparation !== "Tenue" && o.documentsRecus < o.documentsAttendus,
+      (o) =>
+        o.etatPreparation !== "Tenue" && o.documentsRecus < o.documentsAttendus,
     ).length;
-    const enRetard = PRESCRIPTIONS_DEMO.filter((p) => p.etat === "En retard").length;
+    const enRetard = PRESCRIPTIONS_DEMO.filter(
+      (p) => p.etat === "En retard",
+    ).length;
 
     return attendre({
       organes: ORGANES_DEMO,
@@ -2816,7 +4379,8 @@ export function repondreEnDemo(
       compteurs: [
         {
           libelle: "Sessions à venir",
-          valeur: ORGANES_DEMO.filter((o) => o.etatPreparation !== "Tenue").length,
+          valeur: ORGANES_DEMO.filter((o) => o.etatPreparation !== "Tenue")
+            .length,
           note: "organes de gestion",
           feu: "inconnu",
         },
@@ -2834,7 +4398,8 @@ export function repondreEnDemo(
         },
         {
           libelle: "Prescriptions exécutées",
-          valeur: PRESCRIPTIONS_DEMO.filter((p) => p.etat === "Exécutée").length,
+          valeur: PRESCRIPTIONS_DEMO.filter((p) => p.etat === "Exécutée")
+            .length,
           note: `sur ${PRESCRIPTIONS_DEMO.length} suivies`,
           feu: "vert",
         },
@@ -2844,11 +4409,17 @@ export function repondreEnDemo(
 
   if (route === "/gouvernance/representations") {
     const jour = aujourdhui();
-    const expires = REPRESENTATIONS_DEMO.filter((r) => r.mandatAu < jour).length;
-    const enRetard = RECOMMANDATIONS_DEMO.filter((r) => r.etat === "En retard").length;
+    const expires = REPRESENTATIONS_DEMO.filter(
+      (r) => r.mandatAu < jour,
+    ).length;
+    const enRetard = RECOMMANDATIONS_DEMO.filter(
+      (r) => r.etat === "En retard",
+    ).length;
     const assiduiteMoyenne = Math.round(
-      REPRESENTATIONS_DEMO.reduce((somme, r) => somme + r.tauxParticipation, 0) /
-        REPRESENTATIONS_DEMO.length,
+      REPRESENTATIONS_DEMO.reduce(
+        (somme, r) => somme + r.tauxParticipation,
+        0,
+      ) / REPRESENTATIONS_DEMO.length,
     );
 
     return attendre({
@@ -2871,7 +4442,12 @@ export function repondreEnDemo(
           libelle: "Assiduité moyenne",
           valeur: assiduiteMoyenne,
           note: "participation aux séances",
-          feu: assiduiteMoyenne >= 85 ? "vert" : assiduiteMoyenne >= 60 ? "orange" : "rouge",
+          feu:
+            assiduiteMoyenne >= 85
+              ? "vert"
+              : assiduiteMoyenne >= 60
+                ? "orange"
+                : "rouge",
         },
         {
           libelle: "Recommandations en retard",
@@ -2893,20 +4469,31 @@ export function repondreEnDemo(
      * disponibilite ne donne pas — celui-ci enregistre des absences deja
      * decidees, une par une.
      */
-    const conflits: { periode: string; structure: string; responsables: string[] }[] = [];
+    const conflits: {
+      periode: string;
+      structure: string;
+      responsables: string[];
+    }[] = [];
     for (const ligne of CONGES_DEMO) {
       for (const periode of ligne.periodes) {
         const concurrents = CONGES_DEMO.filter(
           (autre) =>
             autre.id !== ligne.id &&
             autre.structure === ligne.structure &&
-            autre.periodes.some((p) => p.du <= periode.au && p.au >= periode.du),
+            autre.periodes.some(
+              (p) => p.du <= periode.au && p.au >= periode.du,
+            ),
         );
 
         if (concurrents.length > 0) {
-          const responsables = [ligne.responsable, ...concurrents.map((c) => c.responsable)].sort();
+          const responsables = [
+            ligne.responsable,
+            ...concurrents.map((c) => c.responsable),
+          ].sort();
           const deja = conflits.some(
-            (c) => c.structure === ligne.structure && c.responsables.join() === responsables.join(),
+            (c) =>
+              c.structure === ligne.structure &&
+              c.responsables.join() === responsables.join(),
           );
           if (!deja) {
             conflits.push({
@@ -2967,7 +4554,9 @@ export function repondreEnDemo(
     if (etat !== "Tous") lignes = lignes.filter((d) => d.etat === etat);
 
     const horsDelai = toutes.filter((d) => d.etat === "Hors délai").length;
-    const enAttente = toutes.filter((d) => d.etat === "En attente de complément").length;
+    const enAttente = toutes.filter(
+      (d) => d.etat === "En attente de complément",
+    ).length;
     const retournes = toutes.filter((d) => d.etat === "Retourné").length;
 
     return attendre({
@@ -3016,14 +4605,21 @@ export function repondreEnDemo(
   //  Archivage — referentiel de conservation, versements, conformite
   // ------------------------------------------------------------------
   if (route === "/archivage/referentiel") {
-    const enAttente = REGLES_DEMO.filter((r) => r.actif && r.valideePar === null).length;
+    const enAttente = REGLES_DEMO.filter(
+      (r) => r.actif && r.valideePar === null,
+    ).length;
     const actives = REGLES_DEMO.filter((r) => r.actif);
 
     return attendre({
       regles: REGLES_DEMO,
       enAttenteValidation: enAttente,
       compteurs: [
-        { libelle: "Règles actives", valeur: actives.length, note: "au référentiel", feu: "inconnu" },
+        {
+          libelle: "Règles actives",
+          valeur: actives.length,
+          note: "au référentiel",
+          feu: "inconnu",
+        },
         {
           libelle: "En attente de visa",
           valeur: enAttente,
@@ -3032,13 +4628,18 @@ export function repondreEnDemo(
         },
         {
           libelle: "Conservation définitive",
-          valeur: actives.filter((r) => r.sortFinal === "Conservation définitive").length,
+          valeur: actives.filter(
+            (r) => r.sortFinal === "Conservation définitive",
+          ).length,
           note: "typologies à valeur historique",
           feu: "vert",
         },
         {
           libelle: "Dossiers couverts",
-          valeur: REGLES_DEMO.reduce((somme, r) => somme + r.dossiersConcernes, 0),
+          valeur: REGLES_DEMO.reduce(
+            (somme, r) => somme + r.dossiersConcernes,
+            0,
+          ),
           note: "toutes typologies",
           feu: "inconnu",
         },
@@ -3050,19 +4651,35 @@ export function repondreEnDemo(
     const filtre = parametres.get("filtre") ?? "Tous";
     let lignes = VERSEMENTS_DEMO.map(versementListe);
     if (filtre === "Échéance dépassée")
-      lignes = lignes.filter((v) => v.echeanceSortFinal < aujourdhui() && v.etat !== "Versé");
-    else if (filtre !== "Tous") lignes = lignes.filter((v) => v.etat === filtre);
+      lignes = lignes.filter(
+        (v) =>
+          v.echeanceSortFinal !== null &&
+          v.echeanceSortFinal < aujourdhui() &&
+          v.etat !== "Versé",
+      );
+    else if (filtre !== "Tous")
+      lignes = lignes.filter((v) => v.etat === filtre);
 
     const aVerser = VERSEMENTS_DEMO.filter((v) => v.etat === "À verser").length;
-    const anomalies = VERSEMENTS_DEMO.filter((v) => v.etat === "Anomalie").length;
+    const anomalies = VERSEMENTS_DEMO.filter(
+      (v) => v.etat === "Anomalie",
+    ).length;
     const depassees = VERSEMENTS_DEMO.filter(
-      (v) => v.echeanceSortFinal < aujourdhui() && v.etat !== "Versé",
+      (v) =>
+        v.echeanceSortFinal !== null &&
+        v.echeanceSortFinal < aujourdhui() &&
+        v.etat !== "Versé",
     ).length;
 
     return attendre({
       versements: lignes,
       compteurs: [
-        { libelle: "À verser", valeur: aVerser, note: "dossiers clos en attente", feu: aVerser > 0 ? "orange" : "vert" },
+        {
+          libelle: "À verser",
+          valeur: aVerser,
+          note: "dossiers clos en attente",
+          feu: aVerser > 0 ? "orange" : "vert",
+        },
         {
           libelle: "En anomalie",
           valeur: anomalies,
@@ -3087,14 +4704,19 @@ export function repondreEnDemo(
 
   const versementFiche = route.match(/^\/archivage\/versements\/(\d+)$/);
   if (versementFiche) {
-    const trouve = VERSEMENTS_DEMO.find((v) => v.id === Number(versementFiche[1]));
+    const trouve = VERSEMENTS_DEMO.find(
+      (v) => v.id === Number(versementFiche[1]),
+    );
     return trouve ? attendre(trouve) : null;
   }
 
   if (route === "/archivage/conformite") {
     const jour = aujourdhui();
     const depassees = VERSEMENTS_DEMO.filter(
-      (v) => v.echeanceSortFinal < jour && v.etat !== "Versé",
+      (v) =>
+        v.echeanceSortFinal !== null &&
+        v.echeanceSortFinal < jour &&
+        v.etat !== "Versé",
     ).map(versementListe);
 
     const typologiesSansRegle = [
@@ -3107,9 +4729,16 @@ export function repondreEnDemo(
     ];
 
     const conformes = VERSEMENTS_DEMO.filter(
-      (v) => v.anomalies.length === 0 && v.echeanceSortFinal >= jour,
+      (v) =>
+        v.anomalies.length === 0 &&
+        v.echeanceSortFinal !== null &&
+        v.echeanceSortFinal >= jour,
     ).length;
-    const taux = Math.round((conformes / VERSEMENTS_DEMO.length) * 100);
+    // `null` sur un fonds vide, comme le serveur : une division par zéro
+    // afficherait « NaN % » là où il faut lire « non mesuré ».
+    const taux = VERSEMENTS_DEMO.length
+      ? Math.round((conformes / VERSEMENTS_DEMO.length) * 100)
+      : null;
 
     return attendre({
       tauxConformite: taux,
@@ -3118,9 +4747,16 @@ export function repondreEnDemo(
       compteurs: [
         {
           libelle: "Taux de conformité",
-          valeur: taux,
+          valeur: taux ?? 0,
           note: "dossiers sans anomalie ni retard",
-          feu: taux >= 85 ? "vert" : taux >= 60 ? "orange" : "rouge",
+          feu:
+            taux === null
+              ? "inconnu"
+              : taux >= 85
+                ? "vert"
+                : taux >= 60
+                  ? "orange"
+                  : "rouge",
         },
         {
           libelle: "Échéances dépassées",
@@ -3131,7 +4767,10 @@ export function repondreEnDemo(
         {
           libelle: "Typologies sans règle validée",
           valeur: typologiesSansRegle.length,
-          note: typologiesSansRegle.length > 0 ? "conservation non opposable" : "toutes couvertes",
+          note:
+            typologiesSansRegle.length > 0
+              ? "conservation non opposable"
+              : "toutes couvertes",
           feu: typologiesSansRegle.length > 0 ? "rouge" : "vert",
         },
         {
@@ -3157,11 +4796,16 @@ export function repondreEnDemo(
     const lignes = classement();
     const decisions = decisionsListe();
     const activites = activitesListe();
-    const suivies = activites.filter((a) => a.etat !== "Réalisée" && a.etat !== "Suspendue");
+    const suivies = activites.filter(
+      (a) => a.etat !== "Réalisée" && a.etat !== "Suspendue",
+    );
     const execution =
       suivies.length === 0
         ? 0
-        : Math.round(suivies.reduce((somme, a) => somme + a.avancement, 0) / suivies.length);
+        : Math.round(
+            suivies.reduce((somme, a) => somme + a.avancement, 0) /
+              suivies.length,
+          );
     const enRetard = decisions.filter((d) => d.etat === "En retard").length;
     const aRisque = lignes.filter((l) => l.feu === "rouge").length;
 
@@ -3173,12 +4817,32 @@ export function repondreEnDemo(
       actualiseLe: "2026-08-06T16:41:00",
       exercice: "2026",
       reperes: [
-        { libelle: "Courriers enregistrés", valeur: "8 942", note: "depuis le 1er janvier" },
-        { libelle: "Exécution des activités", valeur: `${execution} %`, note: "moyenne des plans d'actions" },
+        {
+          libelle: "Courriers enregistrés",
+          valeur: "8 942",
+          note: "depuis le 1er janvier",
+        },
+        {
+          libelle: "Exécution des activités",
+          valeur: `${execution} %`,
+          note: "moyenne des plans d'actions",
+        },
         { libelle: "Respect des délais", valeur: "68 %", note: "cible 80 %" },
-        { libelle: "Délai moyen de traitement", valeur: "3,4 j", note: "toutes structures" },
-        { libelle: "Décisions suivies", valeur: String(decisions.length), note: `dont ${enRetard} hors délai` },
-        { libelle: "Structures à risque", valeur: String(aRisque), note: "score global sous 60" },
+        {
+          libelle: "Délai moyen de traitement",
+          valeur: "3,4 j",
+          note: "toutes structures",
+        },
+        {
+          libelle: "Décisions suivies",
+          valeur: String(decisions.length),
+          note: `dont ${enRetard} hors délai`,
+        },
+        {
+          libelle: "Structures à risque",
+          valeur: String(aRisque),
+          note: "score global sous 60",
+        },
         // La derniere case reste vide tant que la source n'existe pas. Un
         // tiret le dit ; une valeur inventee le cacherait.
         { libelle: "Dématérialisation du courrier", valeur: "—", note: null },
@@ -3192,13 +4856,17 @@ export function repondreEnDemo(
         { mois: "juin", valeur: 0.8 },
         { mois: "juil.", valeur: 1.9 },
       ],
-      chargeParStructure: cinqPremiers(STRUCTURES_DEMO, (s) => s.courriersEnCours).map((s) => ({
+      chargeParStructure: cinqPremiers(
+        STRUCTURES_DEMO,
+        (s) => s.courriersEnCours,
+      ).map((s) => ({
         libelle: s.libelle,
         valeur: s.courriersEnCours,
       })),
-      volumeParCorrespondant: cinqPremiers(CORRESPONDANTS_DEMO, (c) => c.nombreCourriers).map(
-        (c) => ({ libelle: c.libelle, valeur: c.nombreCourriers }),
-      ),
+      volumeParCorrespondant: cinqPremiers(
+        CORRESPONDANTS_DEMO,
+        (c) => c.nombreCourriers,
+      ).map((c) => ({ libelle: c.libelle, valeur: c.nombreCourriers })),
       respectDelais: [
         { mois: "janv.", valeur: 61 },
         { mois: "févr.", valeur: 63 },
@@ -3220,7 +4888,9 @@ export function repondreEnDemo(
       // Le point le plus contraint borne l'acces au port : c'est celui-la que
       // le Directeur general doit voir, pas la moyenne des quatre.
       chenal: (() => {
-        const critique = [...RELEVES_CHENAL_DEMO].sort((a, b) => a.ecart - b.ecart)[0];
+        const critique = [...RELEVES_CHENAL_DEMO].sort(
+          (a, b) => a.ecart - b.ecart,
+        )[0];
         if (!critique) return null;
         return {
           point: critique.point,
@@ -3234,20 +4904,25 @@ export function repondreEnDemo(
       })(),
       recouvrements: (() => {
         const emis = RECOUVREMENTS_DEMO.reduce((total, l) => total + l.emis, 0);
-        const recouvre = RECOUVREMENTS_DEMO.reduce((total, l) => total + l.recouvre, 0);
+        const recouvre = RECOUVREMENTS_DEMO.reduce(
+          (total, l) => total + l.recouvre,
+          0,
+        );
         return {
           periode: "Juillet 2026",
-          tauxGlobal: emis === 0 ? 0 : Math.round((recouvre / emis) * 1000) / 10,
+          tauxGlobal:
+            emis === 0 ? 0 : Math.round((recouvre / emis) * 1000) / 10,
           totalRecouvre: recouvre,
-          totalExploitation: RECOUVREMENTS_DEMO.filter((l) => l.sourceStructure === "DEX").reduce(
-            (total, l) => total + l.recouvre,
-            0,
-          ),
-          totalAutresRecettes: RECOUVREMENTS_DEMO.filter((l) => l.sourceStructure === "DFC").reduce(
-            (total, l) => total + l.recouvre,
-            0,
-          ),
-          parSecteur: RECOUVREMENTS_DEMO.map((l) => ({ libelle: l.secteurCode, valeur: l.taux })),
+          totalExploitation: RECOUVREMENTS_DEMO.filter(
+            (l) => l.sourceStructure === "DEX",
+          ).reduce((total, l) => total + l.recouvre, 0),
+          totalAutresRecettes: RECOUVREMENTS_DEMO.filter(
+            (l) => l.sourceStructure === "DFC",
+          ).reduce((total, l) => total + l.recouvre, 0),
+          parSecteur: RECOUVREMENTS_DEMO.map((l) => ({
+            libelle: l.secteurCode,
+            valeur: l.taux,
+          })),
         };
       })(),
     });
@@ -3278,7 +4953,9 @@ export function repondreEnDemo(
     const tientChenal = sigle === "DDLM" || sigle === "RDD";
     const tientRecettes = sigle === "DEX" || sigle === "DFC";
 
-    const critique = [...RELEVES_CHENAL_DEMO].sort((a, b) => a.ecart - b.ecart)[0];
+    const critique = [...RELEVES_CHENAL_DEMO].sort(
+      (a, b) => a.ecart - b.ecart,
+    )[0];
 
     const chenal =
       consolide || tientChenal
@@ -3287,11 +4964,14 @@ export function repondreEnDemo(
             // Le point critique n'est signale que s'il est reellement sous sa
             // garantie : au-dessus, le plus juste des points reste conforme et
             // n'appelle aucune alerte.
-            pointCritique: critique && critique.ecart < 0 ? critique.point : null,
-            coteCritique: critique && critique.ecart < 0 ? Math.abs(critique.ecart) : null,
+            pointCritique:
+              critique && critique.ecart < 0 ? critique.point : null,
+            coteCritique:
+              critique && critique.ecart < 0 ? Math.abs(critique.ecart) : null,
             evolution: EVOLUTION_CHENAL_DEMO,
             dernierReleveLe: RELEVES_CHENAL_DEMO.reduce<string | null>(
-              (recent, r) => (recent === null || r.releveLe > recent ? r.releveLe : recent),
+              (recent, r) =>
+                recent === null || r.releveLe > recent ? r.releveLe : recent,
               null,
             ),
           }
@@ -3316,7 +4996,10 @@ export function repondreEnDemo(
             lignes,
             totalEmis,
             totalRecouvre,
-            tauxGlobal: totalEmis === 0 ? 0 : Math.round((totalRecouvre / totalEmis) * 1000) / 10,
+            tauxGlobal:
+              totalEmis === 0
+                ? 0
+                : Math.round((totalRecouvre / totalEmis) * 1000) / 10,
             totalExploitation: lignes
               .filter((l) => l.sourceStructure === "DEX")
               .reduce((total, l) => total + l.recouvre, 0),
@@ -3333,6 +5016,21 @@ export function repondreEnDemo(
       peutSaisirChenal: saisit && tientChenal,
       peutSaisirRecouvrements: saisit && tientRecettes,
       periodes: PERIODES_EXPLOITATION,
+      // Les referentiels partent avec l'ecran et suivent la cloison, comme au
+      // serveur reel : la Regie ne recoit aucun secteur, la Direction de
+      // l'exploitation aucun point de chenal.
+      pointsChenal:
+        consolide || tientChenal
+          ? POINTS_CHENAL.map((p) => ({ nom: p.nom, garantie: p.garantie }))
+          : [],
+      secteurs:
+        consolide || tientRecettes
+          ? SECTEURS_PORTUAIRES.map((s) => ({
+              code: s.code,
+              libelle: s.libelle,
+              origine: s.origine,
+            }))
+          : [],
     });
   }
 
@@ -3340,13 +5038,13 @@ export function repondreEnDemo(
   //  Vue d'ensemble du Comite de direction — le conseil des directeurs.
   //
   //  Le Comite est une instance, pas un poste : la page porte donc sur
-  //  l'ensemble des directions, jamais sur celle du membre connecte. Son sigle
-  //  ne sert plus qu'a lui signaler ou tombe sa propre direction dans le
-  //  classement.
+  //  l'ensemble des directions. Son sigle designe la structure dont la
+  //  position — score et rang — est servie a part.
   // ------------------------------------------------------------------
   if (route === "/comite/vue-ensemble") {
     const compte = compteActifDemo()?.utilisateur;
-    const sigleMembre = (compte?.structureLibelle ?? "").split(" — ")[0] || null;
+    const sigleMembre =
+      (compte?.structureLibelle ?? "").split(" — ")[0] || null;
 
     const lignes = classement();
     const decisions = decisionsListe();
@@ -3355,22 +5053,33 @@ export function repondreEnDemo(
     const moyenne =
       lignes.length === 0
         ? 0
-        : Math.round(lignes.reduce((somme, l) => somme + l.scoreGlobal, 0) / lignes.length);
+        : Math.round(
+            lignes.reduce((somme, l) => somme + l.scoreGlobal, 0) /
+              lignes.length,
+          );
 
     // Les decisions du Comite, et d'elles seules : le registre entier melerait
     // celles du Conseil d'administration et du Directeur general, dont le
     // Comite ne repond pas.
     const siennes = decisions.filter((d) => d.instance === "CODIR");
-    const enRetardDecisions = siennes.filter((d) => d.etat === "En retard").length;
+    const enRetardDecisions = siennes.filter(
+      (d) => d.etat === "En retard",
+    ).length;
 
     const execution =
       activites.length === 0
         ? 0
-        : Math.round(activites.reduce((somme, a) => somme + a.avancement, 0) / activites.length);
+        : Math.round(
+            activites.reduce((somme, a) => somme + a.avancement, 0) /
+              activites.length,
+          );
 
     const aRisque = lignes.filter((l) => l.feu === "rouge").length;
     const courriers = lignes.reduce(
-      (total, l) => total + (STRUCTURES_DEMO.find((s) => s.sigle === l.structureSigle)?.courriersEnCours ?? 0),
+      (total, l) =>
+        total +
+        (STRUCTURES_DEMO.find((s) => s.sigle === l.structureSigle)
+          ?.courriersEnCours ?? 0),
       0,
     );
 
@@ -3399,7 +5108,10 @@ export function repondreEnDemo(
         historiques.length === 0
           ? 0
           : Math.round(
-              (historiques.reduce((somme, serie) => somme + serie[index].score, 0) /
+              (historiques.reduce(
+                (somme, serie) => somme + serie[index].score,
+                0,
+              ) /
                 historiques.length) *
                 10,
             ) / 10,
@@ -3409,7 +5121,8 @@ export function repondreEnDemo(
       const scores = historiques.map((serie) => serie[index].score);
       return {
         mois: point.periode,
-        valeur: scores.length === 0 ? 0 : Math.max(...scores) - Math.min(...scores),
+        valeur:
+          scores.length === 0 ? 0 : Math.max(...scores) - Math.min(...scores),
       };
     });
 
@@ -3430,7 +5143,10 @@ export function repondreEnDemo(
         {
           libelle: "Score moyen",
           valeur: `${moyenne} pt`,
-          note: lignes.length === 0 ? null : `de ${Math.min(...lignes.map((l) => l.scoreGlobal))} à ${Math.max(...lignes.map((l) => l.scoreGlobal))} pt`,
+          note:
+            lignes.length === 0
+              ? null
+              : `de ${Math.min(...lignes.map((l) => l.scoreGlobal))} à ${Math.max(...lignes.map((l) => l.scoreGlobal))} pt`,
         },
         {
           libelle: "Directions à risque",
@@ -3451,7 +5167,9 @@ export function repondreEnDemo(
           libelle: "Décisions du Comité",
           valeur: String(siennes.length),
           note:
-            enRetardDecisions > 0 ? `dont ${enRetardDecisions} hors délai` : "aucune hors délai",
+            enRetardDecisions > 0
+              ? `dont ${enRetardDecisions} hors délai`
+              : "aucune hors délai",
         },
         {
           libelle: "Exécution des activités",
@@ -3464,10 +5182,22 @@ export function repondreEnDemo(
           note: "dans les directions notées",
         },
       ],
-      scoreParStructure: lignes.map((l) => ({
-        libelle: l.structureSigle,
-        valeur: l.scoreGlobal,
-      })),
+      // Le classement ne sort plus colonne par colonne (ADR 026) : le membre
+      // y lit sa position, le college se lit par agregats.
+      positionMembre: (() => {
+        const sienne = lignes.find((l) => l.structureSigle === sigleMembre);
+        if (!sienne) return null;
+        return {
+          structureSigle: sienne.structureSigle,
+          structureLibelle: sienne.structureLibelle,
+          scoreGlobal: sienne.scoreGlobal,
+          feu: sienne.feu,
+          rang: sienne.rang,
+          rangPrecedent: sienne.rangPrecedent ?? null,
+          totalStructures: lignes.length,
+          moyenneCollege: moyenne,
+        };
+      })(),
       decisionsParEtat: parEtat(siennes),
       activitesParEtat: parEtat(activites),
       evolutionScoreMoyen,
@@ -3483,13 +5213,20 @@ export function repondreEnDemo(
     const decisions = decisionsListe();
     const activites = activitesListe();
     const enRetard = decisions.filter((d) => d.etat === "En retard");
-    const sansInterim = DISPONIBILITES_DEMO.filter((d) => d.enCours && d.interimaire === null);
+    const sansInterim = DISPONIBILITES_DEMO.filter(
+      (d) => d.enCours && d.interimaire === null,
+    );
     const fragiles = lignes.filter((l) => l.feu === "rouge");
-    const suivies = activites.filter((a) => a.etat !== "Réalisée" && a.etat !== "Suspendue");
+    const suivies = activites.filter(
+      (a) => a.etat !== "Réalisée" && a.etat !== "Suspendue",
+    );
     const execution =
       suivies.length === 0
         ? 0
-        : Math.round(suivies.reduce((somme, a) => somme + a.avancement, 0) / suivies.length);
+        : Math.round(
+            suivies.reduce((somme, a) => somme + a.avancement, 0) /
+              suivies.length,
+          );
     /*
      * §20 : le tableau de bord du Directeur general isole les « activites
      * critiques ». Elles entrent par les alertes plutot que par un cinquieme
@@ -3551,7 +5288,11 @@ export function repondreEnDemo(
       ],
       // Le DG suit ce qu'il a lui-meme decide, et ce que le Conseil a resolu.
       engagements: decisions
-        .filter((d) => d.instance === "Directeur général" || d.instance === "Conseil d'administration")
+        .filter(
+          (d) =>
+            d.instance === "Directeur général" ||
+            d.instance === "Conseil d'administration",
+        )
         .map((d) => ({
           id: d.id,
           reference: d.reference,
@@ -3566,18 +5307,56 @@ export function repondreEnDemo(
           enRetard: d.etat === "En retard",
         })),
       indicateurs: [
-        { libelle: "Délai moyen de traitement", valeur: "6,4 j", variation: "−1,2 j", favorable: true },
-        { libelle: "Respect des délais", valeur: "78 %", variation: "+4 pts", favorable: true },
-        { libelle: "Dématérialisation du courrier", valeur: "41 %", variation: "+7 pts", favorable: true },
-        { libelle: "Courriers traités ce mois", valeur: "2 184", variation: "+3 %", favorable: true },
-        { libelle: "Décisions exécutées", valeur: `${decisions.filter((d) => d.etat === "Exécutée").length} / ${decisions.length}`, variation: null, favorable: null },
-        { libelle: "Ponctualité des remontées", valeur: "83 %", variation: "−5 pts", favorable: false },
+        {
+          libelle: "Délai moyen de traitement",
+          valeur: "6,4 j",
+          variation: "−1,2 j",
+          favorable: true,
+        },
+        {
+          libelle: "Respect des délais",
+          valeur: "78 %",
+          variation: "+4 pts",
+          favorable: true,
+        },
+        {
+          libelle: "Dématérialisation du courrier",
+          valeur: "41 %",
+          variation: "+7 pts",
+          favorable: true,
+        },
+        {
+          libelle: "Courriers traités ce mois",
+          valeur: "2 184",
+          variation: "+3 %",
+          favorable: true,
+        },
+        {
+          libelle: "Décisions exécutées",
+          valeur: `${decisions.filter((d) => d.etat === "Exécutée").length} / ${decisions.length}`,
+          variation: null,
+          favorable: null,
+        },
+        {
+          libelle: "Ponctualité des remontées",
+          valeur: "83 %",
+          variation: "−5 pts",
+          favorable: false,
+        },
       ],
-      meilleures: lignes.slice(0, 3).map((l) => ({ sigle: l.structureSigle, score: l.scoreGlobal, feu: l.feu })),
+      meilleures: lignes.slice(0, 3).map((l) => ({
+        sigle: l.structureSigle,
+        score: l.scoreGlobal,
+        feu: l.feu,
+      })),
       fragiles: lignes
         .slice(-3)
         .reverse()
-        .map((l) => ({ sigle: l.structureSigle, score: l.scoreGlobal, feu: l.feu })),
+        .map((l) => ({
+          sigle: l.structureSigle,
+          score: l.scoreGlobal,
+          feu: l.feu,
+        })),
     });
   }
 
@@ -3586,17 +5365,25 @@ export function repondreEnDemo(
     const lignes = classement();
     const accessibles =
       compte?.utilisateur.perimetre.portee === "institution"
-        ? lignes.map((l) => ({ sigle: l.structureSigle, libelle: l.structureLibelle }))
+        ? lignes.map((l) => ({
+            sigle: l.structureSigle,
+            libelle: l.structureLibelle,
+          }))
         : [{ sigle: "DAF", libelle: "Direction des affaires financières" }];
 
     const sigle = (parametres.get("sigle") || accessibles[0]?.sigle) ?? "DAF";
     const ligne = lignes.find((l) => l.structureSigle === sigle);
-    const activites = activitesListe().filter((a) => a.structureSigle === sigle);
+    const activites = activitesListe().filter(
+      (a) => a.structureSigle === sigle,
+    );
     const enRetard = activites.filter((a) => a.etat === "En retard");
     const moyenne =
       activites.length === 0
         ? 0
-        : Math.round(activites.reduce((somme, a) => somme + a.avancement, 0) / activites.length);
+        : Math.round(
+            activites.reduce((somme, a) => somme + a.avancement, 0) /
+              activites.length,
+          );
     const obligationsDues = OBLIGATIONS_DEMO.filter((o) => !o.depose);
 
     return attendre({
@@ -3621,22 +5408,52 @@ export function repondreEnDemo(
           note: enRetard.length > 0 ? "écart à l'attendu" : "aucune",
           feu: enRetard.length > 0 ? "rouge" : "vert",
         },
-        { libelle: "Activités suivies", valeur: String(activites.length), note: "inscrites au plan", feu: "inconnu" },
+        {
+          libelle: "Activités suivies",
+          valeur: String(activites.length),
+          note: "inscrites au plan",
+          feu: "inconnu",
+        },
       ],
       courrier: [
-        { libelle: "Courriers en cours", valeur: "128", note: "affectés à la structure", feu: "inconnu" },
-        { libelle: "Hors délai", valeur: "17", note: "échéance dépassée", feu: "rouge" },
-        { libelle: "Délai moyen", valeur: "4,1 j", note: "sur les courriers clos", feu: "vert" },
+        {
+          libelle: "Courriers en cours",
+          valeur: "128",
+          note: "affectés à la structure",
+          feu: "inconnu",
+        },
+        {
+          libelle: "Hors délai",
+          valeur: "17",
+          note: "échéance dépassée",
+          feu: "rouge",
+        },
+        {
+          libelle: "Délai moyen",
+          valeur: "4,1 j",
+          note: "sur les courriers clos",
+          feu: "vert",
+        },
       ],
       rituels: [
-        { libelle: "Réunions tenues", valeur: "6 / 7", note: "sur l'exercice", feu: "orange" },
+        {
+          libelle: "Réunions tenues",
+          valeur: "6 / 7",
+          note: "sur l'exercice",
+          feu: "orange",
+        },
         {
           libelle: "Rapports déposés",
           valeur: `${OBLIGATIONS_DEMO.filter((o) => o.depose).length} / ${OBLIGATIONS_DEMO.length}`,
           note: "obligations de la structure",
           feu: obligationsDues.length > 1 ? "orange" : "vert",
         },
-        { libelle: "Ponctualité", valeur: "80 %", note: "dépôts dans les délais", feu: "orange" },
+        {
+          libelle: "Ponctualité",
+          valeur: "80 %",
+          note: "dépôts dans les délais",
+          feu: "orange",
+        },
       ],
       aTraiter: [
         ...enRetard.map((a) => ({
@@ -3653,21 +5470,22 @@ export function repondreEnDemo(
             feu: "rouge" as const,
             chemin: "/activites/obligations",
           })),
-        ...DISPONIBILITES_DEMO.filter((d) => d.enCours && d.interimaire === null && d.structure === sigle).map(
-          (d) => ({
-            libelle: `${d.responsable} absent sans intérimaire`,
-            precision: `${d.type} jusqu'au ${d.au}`,
-            feu: "rouge" as const,
-            chemin: "/gouvernance/disponibilites",
-          }),
-        ),
+        ...DISPONIBILITES_DEMO.filter(
+          (d) => d.enCours && d.interimaire === null && d.structure === sigle,
+        ).map((d) => ({
+          libelle: `${d.responsable} absent sans intérimaire`,
+          precision: `${d.type} jusqu'au ${d.au}`,
+          feu: "rouge" as const,
+          chemin: "/gouvernance/disponibilites",
+        })),
       ],
     });
   }
 
   if (route === "/pilotage/analyses") {
     const lignes = classement().map((l) => {
-      const note = (code: string) => l.criteres.find((c) => c.code === code)?.note ?? 0;
+      const note = (code: string) =>
+        l.criteres.find((c) => c.code === code)?.note ?? 0;
       const activites = note("ACT");
       const courrier = note("COU");
       const dossiers = note("DOS");
@@ -3689,13 +5507,17 @@ export function repondreEnDemo(
     });
 
     const moyenne = (cle: "activites" | "courrier" | "dossiers" | "delais") =>
-      Math.round(lignes.reduce((somme, l) => somme + l[cle], 0) / lignes.length);
+      Math.round(
+        lignes.reduce((somme, l) => somme + l[cle], 0) / lignes.length,
+      );
 
     // Structures dont l'ecart entre la meilleure et la pire mesure depasse
     // 20 points : elles reussissent quelque part et echouent ailleurs, ce qui
     // n'est pas la meme chose qu'une structure uniformement en difficulte.
     const dispersees = lignes.filter((l) => l.dispersion > 20);
-    const doubleRetard = lignes.filter((l) => l.activites < 60 && l.courrier < 60);
+    const doubleRetard = lignes.filter(
+      (l) => l.activites < 60 && l.courrier < 60,
+    );
 
     return attendre({
       periode: "juillet 2026",
@@ -3723,7 +5545,9 @@ export function repondreEnDemo(
         },
         {
           texte: `L'exécution des activités (${moyenne("activites")}) est ${
-            moyenne("activites") >= moyenne("courrier") ? "supérieure" : "inférieure"
+            moyenne("activites") >= moyenne("courrier")
+              ? "supérieure"
+              : "inférieure"
           } au traitement du courrier (${moyenne("courrier")}) en moyenne institutionnelle.`,
           feu: "inconnu",
         },
@@ -3742,26 +5566,130 @@ export function repondreEnDemo(
      * zero aurait fait croire a un echec ; `null` dit qu'on ne sait pas.
      */
     const indicateurs = [
-      { code: "DEL-MOY", libelle: "Délai moyen de traitement d'un dossier", modeCalcul: "Jours entre l'enregistrement et la clôture", source: "BI", unite: "jours", valeurN: 6.4, valeurN1: 9.1, cible: 6.4, cibleMaximum: true, echeance: "12 mois" },
-      { code: "SLA", libelle: "Taux de respect des SLA", modeCalcul: "% de tâches traitées dans le délai contractuel", source: "BI", unite: "%", valeurN: 78, valeurN1: 74, cible: 90, cibleMaximum: false, echeance: "cible permanente" },
-      { code: "DEMAT", libelle: "Taux de dématérialisation du courrier", modeCalcul: "% de courriers traités sans support papier", source: "BI", unite: "%", valeurN: 41, valeurN1: 22, cible: 50, cibleMaximum: false, echeance: "18 mois" },
-      { code: "DISPO", libelle: "Taux de disponibilité de la plateforme", modeCalcul: "% mesuré sur les heures ouvrées", source: "Supervision technique", unite: "%", valeurN: 99.2, valeurN1: 98.4, cible: 95, cibleMaximum: false, echeance: "cible permanente" },
-      { code: "IA", libelle: "Taux d'automatisation IA exploité sans reprise", modeCalcul: "% de classifications validées sans correction humaine", source: "BI / IA", unite: "%", valeurN: null, valeurN1: null, cible: 70, cibleMaximum: false, echeance: "18 mois après mise en service" },
-      { code: "ARCH", libelle: "Taux de conformité archivistique", modeCalcul: "% de dossiers clos avec sort final correctement appliqué", source: "Audit / Archives", unite: "%", valeurN: 60, valeurN1: 48, cible: 100, cibleMaximum: false, echeance: "cible permanente" },
-      { code: "SAT", libelle: "Taux de satisfaction usager", modeCalcul: "Score de satisfaction sur le suivi de dossier", source: "Enquête usagers", unite: "/5", valeurN: null, valeurN1: null, cible: 4, cibleMaximum: false, echeance: "enquête non conduite" },
-      { code: "SEC", libelle: "Incidents de sécurité avérés", modeCalcul: "Nombre d'incidents majeurs constatés", source: "Sécurité", unite: "incidents", valeurN: 0, valeurN1: 1, cible: 0, cibleMaximum: true, echeance: "cible permanente" },
-      { code: "ADOPT", libelle: "Taux d'adoption par les agents", modeCalcul: "% d'agents actifs au quotidien", source: "RH / Conduite du changement", unite: "%", valeurN: null, valeurN1: null, cible: 95, cibleMaximum: false, echeance: "6 mois post-déploiement" },
+      {
+        code: "DEL-MOY",
+        libelle: "Délai moyen de traitement d'un dossier",
+        modeCalcul: "Jours entre l'enregistrement et la clôture",
+        source: "BI",
+        unite: "jours",
+        valeurN: 6.4,
+        valeurN1: 9.1,
+        cible: 6.4,
+        cibleMaximum: true,
+        echeance: "12 mois",
+      },
+      {
+        code: "SLA",
+        libelle: "Taux de respect des SLA",
+        modeCalcul: "% de tâches traitées dans le délai contractuel",
+        source: "BI",
+        unite: "%",
+        valeurN: 78,
+        valeurN1: 74,
+        cible: 90,
+        cibleMaximum: false,
+        echeance: "cible permanente",
+      },
+      {
+        code: "DEMAT",
+        libelle: "Taux de dématérialisation du courrier",
+        modeCalcul: "% de courriers traités sans support papier",
+        source: "BI",
+        unite: "%",
+        valeurN: 41,
+        valeurN1: 22,
+        cible: 50,
+        cibleMaximum: false,
+        echeance: "18 mois",
+      },
+      {
+        code: "DISPO",
+        libelle: "Taux de disponibilité de la plateforme",
+        modeCalcul: "% mesuré sur les heures ouvrées",
+        source: "Supervision technique",
+        unite: "%",
+        valeurN: 99.2,
+        valeurN1: 98.4,
+        cible: 95,
+        cibleMaximum: false,
+        echeance: "cible permanente",
+      },
+      {
+        code: "IA",
+        libelle: "Taux d'automatisation IA exploité sans reprise",
+        modeCalcul: "% de classifications validées sans correction humaine",
+        source: "BI / IA",
+        unite: "%",
+        valeurN: null,
+        valeurN1: null,
+        cible: 70,
+        cibleMaximum: false,
+        echeance: "18 mois après mise en service",
+      },
+      {
+        code: "ARCH",
+        libelle: "Taux de conformité archivistique",
+        modeCalcul: "% de dossiers clos avec sort final correctement appliqué",
+        source: "Audit / Archives",
+        unite: "%",
+        valeurN: 60,
+        valeurN1: 48,
+        cible: 100,
+        cibleMaximum: false,
+        echeance: "cible permanente",
+      },
+      {
+        code: "SAT",
+        libelle: "Taux de satisfaction usager",
+        modeCalcul: "Score de satisfaction sur le suivi de dossier",
+        source: "Enquête usagers",
+        unite: "/5",
+        valeurN: null,
+        valeurN1: null,
+        cible: 4,
+        cibleMaximum: false,
+        echeance: "enquête non conduite",
+      },
+      {
+        code: "SEC",
+        libelle: "Incidents de sécurité avérés",
+        modeCalcul: "Nombre d'incidents majeurs constatés",
+        source: "Sécurité",
+        unite: "incidents",
+        valeurN: 0,
+        valeurN1: 1,
+        cible: 0,
+        cibleMaximum: true,
+        echeance: "cible permanente",
+      },
+      {
+        code: "ADOPT",
+        libelle: "Taux d'adoption par les agents",
+        modeCalcul: "% d'agents actifs au quotidien",
+        source: "RH / Conduite du changement",
+        unite: "%",
+        valeurN: null,
+        valeurN1: null,
+        cible: 95,
+        cibleMaximum: false,
+        echeance: "6 mois post-déploiement",
+      },
     ];
 
     const avecFeu = indicateurs.map((i) => {
       if (i.valeurN === null) return { ...i, feu: "inconnu" as const };
-      const atteinte = i.cibleMaximum ? i.valeurN <= i.cible : i.valeurN >= i.cible;
+      const atteinte = i.cibleMaximum
+        ? i.valeurN <= i.cible
+        : i.valeurN >= i.cible;
       if (atteinte) return { ...i, feu: "vert" as const };
       // A moins de 15 % de la cible, on considere qu'elle reste atteignable.
       const ecart = i.cibleMaximum
         ? (i.valeurN - i.cible) / Math.max(1, i.cible)
         : (i.cible - i.valeurN) / Math.max(1, i.cible);
-      return { ...i, feu: ecart <= 0.15 ? ("orange" as const) : ("rouge" as const) };
+      return {
+        ...i,
+        feu: ecart <= 0.15 ? ("orange" as const) : ("rouge" as const),
+      };
     });
 
     const mesures = avecFeu.filter((i) => i.valeurN !== null);
@@ -3771,12 +5699,22 @@ export function repondreEnDemo(
       annee,
       indicateurs: avecFeu,
       compteurs: [
-        { libelle: "Indicateurs du programme", valeur: avecFeu.length, note: "au référentiel du BRD", feu: "inconnu" },
+        {
+          libelle: "Indicateurs du programme",
+          valeur: avecFeu.length,
+          note: "au référentiel du BRD",
+          feu: "inconnu",
+        },
         {
           libelle: "Cibles atteintes",
           valeur: atteints,
           note: `sur ${mesures.length} mesurés`,
-          feu: atteints >= mesures.length * 0.7 ? "vert" : atteints > 0 ? "orange" : "rouge",
+          feu:
+            atteints >= mesures.length * 0.7
+              ? "vert"
+              : atteints > 0
+                ? "orange"
+                : "rouge",
         },
         {
           libelle: "Non mesurés",
@@ -3803,9 +5741,13 @@ export function repondreEnDemo(
   if (route === "/pilotage/synthese") {
     const lignes = classement();
     const decisions = decisionsListe();
-    const echues = decisions.filter((d) => d.echeance !== null && d.etat !== "Suspendue");
+    const echues = decisions.filter(
+      (d) => d.echeance !== null && d.etat !== "Suspendue",
+    );
     const activites = activitesListe();
-    const suivies = activites.filter((a) => a.etat !== "Réalisée" && a.etat !== "Suspendue");
+    const suivies = activites.filter(
+      (a) => a.etat !== "Réalisée" && a.etat !== "Suspendue",
+    );
 
     return attendre({
       instance: "Comité de direction",
@@ -3822,7 +5764,10 @@ export function repondreEnDemo(
       executionActivites:
         suivies.length === 0
           ? 0
-          : Math.round(suivies.reduce((somme, a) => somme + a.avancement, 0) / suivies.length),
+          : Math.round(
+              suivies.reduce((somme, a) => somme + a.avancement, 0) /
+                suivies.length,
+            ),
       decisionsEchues: echues.length,
       decisionsExecutees: decisions.filter((d) => d.etat === "Exécutée").length,
       classement: lignes.map((l) => ({
@@ -3869,7 +5814,8 @@ export function repondreEnDemo(
 
     // Le classement ne vaut que sur un mois clos : au-dela, il est indicatif.
     const maintenant = new Date();
-    const provisoire = annee === maintenant.getFullYear() && mois >= maintenant.getMonth() + 1;
+    const provisoire =
+      annee === maintenant.getFullYear() && mois >= maintenant.getMonth() + 1;
 
     return attendre({
       periode: { granularite: "mois", annee, rang: mois },
@@ -3877,7 +5823,12 @@ export function repondreEnDemo(
       lignes,
       moyenneInstitution: moyenne,
       compteurs: [
-        { libelle: "Structures évaluées", valeur: lignes.length, note: "sur la période", feu: "inconnu" },
+        {
+          libelle: "Structures évaluées",
+          valeur: lignes.length,
+          note: "sur la période",
+          feu: "inconnu",
+        },
         {
           libelle: "En situation critique",
           valeur: critiques,
@@ -3900,7 +5851,9 @@ export function repondreEnDemo(
     });
   }
 
-  const structureDemandee = route.match(/^\/performance\/matrice\/([A-Za-z]+)$/);
+  const structureDemandee = route.match(
+    /^\/performance\/matrice\/([A-Za-z]+)$/,
+  );
   if (structureDemandee) {
     const sigle = structureDemandee[1].toUpperCase();
     if (!existeStructure(sigle)) return null;
@@ -3919,7 +5872,8 @@ export function repondreEnDemo(
       rangPrecedent: ligne.rangPrecedent,
       totalStructures: lignes.length,
       scoreGlobal: scoreGlobal(sigle),
-      scorePrecedent: courbe.length > 1 ? courbe[courbe.length - 2].score : null,
+      scorePrecedent:
+        courbe.length > 1 ? courbe[courbe.length - 2].score : null,
       feu: ligne.feu,
       moyenneInstitution: Math.round(
         lignes.reduce((somme, l) => somme + l.scoreGlobal, 0) / lignes.length,
@@ -3933,11 +5887,23 @@ export function repondreEnDemo(
   }
 
   if (route === "/performance/dictionnaire") {
-    return attendre({ indicateurs: INDICATEURS_DICTIONNAIRE, risques: GRILLE_RISQUES });
+    return attendre({
+      // Les criteres partent avec le dictionnaire, comme au serveur reel : le
+      // formulaire de creation doit proposer les axes existants.
+      criteres: CRITERES.map(({ code, libelle, poids }) => ({
+        code,
+        libelle,
+        poids,
+      })),
+      indicateurs: INDICATEURS_DICTIONNAIRE,
+      risques: GRILLE_RISQUES,
+    });
   }
 
   if (route === "/performance/calendrier") {
-    const enDefaut = CALENDRIER_DEMO.filter((l) => l.recus < l.structuresAttendues).length;
+    const enDefaut = CALENDRIER_DEMO.filter(
+      (l) => l.recus < l.structuresAttendues,
+    ).length;
     const manquants = CALENDRIER_DEMO.reduce(
       (somme, l) => somme + (l.structuresAttendues - l.recus),
       0,
@@ -3946,7 +5912,12 @@ export function repondreEnDemo(
     return attendre({
       lignes: CALENDRIER_DEMO,
       compteurs: [
-        { libelle: "Productions suivies", valeur: CALENDRIER_DEMO.length, note: "au calendrier", feu: "inconnu" },
+        {
+          libelle: "Productions suivies",
+          valeur: CALENDRIER_DEMO.length,
+          note: "au calendrier",
+          feu: "inconnu",
+        },
         {
           libelle: "Incomplètes",
           valeur: enDefaut,
@@ -3982,22 +5953,33 @@ export function repondreEnDemo(
 
     const toutes = activitesListe();
     let lignes = toutes;
-    if (structure !== "Toutes") lignes = lignes.filter((a) => a.structureSigle === structure);
+    if (structure !== "Toutes")
+      lignes = lignes.filter((a) => a.structureSigle === structure);
     if (etat !== "Tous") lignes = lignes.filter((a) => a.etat === etat);
 
     const enRetard = toutes.filter((a) => a.etat === "En retard").length;
-    const suivies = toutes.filter((a) => a.etat !== "Réalisée" && a.etat !== "Suspendue");
+    const suivies = toutes.filter(
+      (a) => a.etat !== "Réalisée" && a.etat !== "Suspendue",
+    );
     const moyenne =
       suivies.length === 0
         ? 0
-        : Math.round(suivies.reduce((somme, a) => somme + a.avancement, 0) / suivies.length);
+        : Math.round(
+            suivies.reduce((somme, a) => somme + a.avancement, 0) /
+              suivies.length,
+          );
 
     return attendre({
       activites: lignes,
       total: toutes.length,
       structures: [...new Set(toutes.map((a) => a.structureSigle))].sort(),
       compteurs: [
-        { libelle: "Activités suivies", valeur: suivies.length, note: "en cours ou programmées", feu: "inconnu" },
+        {
+          libelle: "Activités suivies",
+          valeur: suivies.length,
+          note: "en cours ou programmées",
+          feu: "inconnu",
+        },
         {
           libelle: "En retard",
           valeur: enRetard,
@@ -4033,20 +6015,30 @@ export function repondreEnDemo(
     const demandee = parametres.get("structure") ?? "";
     const sigle = accessibles.some((s) => s.sigle === demandee)
       ? demandee
-      : (accessibles.find((s) => s.sigle === structureDeLaSession()) ?? accessibles[0]).sigle;
+      : (
+          accessibles.find((s) => s.sigle === structureDeLaSession()) ??
+          accessibles[0]
+        ).sigle;
 
     const plan = PLANS_DEMO.find((p) => p.structureSigle === sigle);
-    const activites = activitesListe().filter((a) => a.structureSigle === sigle);
+    const activites = activitesListe().filter(
+      (a) => a.structureSigle === sigle,
+    );
     const avancement =
       activites.length === 0
         ? 0
-        : Math.round(activites.reduce((somme, a) => somme + a.avancement, 0) / activites.length);
+        : Math.round(
+            activites.reduce((somme, a) => somme + a.avancement, 0) /
+              activites.length,
+          );
 
     return attendre({
       annee,
       structureSigle: sigle,
       structureLibelle:
-        plan?.structureLibelle ?? accessibles.find((s) => s.sigle === sigle)?.libelle ?? sigle,
+        plan?.structureLibelle ??
+        accessibles.find((s) => s.sigle === sigle)?.libelle ??
+        sigle,
       etat: plan?.etat ?? "Brouillon",
       soumisLe: plan?.soumisLe ?? null,
       valideLe: plan?.valideLe ?? null,
@@ -4054,10 +6046,9 @@ export function repondreEnDemo(
       motifRetour: plan?.motifRetour ?? null,
       activites,
       avancementGlobal: avancement,
-      budgetTotal: ACTIVITES_DEMO.filter((a) => a.structureSigle === sigle).reduce(
-        (somme, a) => somme + (a.budgetValide ?? 0),
-        0,
-      ),
+      budgetTotal: ACTIVITES_DEMO.filter(
+        (a) => a.structureSigle === sigle,
+      ).reduce((somme, a) => somme + (a.budgetValide ?? 0), 0),
       structuresAccessibles: accessibles,
     });
   }
@@ -4073,8 +6064,13 @@ export function repondreEnDemo(
     const annee = Number(parametres.get("annee") ?? 2026);
 
     const plans = PLANS_DEMO.map((plan) => {
-      const activites = ACTIVITES_DEMO.filter((a) => a.structureSigle === plan.structureSigle);
-      const budget = activites.reduce((somme, a) => somme + (a.budgetValide ?? 0), 0);
+      const activites = ACTIVITES_DEMO.filter(
+        (a) => a.structureSigle === plan.structureSigle,
+      );
+      const budget = activites.reduce(
+        (somme, a) => somme + (a.budgetValide ?? 0),
+        0,
+      );
 
       return {
         structureSigle: plan.structureSigle,
@@ -4085,16 +6081,22 @@ export function repondreEnDemo(
         avancementGlobal:
           activites.length === 0
             ? 0
-            : Math.round(activites.reduce((somme, a) => somme + a.avancement, 0) / activites.length),
+            : Math.round(
+                activites.reduce((somme, a) => somme + a.avancement, 0) /
+                  activites.length,
+              ),
         budgetTotal: budget === 0 ? null : budget,
         soumisLe: plan.soumisLe,
       };
     });
 
-    const attente = plans.filter((p) => p.etat === "Soumis au contrôle de gestion").length;
+    const attente = plans.filter(
+      (p) => p.etat === "Soumis au contrôle de gestion",
+    ).length;
     const retournes = plans.filter((p) => p.etat === "Retourné").length;
     const valides = plans.filter((p) => p.etat === "Validé").length;
-    const couverture = plans.length === 0 ? 0 : Math.round((valides / plans.length) * 100);
+    const couverture =
+      plans.length === 0 ? 0 : Math.round((valides / plans.length) * 100);
 
     return attendre({
       plans,
@@ -4108,15 +6110,24 @@ export function repondreEnDemo(
         {
           libelle: "Retournés",
           valeur: retournes,
-          note: retournes > 0 ? "à corriger par la structure" : "aucun retour en cours",
+          note:
+            retournes > 0
+              ? "à corriger par la structure"
+              : "aucun retour en cours",
           feu: retournes > 0 ? "rouge" : "vert",
         },
-        { libelle: "Validés", valeur: valides, note: `sur ${plans.length} structures`, feu: "vert" },
+        {
+          libelle: "Validés",
+          valeur: valides,
+          note: `sur ${plans.length} structures`,
+          feu: "vert",
+        },
         {
           libelle: "Couverture",
           valeur: couverture,
           note: "des structures engagées par un plan validé",
-          feu: couverture >= 85 ? "vert" : couverture >= 60 ? "orange" : "rouge",
+          feu:
+            couverture >= 85 ? "vert" : couverture >= 60 ? "orange" : "rouge",
         },
       ],
     });
@@ -4126,14 +6137,19 @@ export function repondreEnDemo(
     const filtre = parametres.get("filtre") ?? "Toutes";
     let lignes = OBLIGATIONS_DEMO;
     if (filtre === "À déposer") lignes = lignes.filter((o) => !o.depose);
-    else if (filtre === "En retard") lignes = lignes.filter((o) => o.retardJours !== null);
-    else if (filtre !== "Toutes") lignes = lignes.filter((o) => o.nature === filtre);
+    else if (filtre === "En retard")
+      lignes = lignes.filter((o) => o.retardJours !== null);
+    else if (filtre !== "Toutes")
+      lignes = lignes.filter((o) => o.nature === filtre);
 
     const aDeposer = OBLIGATIONS_DEMO.filter((o) => !o.depose).length;
-    const horsDelai = OBLIGATIONS_DEMO.filter((o) => o.retardJours !== null).length;
+    const horsDelai = OBLIGATIONS_DEMO.filter(
+      (o) => o.retardJours !== null,
+    ).length;
     const deposes = OBLIGATIONS_DEMO.filter((o) => o.depose);
     const aLheure = deposes.filter((o) => o.retardJours === null).length;
-    const ponctualite = deposes.length === 0 ? 0 : Math.round((aLheure / deposes.length) * 100);
+    const ponctualite =
+      deposes.length === 0 ? 0 : Math.round((aLheure / deposes.length) * 100);
 
     return attendre({
       obligations: lignes,
@@ -4148,23 +6164,32 @@ export function repondreEnDemo(
         {
           libelle: "Hors délai",
           valeur: horsDelai,
-          note: horsDelai > 0 ? "déposés en retard ou attendus" : "aucun retard",
+          note:
+            horsDelai > 0 ? "déposés en retard ou attendus" : "aucun retard",
           feu: horsDelai > 0 ? "rouge" : "vert",
         },
         {
           libelle: "Ponctualité",
           valeur: ponctualite,
           note: "des dépôts dans les délais",
-          feu: ponctualite >= 85 ? "vert" : ponctualite >= 60 ? "orange" : "rouge",
+          feu:
+            ponctualite >= 85 ? "vert" : ponctualite >= 60 ? "orange" : "rouge",
         },
-        { libelle: "Déposés", valeur: deposes.length, note: "sur la période", feu: "vert" },
+        {
+          libelle: "Déposés",
+          valeur: deposes.length,
+          note: "sur la période",
+          feu: "vert",
+        },
       ],
     });
   }
 
   const activiteDemandee = route.match(/^\/activites\/(\d+)$/);
   if (activiteDemandee) {
-    const trouvee = ACTIVITES_DEMO.find((a) => a.id === Number(activiteDemandee[1]));
+    const trouvee = ACTIVITES_DEMO.find(
+      (a) => a.id === Number(activiteDemandee[1]),
+    );
     return trouvee ? attendre(trouvee) : null;
   }
 
