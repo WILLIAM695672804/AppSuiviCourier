@@ -1,30 +1,40 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
+  Controller,
+  useFieldArray,
   useForm,
   useWatch,
   type Control,
   type FieldErrors,
   type UseFormRegister,
 } from "react-hook-form";
+import { Bouton } from "@/components/ui/Bouton";
 import { Champ, Liste } from "@/components/ui/Champ";
 import { ChampDate } from "@/components/ui/ChampDate";
+import { ChampMois } from "@/components/ui/ChampMois";
 import { ChampTexteLong } from "@/components/ui/ChampTexteLong";
 import { Encart } from "@/components/ui/Encart";
 import { ModaleFormulaire } from "@/components/ui/ModaleFormulaire";
 import { SelecteurAgent } from "@/components/ui/SelecteurAgent";
+import { SelecteurStructure } from "@/components/ui/SelecteurStructure";
 import { ZoneDepot, type FichierDepose } from "@/components/ui/ZoneDepot";
 import { OPTIONS_AXES, type LibelleAxe } from "@/lib/axesStrategiques";
-import { formaterDate } from "@/lib/format";
+import { messageDErreur } from "@/lib/erreurApi";
+import { formaterDate, formaterMois, moisDeLaDate } from "@/lib/format";
+import { useSession } from "@/lib/contexteSession";
+import { structuresQuery } from "@/lib/referentiel";
 import {
   useAjouterIndicateur,
-  useAjouterTache,
   useChangerEtatPlan,
   useCreerActivite,
   useDeclarerAvancement,
   useDeposerObligation,
   useLeverInstruction,
   useModifierActivite,
+  useModifierTaches,
   useRattacherInstruction,
+  useRecalibrerAvancement,
   useRelancerActivite,
   useReleverIndicateur,
   useSuspendreActivite,
@@ -32,6 +42,8 @@ import {
   type IndicateurActivite,
   type InstructionActivite,
   type Obligation,
+  type SaisieTacheLigne,
+  type TacheActivite,
 } from "@/features/activite/api";
 import { useDeposerPiece } from "@/features/pieces/api";
 
@@ -42,8 +54,8 @@ import { useDeposerPiece } from "@/features/pieces/api";
  * permissions et ne racontent pas la même chose :
  *
  *  — ce que la structure déclare de son propre travail (`ACT_SAI`) : créer et
- *    modifier une activité, poser ses indicateurs et ses tâches, déclarer un
- *    avancement, verser une pièce ;
+ *    modifier une activité, poser ses indicateurs et ses tâches, déclarer
+ *    l'avancement d'une tâche, verser une pièce ;
  *  — ce que l'autorité impose (`DEC`) : rattacher une instruction verbale ou
  *    une décision du DG, suspendre ou reprendre l'exécution ;
  *  — ce que la DSR fait quand rien ne bouge (`REL`) : relancer.
@@ -61,6 +73,9 @@ interface ChampsActivite {
   resultatsAttendus: string;
   /** L'identifiant de l'agent. `<select>` rend une chaîne ; le service la convertit. */
   responsableId: string;
+  /** Les sigles des structures co-responsables, hors porteuse — ADR 047. */
+  structuresAssociees: string[];
+  /** Le mois, `AAAA-MM` : la période d'une activité ne se saisit pas au jour. */
   debut: string;
   fin: string;
   budgetValide: string;
@@ -77,10 +92,13 @@ function ChampsCommunsActivite({
   register,
   errors,
   control,
+  porteuse,
 }: {
   register: UseFormRegister<ChampsActivite>;
   errors: FieldErrors<ChampsActivite>;
   control: Control<ChampsActivite>;
+  /** La structure qui porte l'activité à son plan. Affichée, jamais choisie. */
+  porteuse: { sigle: string; libelle: string };
 }) {
   const debut = useWatch({ control, name: "debut" });
 
@@ -138,28 +156,42 @@ function ChampsCommunsActivite({
       />
 
       {/*
-        Le responsable se choisit et ne se déduit pas du compte connecté : un
-        point focal inscrit les activités de toute sa direction sans en porter
-        aucune. L'annuaire n'est donc pas borné à sa structure — ADR 020.
+        Ce qui répond d'une activité, c'est une **structure** — ADR 047. La
+        porteuse vient du plan et ne se choisit pas ; les autres s'ajoutent, et
+        chacune voit l'activité et la déclare.
+      */}
+      <ChampStructuresResponsables control={control} porteuse={porteuse} />
+
+      {/*
+        Le point focal ne se déduit pas du compte connecté : un point focal
+        inscrit les activités de toute sa direction sans en porter aucune.
+        L'annuaire n'est donc pas borné à sa structure — ADR 020. Et il est
+        **facultatif** : la responsabilité tient aux structures.
       */}
       <SelecteurAgent
-        libelle="Responsable de l'activité"
-        aide="La personne qui répond de l'exécution, pas celle qui saisit."
+        libelle="Point focal (facultatif)"
+        invite="Aucun point focal"
+        aide="La personne qu'on appelle. Ce sont les structures ci-dessus qui répondent de l'exécution."
         erreur={errors.responsableId?.message}
-        {...register("responsableId", { required: "Désignez un responsable." })}
+        {...register("responsableId")}
       />
 
+      {/*
+        Au mois, et non au jour : un plan annuel s'écrit « de mars à décembre »,
+        et le quantième était inventé à chaque saisie. Le serveur pose la borne
+        — premier jour du mois au début, dernier à la fin (ADR 047).
+      */}
       <div className="grid gap-4 md:grid-cols-2">
-        <ChampDate
+        <ChampMois
           libelle="Début d'exécution"
           erreur={errors.debut?.message}
-          {...register("debut", { required: "Indiquez le début." })}
+          {...register("debut", { required: "Indiquez le mois de début." })}
         />
-        <ChampDate
+        <ChampMois
           libelle="Fin d'exécution"
           erreur={errors.fin?.message}
           {...register("fin", {
-            required: "Indiquez la fin.",
+            required: "Indiquez le mois de fin.",
             validate: (valeur) =>
               !debut || valeur >= debut || "La fin ne peut pas précéder le début.",
           })}
@@ -178,6 +210,327 @@ function ChampsCommunsActivite({
   );
 }
 
+/**
+ * Les structures qui répondent de l'activité — ADR 047.
+ *
+ * La **porteuse** s'affiche et ne se choisit pas : elle vient du plan d'actions
+ * de l'agent qui enregistre, et c'est ce plan qui compte l'activité. La
+ * proposer au choix laisserait croire qu'on peut inscrire une activité au plan
+ * d'une autre direction, ce que le serveur refuse.
+ *
+ * Les autres s'ajoutent librement, **sans borne de périmètre** : une activité
+ * transverse associe précisément une direction que le point focal ne lit pas.
+ * Les associer lui ouvre la visibilité — c'est le geste, pas un effet de bord.
+ *
+ * `SelecteurStructure` travaille par identifiants, l'API par sigles : la
+ * conversion se fait ici, contre le référentiel de l'organigramme. Tant qu'il
+ * n'est pas arrivé, la liste est vide et rien n'est cliquable ; l'aide le dit
+ * plutôt que de laisser croire que l'organigramme ne contient rien.
+ */
+function ChampStructuresResponsables({
+  control,
+  porteuse,
+}: {
+  control: Control<ChampsActivite>;
+  porteuse: { sigle: string; libelle: string };
+}) {
+  const { data: referentiel } = useQuery(structuresQuery());
+  const structures = referentiel ?? [];
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-1 border border-bordure-forte bg-surface-douce px-3 py-2.5">
+        <span className="text-[11px] leading-none font-semibold text-encre-faible">
+          Structure porteuse
+        </span>
+        <span className="text-[12.5px] leading-none font-bold text-encre">
+          {porteuse.sigle || "—"}
+          {porteuse.libelle && (
+            <span className="ml-2 font-medium text-encre-moyenne">{porteuse.libelle}</span>
+          )}
+        </span>
+        <span className="text-[10.5px] leading-[1.4] font-medium text-encre-tenue">
+          Elle inscrit l'activité à son plan d'actions annuel. Elle ne se choisit pas.
+        </span>
+      </div>
+
+      <Controller
+        control={control}
+        name="structuresAssociees"
+        render={({ field }) => (
+          <SelecteurStructure
+            libelle="Autres structures responsables"
+            avecPilote={false}
+            aide={
+              referentiel
+                ? "Elles voient l'activité et la déclarent, sans l'inscrire à leur propre plan."
+                : "Chargement de l'organigramme…"
+            }
+            choisies={structures
+              .filter((s) => (field.value ?? []).includes(s.sigle))
+              .map((s) => s.id)}
+            onChange={(ids) =>
+              field.onChange(
+                ids
+                  .map((id) => structures.find((s) => s.id === id)?.sigle)
+                  .filter((sigle): sigle is string => Boolean(sigle) && sigle !== porteuse.sigle),
+              )
+            }
+          />
+        )}
+      />
+    </div>
+  );
+}
+
+/**
+ * Une ligne de l'éditeur de tâches.
+ *
+ * `tacheId` et non `id` : `useFieldArray` réserve `id` à sa propre clef de
+ * rendu, et l'écraserait. La part reste une chaîne, ce que rend un `<input>` ;
+ * elle n'est convertie qu'à l'envoi.
+ */
+interface LigneTache {
+  /** Absent : la tâche est à créer. Présent : la tâche existante est mise à jour. */
+  tacheId?: number;
+  libelle: string;
+  valeurPrevue: string;
+  /** `AAAA-MM`. Vide : le mois de l'activité. */
+  moisDebut: string;
+  moisFin: string;
+}
+
+interface ChampsTaches {
+  taches: LigneTache[];
+}
+
+const LIGNE_UNIQUE: LigneTache = {
+  libelle: "",
+  valeurPrevue: "100",
+  moisDebut: "",
+  moisFin: "",
+};
+
+/**
+ * Une valeur en centièmes entiers.
+ *
+ * La somme à 100 (RG-3) se compare en entiers : en virgule flottante,
+ * 33,33 + 33,33 + 33,34 ne tombe pas sur 100, et le formulaire refuserait un
+ * découpage que le serveur, qui compte en décimal, accepte.
+ */
+function enCentiemes(valeur: string | number): number {
+  const nombre = Number(String(valeur).replace(",", "."));
+  return Number.isFinite(nombre) ? Math.round(nombre * 100) : 0;
+}
+
+/** « 33,33 », « 100 » — des points de l'activité (RG-5). */
+function formaterPoints(valeur: number): string {
+  return valeur.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+}
+
+/** Les lignes telles que l'API les attend. Un mois laissé vide reprend celui de l'activité. */
+function lignesAEnvoyer(lignes: LigneTache[], debut: string, fin: string): SaisieTacheLigne[] {
+  return lignes.map((ligne) => ({
+    ...(ligne.tacheId === undefined ? {} : { id: ligne.tacheId }),
+    libelle: ligne.libelle.trim(),
+    valeurPrevue: enCentiemes(ligne.valeurPrevue) / 100,
+    moisDebut: ligne.moisDebut || debut,
+    moisFin: ligne.moisFin || fin,
+  }));
+}
+
+/**
+ * La liste des tâches d'une activité et leurs parts — ADR 049.
+ *
+ * L'avancement de l'activité n'est plus saisi : il est la somme des valeurs
+ * obtenues sur ses tâches (RG-7). Le découpage se pose donc **avec**
+ * l'activité (RG-1), et chaque tâche reçoit une part de 0 à 100 (RG-2) dont le
+ * total vaut exactement 100 (RG-3). Le total courant s'affiche pendant la
+ * saisie : un refus découvert à l'envoi obligerait à refaire le calcul de tête.
+ *
+ * Les mois sont bornés par la période de l'activité (RG-8, RG-9) : le sélecteur
+ * ne propose que ceux-là, et c'est lui qui porte l'année — elle ne se saisit
+ * pas. Le serveur refuse de toute façon une tâche qui en sortirait.
+ *
+ * Partagé entre la création et la modification de la liste, pour que les deux
+ * appliquent les mêmes règles. En modification, `existantes` dit ce qui a déjà
+ * avancé : une telle tâche ne se retire pas, et sa part ne descend pas sous ce
+ * qu'elle a obtenu — le serveur le refuserait, autant ne pas le proposer.
+ */
+function EditeurTaches({
+  control,
+  register,
+  errors,
+  debut,
+  fin,
+  existantes = [],
+}: {
+  control: Control<ChampsTaches>;
+  register: UseFormRegister<ChampsTaches>;
+  errors: FieldErrors<ChampsTaches>;
+  /** Période de l'activité, `AAAA-MM`. Vide tant qu'elle n'est pas saisie. */
+  debut: string;
+  fin: string;
+  existantes?: TacheActivite[];
+}) {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "taches",
+    rules: {
+      validate: (lignes) => {
+        if (lignes.length === 0) return "Une activité compte au moins une tâche.";
+        const total = lignes.reduce((somme, ligne) => somme + enCentiemes(ligne.valeurPrevue), 0);
+        return (
+          total === 10000 ||
+          `Les parts totalisent ${formaterPoints(total / 100)} : elles doivent faire exactement 100.`
+        );
+      },
+    },
+  });
+  const lignes = useWatch({ control, name: "taches" }) ?? [];
+  const total = lignes.reduce((somme, ligne) => somme + enCentiemes(ligne?.valeurPrevue ?? ""), 0);
+  const reliquat = 10000 - total;
+  const periodeConnue = Boolean(debut && fin);
+
+  const dansLaPeriode = (mois: string) =>
+    !periodeConnue ||
+    !mois ||
+    (mois >= debut && mois <= fin) ||
+    `Hors de la période de l'activité (${formaterMois(debut)} – ${formaterMois(fin)}).`;
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="text-[11px] leading-none font-semibold text-encre-faible">
+          Tâches à réaliser
+        </span>
+        <span
+          className={`text-[11px] leading-none font-bold tabular-nums ${
+            total === 10000 ? "text-succes" : "text-danger"
+          }`}
+        >
+          Total {formaterPoints(total / 100)} / 100
+        </span>
+      </div>
+      <span className="text-[10.5px] leading-[1.4] font-medium text-encre-tenue">
+        Chaque tâche reçoit une part de l'activité ; les parts totalisent 100, et l'activité avance
+        de ce que ses tâches obtiennent. Un mois laissé vide reprend celui de l'activité.
+      </span>
+
+      {fields.map((field, index) => {
+        const existante = existantes.find((t) => t.id === field.tacheId);
+        const plancher = existante ? Math.max(existante.valeurObtenue, existante.valeurRetenue) : 0;
+        const avancee = plancher > 0;
+
+        return (
+          <div
+            key={field.id}
+            className="flex flex-col gap-3 border border-bordure-forte bg-surface px-3 py-3"
+          >
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px]">
+              <Champ
+                libelle={`Tâche ${index + 1}`}
+                placeholder="Rédaction du cahier des charges"
+                erreur={errors.taches?.[index]?.libelle?.message}
+                {...register(`taches.${index}.libelle`, {
+                  validate: (valeur) => valeur.trim() !== "" || "Le libellé est obligatoire.",
+                })}
+              />
+              <Champ
+                libelle="Part (points)"
+                type="number"
+                min={0.01}
+                max={100}
+                step={0.01}
+                aide={avancee ? `Obtenu : ${formaterPoints(plancher)}` : undefined}
+                erreur={errors.taches?.[index]?.valeurPrevue?.message}
+                {...register(`taches.${index}.valeurPrevue`, {
+                  validate: (valeur) => {
+                    const refus = refusDeValeur(valeur);
+                    if (refus) return refus;
+                    const centiemes = enCentiemes(valeur);
+                    if (centiemes <= 0 || centiemes > 10000) return "Entre 0,01 et 100.";
+                    return (
+                      centiemes >= Math.round(plancher * 100) ||
+                      `La tâche a déjà obtenu ${formaterPoints(plancher)} points.`
+                    );
+                  },
+                })}
+              />
+            </div>
+
+            <div className="grid items-end gap-3 md:grid-cols-[1fr_1fr_auto]">
+              <ChampMois
+                libelle="Mois de début"
+                min={debut || undefined}
+                max={fin || undefined}
+                erreur={errors.taches?.[index]?.moisDebut?.message}
+                {...register(`taches.${index}.moisDebut`, {
+                  validate: dansLaPeriode,
+                })}
+              />
+              <ChampMois
+                libelle="Mois de fin"
+                min={debut || undefined}
+                max={fin || undefined}
+                erreur={errors.taches?.[index]?.moisFin?.message}
+                {...register(`taches.${index}.moisFin`, {
+                  validate: (valeur, valeurs) => {
+                    const hors = dansLaPeriode(valeur);
+                    if (hors !== true) return hors;
+                    const premier = valeurs.taches[index]?.moisDebut || debut;
+                    const dernier = valeur || fin;
+                    return (
+                      !premier ||
+                      !dernier ||
+                      dernier >= premier ||
+                      "La fin ne peut pas précéder le début."
+                    );
+                  },
+                })}
+              />
+              <Bouton
+                type="button"
+                icone="croix"
+                onClick={() => remove(index)}
+                disabled={fields.length === 1 || avancee}
+                title={avancee ? "Une tâche qui a déjà avancé ne se retire pas." : undefined}
+              >
+                Retirer
+              </Bouton>
+            </div>
+          </div>
+        );
+      })}
+
+      {errors.taches?.root?.message && (
+        <Encart ton="danger" icone="horloge">
+          {errors.taches.root.message}
+        </Encart>
+      )}
+
+      <div>
+        <Bouton
+          type="button"
+          icone="plus"
+          onClick={() =>
+            append({
+              libelle: "",
+              // Le reliquat plutôt que zéro : c'est presque toujours ce que la
+              // dernière tâche doit recevoir, et le total tombe juste d'emblée.
+              valeurPrevue: reliquat > 0 ? String(reliquat / 100) : "",
+              moisDebut: "",
+              moisFin: "",
+            })
+          }
+        >
+          Ajouter une tâche
+        </Bouton>
+      </div>
+    </div>
+  );
+}
+
 export function ModaleNouvelleActivite({
   ouverte,
   onFermer,
@@ -186,13 +539,21 @@ export function ModaleNouvelleActivite({
   onFermer: () => void;
 }) {
   const creer = useCreerActivite();
+  // La porteuse est la structure de l'agent : c'est son plan qui reçoit
+  // l'activité. Le serveur la déduit de la même façon — le front l'affiche
+  // pour que personne ne découvre après coup à quel plan il a écrit.
+  const session = useSession();
   const {
     register,
     control,
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<ChampsActivite>();
+  } = useForm<ChampsActivite & ChampsTaches>({
+    defaultValues: { structuresAssociees: [], taches: [LIGNE_UNIQUE] },
+  });
+  const debut = useWatch({ control, name: "debut" }) ?? "";
+  const fin = useWatch({ control, name: "fin" }) ?? "";
 
   function fermer() {
     reset();
@@ -208,10 +569,12 @@ export function ModaleNouvelleActivite({
         objectif: valeurs.objectif,
         etatReferenceGeneral: valeurs.etatReferenceGeneral,
         resultatsAttendus: valeurs.resultatsAttendus,
-        responsableId: Number(valeurs.responsableId),
+        responsableId: valeurs.responsableId ? Number(valeurs.responsableId) : null,
+        structuresAssociees: valeurs.structuresAssociees ?? [],
         debut: valeurs.debut,
         fin: valeurs.fin,
         budgetValide: valeurs.budgetValide ? Number(valeurs.budgetValide) : null,
+        taches: lignesAEnvoyer(valeurs.taches, valeurs.debut, valeurs.fin),
       },
       { onSuccess: fermer },
     );
@@ -226,11 +589,29 @@ export function ModaleNouvelleActivite({
       sousTitre="Elle rejoint le plan d'actions de votre structure pour l'exercice en cours."
       libelleEnvoi="Ajouter au plan"
       enCours={creer.isPending}
-      erreur={creer.isError ? "L'activité n'a pas pu être ajoutée." : null}
-      consequence="Les indicateurs et les tâches se posent ensuite, depuis la fiche de l'activité."
-      largeur={680}
+      erreur={
+        creer.isError ? messageDErreur(creer.error, "L'activité n'a pas pu être ajoutée.") : null
+      }
+      consequence="L'avancement de l'activité sera la somme de ce que ses tâches obtiennent. Les indicateurs se posent ensuite, depuis la fiche."
+      largeur={720}
     >
-      <ChampsCommunsActivite register={register} errors={errors} control={control} />
+      <ChampsCommunsActivite
+        register={register as unknown as UseFormRegister<ChampsActivite>}
+        errors={errors as FieldErrors<ChampsActivite>}
+        control={control as unknown as Control<ChampsActivite>}
+        porteuse={{
+          sigle: session.structureSigle,
+          libelle: session.structureLibelle,
+        }}
+      />
+
+      <EditeurTaches
+        control={control as unknown as Control<ChampsTaches>}
+        register={register as unknown as UseFormRegister<ChampsTaches>}
+        errors={errors as FieldErrors<ChampsTaches>}
+        debut={debut}
+        fin={fin}
+      />
     </ModaleFormulaire>
   );
 }
@@ -267,8 +648,11 @@ export function ModaleModifierActivite({
       etatReferenceGeneral: activite.etatReferenceGeneral,
       resultatsAttendus: activite.resultatsAttendus,
       responsableId: activite.responsableId === null ? "" : String(activite.responsableId),
-      debut: activite.debut,
-      fin: activite.fin,
+      structuresAssociees: activite.structuresAssociees.map((s) => s.sigle),
+      // La fiche rend une date pleine, le champ attend un mois : le quantième
+      // posé par le serveur ne se re-saisit pas (ADR 047).
+      debut: moisDeLaDate(activite.debut),
+      fin: moisDeLaDate(activite.fin),
       budgetValide: activite.budgetValide === null ? "" : String(activite.budgetValide),
     },
   });
@@ -288,7 +672,8 @@ export function ModaleModifierActivite({
         objectif: valeurs.objectif,
         etatReferenceGeneral: valeurs.etatReferenceGeneral,
         resultatsAttendus: valeurs.resultatsAttendus,
-        responsableId: Number(valeurs.responsableId),
+        responsableId: valeurs.responsableId ? Number(valeurs.responsableId) : null,
+        structuresAssociees: valeurs.structuresAssociees ?? [],
         debut: valeurs.debut,
         fin: valeurs.fin,
         budgetValide: valeurs.budgetValide ? Number(valeurs.budgetValide) : null,
@@ -307,7 +692,11 @@ export function ModaleModifierActivite({
       sousTitre={activite.reference}
       libelleEnvoi="Enregistrer"
       enCours={modifier.isPending}
-      erreur={modifier.isError ? "La modification n'a pas pu être enregistrée." : null}
+      erreur={
+        modifier.isError
+          ? messageDErreur(modifier.error, "La modification n'a pas pu être enregistrée.")
+          : null
+      }
       consequence="La modification et son motif sont inscrits à la fiche de vie."
       largeur={680}
     >
@@ -315,6 +704,10 @@ export function ModaleModifierActivite({
         register={register as unknown as UseFormRegister<ChampsActivite>}
         errors={errors as FieldErrors<ChampsActivite>}
         control={control as unknown as Control<ChampsActivite>}
+        porteuse={{
+          sigle: activite.structureSigle,
+          libelle: activite.structureLibelle,
+        }}
       />
 
       <ChampTexteLong
@@ -488,8 +881,23 @@ export function ModaleReleveIndicateur({
   );
 }
 
-/** Ajout d'une tâche — §15, « tâches à réaliser ». */
-export function ModaleTacheActivite({
+/**
+ * Modification de la liste des tâches — ADR 049.
+ *
+ * La liste s'envoie **entière** et remplace l'ajout unitaire : la somme à 100
+ * (RG-3) ne se contrôle que sur la liste, puisque passer de 50/50 à 30/70
+ * transite par une somme fausse. Une tâche absente de la liste est retirée ;
+ * une tâche présente garde son identifiant, donc ses déclarations.
+ *
+ * **Aucun agent n'est désigné** (ADR 048) : une tâche relève de son activité,
+ * et ce sont les structures responsables de l'activité qui en répondent
+ * (ADR 047).
+ *
+ * Le motif est exigé, comme pour toute modification de l'activité : changer
+ * les parts change ce qui reste à obtenir sur chaque tâche, et la fiche de vie
+ * doit dire pourquoi le découpage a bougé.
+ */
+export function ModaleTachesActivite({
   ouverte,
   onFermer,
   activite,
@@ -498,33 +906,43 @@ export function ModaleTacheActivite({
   onFermer: () => void;
   activite: ActiviteDetail;
 }) {
-  const ajouter = useAjouterTache();
+  const modifier = useModifierTaches();
+  const debut = moisDeLaDate(activite.debut);
+  const fin = moisDeLaDate(activite.fin);
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<{ libelle: string; echeance: string; responsableId: string }>({
-    // Le responsable de l'activité par défaut : une tâche lui revient sauf
-    // mention contraire, et le formulaire ne doit pas le faire ressaisir.
+  } = useForm<ChampsTaches & { motif: string }>({
     defaultValues: {
-      responsableId: activite.responsableId === null ? "" : String(activite.responsableId),
+      taches:
+        activite.taches.length > 0
+          ? activite.taches.map((tache) => ({
+              tacheId: tache.id,
+              libelle: tache.libelle,
+              valeurPrevue: String(tache.valeurPrevue),
+              moisDebut: tache.moisDebut,
+              moisFin: tache.moisFin,
+            }))
+          : [LIGNE_UNIQUE],
+      motif: "",
     },
   });
 
   function fermer() {
     reset();
-    ajouter.reset();
+    modifier.reset();
     onFermer();
   }
 
   const envoyer = handleSubmit((valeurs) => {
-    ajouter.mutate(
+    modifier.mutate(
       {
         activiteId: activite.id,
-        libelle: valeurs.libelle,
-        echeance: valeurs.echeance,
-        responsableId: Number(valeurs.responsableId),
+        taches: lignesAEnvoyer(valeurs.taches, debut, fin),
+        motif: valeurs.motif,
       },
       { onSuccess: fermer },
     );
@@ -535,45 +953,67 @@ export function ModaleTacheActivite({
       ouverte={ouverte}
       onFermer={fermer}
       onEnvoyer={envoyer}
-      titre="Ajouter une tâche"
+      titre="Modifier les tâches"
       sousTitre={activite.reference}
-      libelleEnvoi="Ajouter"
-      enCours={ajouter.isPending}
-      erreur={ajouter.isError ? "La tâche n'a pas pu être ajoutée." : null}
-      consequence="Elle entre au décompte des tâches et se coche lors d'une déclaration d'avancement."
-      largeur={600}
+      libelleEnvoi="Enregistrer"
+      enCours={modifier.isPending}
+      erreur={
+        modifier.isError
+          ? messageDErreur(modifier.error, "Les tâches n'ont pas pu être enregistrées.")
+          : null
+      }
+      consequence="Les valeurs déjà obtenues sont conservées : l'avancement de l'activité ne bouge pas, seule la part restant à obtenir sur chaque tâche change. La nouvelle liste et son motif sont inscrits à la fiche de vie."
+      largeur={680}
     >
-      <Champ
-        libelle="Libellé"
-        placeholder="Numérisation à réception"
-        erreur={errors.libelle?.message}
-        {...register("libelle", { required: "Le libellé est obligatoire." })}
+      <EditeurTaches
+        control={control as unknown as Control<ChampsTaches>}
+        register={register as unknown as UseFormRegister<ChampsTaches>}
+        errors={errors as FieldErrors<ChampsTaches>}
+        debut={debut}
+        fin={fin}
+        existantes={activite.taches}
       />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <ChampDate
-          libelle="Échéance"
-          erreur={errors.echeance?.message}
-          {...register("echeance", {
-            required: "Indiquez l'échéance.",
-            validate: (valeur) =>
-              valeur <= activite.fin || "L'échéance dépasse la fin d'exécution de l'activité.",
-          })}
-        />
-        <SelecteurAgent
-          libelle="Responsable"
-          erreur={errors.responsableId?.message}
-          {...register("responsableId", {
-            required: "Désignez un responsable.",
-          })}
-        />
-      </div>
+      <ChampTexteLong
+        libelle="Motif de la modification"
+        placeholder="Ce qui justifie le nouveau découpage — tâche oubliée, part mal estimée, instruction reçue."
+        rows={3}
+        erreur={errors.motif?.message}
+        {...register("motif", {
+          validate: (valeur) =>
+            valeur.trim() !== "" ||
+            "Le motif est obligatoire : un découpage modifié sans motif rend l'avancement illisible.",
+        })}
+      />
     </ModaleFormulaire>
   );
 }
 
 /**
- * Déclaration d'avancement — §18.
+ * Le refus d'une valeur en points, ou `null` si elle se lit.
+ *
+ * Le serveur compte au centième et refuse une précision plus fine plutôt que
+ * de l'arrondir en silence : le formulaire applique la même règle, pour que le
+ * refus arrive sous le champ et non en tête de modale.
+ */
+function refusDeValeur(valeur: string): string | null {
+  if (String(valeur).trim() === "") return "Indiquez une valeur.";
+  const nombre = Number(String(valeur).replace(",", "."));
+  if (!Number.isFinite(nombre)) return "Indiquez un nombre.";
+  if (Math.abs(nombre * 100 - Math.round(nombre * 100)) > 1e-6) return "Au centième au plus.";
+  return null;
+}
+
+/**
+ * Déclaration d'avancement d'une tâche — §18, ADR 049.
+ *
+ * **L'avancement se déclare sur une tâche, jamais sur l'activité** (RG-4). Le
+ * parcours est celui de la demande : l'activité est ouverte, on choisit la
+ * tâche, on déclare. La valeur s'exprime en points de l'activité (RG-5) — une
+ * tâche prévue à 30 et déclarée à 15 apporte 15 points — et ne dépasse pas la
+ * part prévue (RG-6). Elle est **cumulative** : elle remplace la précédente,
+ * elle ne s'y ajoute pas. L'activité en fait la somme (RG-7), et la modale
+ * montre le taux qui en résultera avant l'envoi.
  *
  * **Deux appels, dans cet ordre, et l'ordre se justifie.** La déclaration part
  * d'abord (`POST /activites/{id}/avancement`), les justificatifs ensuite
@@ -594,31 +1034,54 @@ export function ModaleAvancementActivite({
   ouverte,
   onFermer,
   activite,
+  tacheInitiale,
 }: {
   ouverte: boolean;
   onFermer: () => void;
   activite: ActiviteDetail;
+  /** La tâche désignée depuis la fiche. À défaut, la première qui n'est pas faite. */
+  tacheInitiale?: number;
 }) {
-  const [taches, setTaches] = useState<number[]>(
-    activite.taches.filter((t) => t.fait).map((t) => t.id),
-  );
   const [fichiers, setFichiers] = useState<FichierDepose[]>([]);
   const [erreurPieces, setErreurPieces] = useState<string | null>(null);
   const declarer = useDeclarerAvancement();
   const deposer = useDeposerPiece("activite", activite.id);
+
+  const premiere =
+    activite.taches.find((t) => t.id === tacheInitiale) ??
+    activite.taches.find((t) => !t.fait) ??
+    activite.taches[0];
 
   const {
     register,
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
-  } = useForm<{ avancement: number; observation: string }>({
-    defaultValues: { avancement: activite.avancement },
+  } = useForm<{ tacheId: string; valeurObtenue: string; observation: string }>({
+    defaultValues: {
+      tacheId: premiere ? String(premiere.id) : "",
+      valeurObtenue: premiere ? String(premiere.valeurObtenue) : "",
+      observation: "",
+    },
   });
 
-  const avancement = useWatch({ control, name: "avancement" });
-  const ecart = Number(avancement) - activite.avancementAttendu;
+  const tacheId = useWatch({ control, name: "tacheId" });
+  const valeur = useWatch({ control, name: "valeurObtenue" }) ?? "";
+  const tache = activite.taches.find((t) => String(t.id) === tacheId);
+
+  // Le taux qui résultera de la déclaration. Une tâche recalibrée garde sa
+  // valeur retenue : la DSR l'a fixée, une nouvelle déclaration ne la déplace
+  // pas tant que le recalibrage n'est pas levé (ADR 049).
+  const apres =
+    activite.taches.reduce(
+      (somme, t) =>
+        somme +
+        (t.id === tache?.id && !t.recalibrage ? enCentiemes(valeur) : enCentiemes(t.valeurRetenue)),
+      0,
+    ) / 100;
+  const ecart = apres - activite.avancementAttendu;
 
   function fermer() {
     reset();
@@ -635,9 +1098,9 @@ export function ModaleAvancementActivite({
     try {
       await declarer.mutateAsync({
         activiteId: activite.id,
-        avancement: Number(valeurs.avancement),
+        tacheId: Number(valeurs.tacheId),
+        valeurObtenue: enCentiemes(valeurs.valeurObtenue) / 100,
         observation: valeurs.observation,
-        tachesFaites: taches,
       });
     } catch {
       // `declarer.isError` porte déjà le message ; relancer ici produirait une
@@ -685,68 +1148,99 @@ export function ModaleAvancementActivite({
       sousTitre={activite.reference}
       libelleEnvoi="Déclarer"
       enCours={declarer.isPending || deposer.isPending}
-      erreur={erreurPieces ?? (declarer.isError ? "L'avancement n'a pas pu être déclaré." : null)}
-      consequence="La déclaration est inscrite à la fiche de vie et alimente le scoring de la structure."
+      erreur={
+        erreurPieces ??
+        (declarer.isError
+          ? messageDErreur(declarer.error, "L'avancement n'a pas pu être déclaré.")
+          : null)
+      }
+      consequence="La déclaration est inscrite à la fiche de vie. L'avancement de l'activité, somme de ses tâches, alimente le scoring de la structure."
     >
-      <Champ
-        libelle="Avancement déclaré (%)"
-        type="number"
-        min={0}
-        max={100}
-        aide={`Avancement attendu à cette date : ${activite.avancementAttendu} %.`}
-        erreur={errors.avancement?.message}
-        {...register("avancement", {
-          required: "Indiquez l'avancement.",
-          min: { value: 0, message: "L'avancement ne peut pas être négatif." },
-          max: { value: 100, message: "L'avancement ne dépasse pas 100 %." },
-        })}
-      />
-
-      {ecart < -10 && (
+      {activite.taches.length === 0 && (
         <Encart ton="alerte" icone="horloge">
-          L'écart avec l'attendu atteint {-ecart} points. Au-delà de dix points, l'activité passe en
-          retard et la DSR en est informée. Expliquez ce qui bloque dans l'observation.
+          Cette activité ne compte aucune tâche. L'avancement se déclare sur une tâche : découpez
+          d'abord l'activité, depuis sa fiche.
         </Encart>
       )}
 
-      {activite.taches.length > 0 && (
-        <div className="flex flex-col gap-[7px]">
-          <span className="text-[11px] leading-none font-semibold text-encre-faible">
-            Tâches réalisées
-          </span>
-          <div className="flex max-h-[220px] flex-col overflow-y-auto rounded-none border border-bordure-forte">
-            {activite.taches.map((tache, index) => (
-              <label
-                key={tache.id}
-                className={`flex cursor-pointer items-center gap-2.5 px-3 py-2.5 ${
-                  index > 0 ? "border-t border-separateur" : ""
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={taches.includes(tache.id)}
-                  onChange={() =>
-                    setTaches((actuelles) =>
-                      actuelles.includes(tache.id)
-                        ? actuelles.filter((i) => i !== tache.id)
-                        : [...actuelles, tache.id],
-                    )
-                  }
-                  className="size-4 flex-none accent-[var(--color-accent)]"
-                />
-                <span className="min-w-0 flex-1 truncate text-[11.5px] leading-none font-medium text-encre-moyenne">
-                  {tache.libelle}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
+      <Liste
+        libelle="Tâche"
+        invite="Choisissez la tâche"
+        options={activite.taches.map((t) => ({
+          valeur: String(t.id),
+          libelle: `${t.libelle} — ${formaterPoints(t.valeurObtenue)} / ${formaterPoints(t.valeurPrevue)}`,
+        }))}
+        erreur={errors.tacheId?.message}
+        {...register("tacheId", {
+          required: "Choisissez la tâche dont vous déclarez l'avancement.",
+          // La valeur déclarée à ce jour, et non zéro : la déclaration est
+          // cumulative, et repartir de zéro ferait déclarer un recul par mégarde.
+          onChange: (evenement: { target: { value: string } }) => {
+            const choisie = activite.taches.find((t) => String(t.id) === evenement.target.value);
+            setValue("valeurObtenue", choisie ? String(choisie.valeurObtenue) : "");
+          },
+        })}
+      />
+
+      {tache && (
+        <Encart ton="accent" icone="cible">
+          Part prévue : {formaterPoints(tache.valeurPrevue)} points, de{" "}
+          {formaterMois(tache.moisDebut)} à {formaterMois(tache.moisFin)}. Déclaré à ce jour :{" "}
+          {formaterPoints(tache.valeurObtenue)}.
+          {tache.recalibrage
+            ? ` La DSR retient ${formaterPoints(tache.recalibrage.valeurRetenue)} points sur cette tâche : votre déclaration sera inscrite, mais ne changera pas la valeur retenue tant que le recalibrage n'est pas levé.`
+            : ""}
+        </Encart>
+      )}
+
+      <Champ
+        libelle="Valeur obtenue (points de l'activité)"
+        type="number"
+        min={0}
+        max={tache?.valeurPrevue}
+        step={0.01}
+        aide={
+          tache
+            ? `De 0 à ${formaterPoints(tache.valeurPrevue)}. Cumulée : elle remplace la déclaration précédente.`
+            : undefined
+        }
+        erreur={errors.valeurObtenue?.message}
+        {...register("valeurObtenue", {
+          validate: (saisie) => {
+            const refus = refusDeValeur(saisie);
+            if (refus) return refus;
+            const centiemes = enCentiemes(saisie);
+            if (centiemes < 0) return "La valeur ne peut pas être négative.";
+            return (
+              !tache ||
+              centiemes <= enCentiemes(tache.valeurPrevue) ||
+              `La tâche est prévue à ${formaterPoints(tache.valeurPrevue)} points : elle n'en obtient pas davantage.`
+            );
+          },
+        })}
+      />
+
+      {tache && (
+        <p className="text-[11px] leading-[1.5] font-medium text-encre-tenue">
+          Avancement de l'activité après la déclaration :{" "}
+          <span className="font-bold text-encre tabular-nums">{formaterPoints(apres)} %</span>, pour{" "}
+          {activite.avancementAttendu} % attendus à cette date.
+        </p>
+      )}
+
+      {tache && ecart < -10 && (
+        <Encart ton="alerte" icone="horloge">
+          L'écart avec l'attendu atteint {formaterPoints(-ecart)} points. Au-delà de dix points,
+          l'activité passe en retard et la DSR en est informée. Expliquez ce qui bloque dans
+          l'observation.
+        </Encart>
       )}
 
       <ChampTexteLong
         libelle="Observation"
         placeholder="Ce qui a avancé, ce qui bloque."
         erreur={errors.observation?.message}
+        aide="Le serveur la refuse si elle est vide : c'est elle qui alimente la fiche de vie, et c'est sur elle que la DSR s'appuie pour recalibrer."
         {...register("observation", {
           required: "Une observation est obligatoire.",
         })}
@@ -1282,6 +1776,189 @@ export function ModaleEtatPlan({
               : false,
         })}
       />
+    </ModaleFormulaire>
+  );
+}
+
+/**
+ * Recalibrage d'une tâche — ADR 030, descendu à la tâche par l'ADR 049.
+ *
+ * La structure déclare, la DSR retient. Depuis l'ADR 049, elle retient **sur
+ * une tâche** : l'avancement de l'activité est la somme des valeurs de ses
+ * tâches (RG-7), et un taux posé sur l'activité ne se répartirait sur aucune —
+ * la somme des tâches cesserait d'égaler l'avancement affiché.
+ *
+ * La valeur déclarée n'est pas réécrite : elle reste sur la tâche, à côté de
+ * la valeur retenue, parce que c'est le désaccord qui doit être lisible et non
+ * sa disparition. La modale montre donc les deux chiffres avant l'envoi, et
+ * exige le motif dans les deux sens — poser un désaccord comme le lever sont
+ * l'un et l'autre des décisions, et une décision sans motif ne se conteste pas.
+ *
+ * `ACT_REC`, que seul le profil DSR porte : le contrôle de gestion valide les
+ * plans (`ACT_VAL`) mais ne contredit pas une structure sur ses réalisations.
+ */
+export function ModaleRecalibrage({
+  ouverte,
+  onFermer,
+  activite,
+  tacheInitiale,
+}: {
+  ouverte: boolean;
+  onFermer: () => void;
+  activite: ActiviteDetail;
+  /** La tâche désignée depuis la fiche. À défaut, la première de la liste. */
+  tacheInitiale?: number;
+}) {
+  const recalibrer = useRecalibrerAvancement();
+  const premiere = activite.taches.find((t) => t.id === tacheInitiale) ?? activite.taches[0];
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { errors },
+  } = useForm<{ tacheId: string; valeur: string; motif: string }>({
+    defaultValues: {
+      tacheId: premiere ? String(premiere.id) : "",
+      valeur: premiere ? String(premiere.valeurRetenue) : "",
+      motif: "",
+    },
+  });
+
+  const tacheId = useWatch({ control, name: "tacheId" });
+  const retenue = useWatch({ control, name: "valeur" }) ?? "";
+  const tache = activite.taches.find((t) => String(t.id) === tacheId);
+  const ecart = tache ? (enCentiemes(retenue) - enCentiemes(tache.valeurObtenue)) / 100 : 0;
+
+  function fermer() {
+    reset();
+    recalibrer.reset();
+    onFermer();
+  }
+
+  const envoyer = handleSubmit((valeurs) => {
+    recalibrer.mutate(
+      {
+        activiteId: activite.id,
+        tacheId: Number(valeurs.tacheId),
+        valeur: enCentiemes(valeurs.valeur) / 100,
+        motif: valeurs.motif,
+      },
+      { onSuccess: fermer },
+    );
+  });
+
+  function lever() {
+    if (!tache) return;
+    // Le motif est demandé au clic et non par un second formulaire : lever un
+    // recalibrage est un geste rare, et lui construire son propre écran
+    // l'aurait rendu plus difficile à trouver qu'à exécuter.
+    const motif = (window.prompt("Motif de la levée du recalibrage :") ?? "").trim();
+    if (!motif) return;
+
+    recalibrer.mutate(
+      { activiteId: activite.id, tacheId: tache.id, valeur: null, motif },
+      { onSuccess: fermer },
+    );
+  }
+
+  return (
+    <ModaleFormulaire
+      ouverte={ouverte}
+      onFermer={fermer}
+      onEnvoyer={envoyer}
+      titre="Recalibrer une tâche"
+      sousTitre={activite.reference}
+      libelleEnvoi="Retenir cette valeur"
+      enCours={recalibrer.isPending}
+      erreur={
+        recalibrer.isError
+          ? messageDErreur(recalibrer.error, "Le recalibrage n'a pas pu être enregistré.")
+          : null
+      }
+      consequence="La valeur retenue remplace la valeur déclarée de la tâche, et l'avancement de l'activité — leur somme — dans les tableaux de bord, les scores et les agrégats. Le point focal en est averti — à défaut, le responsable de la structure porteuse — et la fiche de vie garde les deux chiffres."
+      largeur={600}
+    >
+      <Liste
+        libelle="Tâche"
+        invite="Choisissez la tâche"
+        options={activite.taches.map((t) => ({
+          valeur: String(t.id),
+          libelle: `${t.libelle} — déclaré ${formaterPoints(t.valeurObtenue)} / ${formaterPoints(t.valeurPrevue)}${t.recalibrage ? " · recalibrée" : ""}`,
+        }))}
+        erreur={errors.tacheId?.message}
+        {...register("tacheId", {
+          required: "Choisissez la tâche à recalibrer.",
+          onChange: (evenement: { target: { value: string } }) => {
+            const choisie = activite.taches.find((t) => String(t.id) === evenement.target.value);
+            setValue("valeur", choisie ? String(choisie.valeurRetenue) : "");
+          },
+        })}
+      />
+
+      {tache && (
+        <Encart ton="neutre" icone="document">
+          La structure déclare {formaterPoints(tache.valeurObtenue)} points sur cette tâche, prévue
+          à {formaterPoints(tache.valeurPrevue)}.
+          {tache.recalibrage
+            ? ` Un recalibrage est déjà en place : ${formaterPoints(tache.recalibrage.valeurRetenue)} points retenus — ${tache.recalibrage.motif}`
+            : ""}
+        </Encart>
+      )}
+
+      <Champ
+        libelle="Valeur retenue (points de l'activité)"
+        type="number"
+        min={0}
+        max={tache?.valeurPrevue}
+        step={0.01}
+        aide={tache ? `De 0 à ${formaterPoints(tache.valeurPrevue)}.` : undefined}
+        erreur={errors.valeur?.message}
+        {...register("valeur", {
+          validate: (saisie) => {
+            const refus = refusDeValeur(saisie);
+            if (refus) return refus;
+            const centiemes = enCentiemes(saisie);
+            if (centiemes < 0) return "La valeur ne peut pas être négative.";
+            return (
+              !tache ||
+              centiemes <= enCentiemes(tache.valeurPrevue) ||
+              `La tâche est prévue à ${formaterPoints(tache.valeurPrevue)} points : la valeur retenue ne la dépasse pas.`
+            );
+          },
+        })}
+      />
+
+      {tache && ecart !== 0 && (
+        <Encart ton="alerte" icone="bouclier">
+          {ecart < 0
+            ? `Vous retirez ${formaterPoints(-ecart)} points à ce que la structure a déclaré.`
+            : `Vous ajoutez ${formaterPoints(ecart)} points à ce que la structure a déclaré.`}{" "}
+          Le motif lui sera notifié tel quel.
+        </Encart>
+      )}
+
+      <ChampTexteLong
+        libelle="Motif"
+        placeholder="Ce qui n'est pas justifié dans les réalisations annoncées."
+        aide="Obligatoire. Il part au point focal — à défaut au responsable de la structure porteuse — et s'inscrit à la fiche de vie."
+        erreur={errors.motif?.message}
+        {...register("motif", {
+          required: "Un recalibrage s'écrit avec son motif.",
+        })}
+      />
+
+      {tache?.recalibrage && (
+        <button
+          type="button"
+          onClick={lever}
+          className="cursor-pointer self-start text-[11.5px] leading-none font-bold text-accent hover:underline"
+        >
+          Lever le recalibrage de cette tâche et rendre la main à la structure
+        </button>
+      )}
     </ModaleFormulaire>
   );
 }

@@ -21,7 +21,6 @@ import { Impressions } from "@/features/pilotage/pages/Impressions";
 import { RegistreCourriers } from "@/features/courrier/pages/RegistreCourriers";
 import { FicheCourrier } from "@/features/courrier/pages/FicheCourrier";
 import { EnregistrementCourrier } from "@/features/courrier/pages/EnregistrementCourrier";
-import { ImportCourriers } from "@/features/courrier/pages/ImportCourriers";
 import { RegistreDeparts } from "@/features/depart/pages/RegistreDeparts";
 import { FileSignature } from "@/features/depart/pages/FileSignature";
 import { BordereauCoursier } from "@/features/depart/pages/BordereauCoursier";
@@ -32,6 +31,8 @@ import { FicheCotationImprimable } from "@/features/courrier/pages/FicheCotation
 import { CourriersInternes } from "@/features/courrier/pages/CourriersInternes";
 import { Cotations } from "@/features/courrier/pages/Cotations";
 import { AccusesReception } from "@/features/courrier/pages/AccusesReception";
+import { BureauOrdre } from "@/features/courrier/pages/BureauOrdre";
+import { SupervisionDelais } from "@/features/courrier/pages/SupervisionDelais";
 import { SignalementEcart } from "@/features/courrier/pages/SignalementEcart";
 import { FicheDeVie } from "@/features/courrier/pages/FicheDeVie";
 import { Affectations } from "@/features/courrier/pages/Affectations";
@@ -131,7 +132,6 @@ export const routeur = createBrowserRouter([
                * Import de masse — meme permission que l'enregistrement : c'est
                * le meme geste, a une autre echelle.
                */
-              { path: "courriers/import", element: <ImportCourriers /> },
             ],
           },
           {
@@ -167,6 +167,28 @@ export const routeur = createBrowserRouter([
           {
             element: <ExigePermission permissions={[PERMISSIONS.AFF]} />,
             children: [{ path: "affectations", element: <Affectations /> }],
+          },
+          /*
+           * Le bureau d'ordre de la structure — au Port, c'est son point focal.
+           * Sous `BO_STR` et non sous `LEC` : lire le registre des courriers et
+           * tenir le cahier d'entrée-sortie de sa direction sont deux gestes
+           * différents, et le second n'appartient qu'à une personne par
+           * structure. Voir ADR 031.
+           */
+          {
+            element: <ExigePermission permissions={[PERMISSIONS.BO_STR]} />,
+            children: [{ path: "courriers/bureau-ordre", element: <BureauOrdre /> }],
+          },
+          /*
+           * La supervision des délais — le mapping complet de la DSR. Sous
+           * `REL`, la permission de relancer, et non sous `STAT` : ce n'est pas
+           * une statistique mais la liste de travail de celui qui relance. La
+           * même permission ouvre le dossier interne côté serveur, et les deux
+           * doivent tenir la frontière au même endroit.
+           */
+          {
+            element: <ExigePermission permissions={[PERMISSIONS.REL]} />,
+            children: [{ path: "courriers/supervision", element: <SupervisionDelais /> }],
           },
           /*
            * Restitution — les trois niveaux du descriptif fonctionnel.

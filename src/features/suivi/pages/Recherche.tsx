@@ -9,12 +9,16 @@ import { Etiqueteur, Liste } from "@/components/ui/Champ";
 import { ChampRecherche } from "@/components/ui/ChampRecherche";
 import { Etiquette } from "@/components/ui/Etiquette";
 import { Interrupteur } from "@/components/ui/Interrupteur";
+import { ModaleFormulaire } from "@/components/ui/ModaleFormulaire";
 import { statutAffiche } from "@/features/courrier/statut";
 import {
   rechercheQuery,
   recherchesEnregistreesQuery,
+  useEnregistrerRecherche,
+  useOublierRecherche,
   type CriteresRecherche,
 } from "@/features/suivi/api";
+import { ErreurApi } from "@/lib/api";
 import { usePermission } from "@/lib/contexteSession";
 import { formaterDate } from "@/lib/format";
 import { naturesQuery, structuresQuery } from "@/lib/referentiel";
@@ -66,6 +70,35 @@ export function Recherche() {
   const { data: natures = [] } = useQuery(naturesQuery());
   const { data: enregistrees = [] } = useQuery(recherchesEnregistreesQuery());
   const { data: resultats, isFetching } = useQuery(rechercheQuery(lances));
+  const enregistrer = useEnregistrerRecherche();
+  const oublier = useOublierRecherche();
+
+  const [nommage, setNommage] = useState(false);
+  const [nom, setNom] = useState("");
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  /**
+   * On enregistre les criteres **lances**, pas ceux du formulaire.
+   *
+   * Ce que l'agent veut conserver, c'est la recherche dont il vient de lire les
+   * resultats. Sauvegarder un formulaire modifie depuis lui rendrait, la semaine
+   * suivante, une liste qu'il n'a jamais vue.
+   */
+  async function conserver() {
+    setErreur(null);
+    try {
+      await enregistrer.mutateAsync({
+        libelle: nom,
+        criteres: lances ?? criteres,
+      });
+      setNom("");
+      setNommage(false);
+    } catch (e) {
+      setErreur(
+        e instanceof ErreurApi ? e.message : "L'enregistrement n'a pas abouti.",
+      );
+    }
+  }
 
   function modifier(champ: keyof CriteresRecherche, valeur: unknown) {
     setCriteres((precedents) => ({ ...precedents, [champ]: valeur }));
@@ -76,7 +109,9 @@ export function Recherche() {
       const liste = precedents[champ];
       return {
         ...precedents,
-        [champ]: liste.includes(code) ? liste.filter((x) => x !== code) : [...liste, code],
+        [champ]: liste.includes(code)
+          ? liste.filter((x) => x !== code)
+          : [...liste, code],
       };
     });
   }
@@ -88,8 +123,20 @@ export function Recherche() {
         sousTitre="Registre courant et fonds archivé depuis 2019"
         actions={
           <div className="flex items-center gap-2">
-            <Bouton icone="document">Enregistrer la recherche</Bouton>
-            <Bouton variante="principal" icone="exporter" disabled={!resultats?.lignes.length}>
+            {/* Desactive tant que rien n'a ete lance : on ne conserve pas une
+                recherche dont on n'a pas vu ce qu'elle rend. */}
+            <Bouton
+              icone="document"
+              disabled={!lances}
+              onClick={() => setNommage(true)}
+            >
+              Enregistrer la recherche
+            </Bouton>
+            <Bouton
+              variante="principal"
+              icone="exporter"
+              disabled={!resultats?.lignes.length}
+            >
               Exporter les résultats
             </Bouton>
           </div>
@@ -135,7 +182,9 @@ export function Recherche() {
                       aria-label="Du"
                       className="min-w-0 flex-1 rounded-none border border-bordure-forte px-[11px] py-2.5 text-[11.5px] leading-none font-semibold text-encre outline-none focus:border-accent"
                     />
-                    <span className="text-[11px] leading-none font-semibold text-encre-tenue">au</span>
+                    <span className="text-[11px] leading-none font-semibold text-encre-tenue">
+                      au
+                    </span>
                     <input
                       type="date"
                       value={criteres.au}
@@ -162,7 +211,9 @@ export function Recherche() {
                     <div className="flex items-center justify-between gap-2">
                       <CaseLibellee
                         cochee={criteres.sessions.includes("CONFIDENTIEL")}
-                        onChange={() => basculerListe("sessions", "CONFIDENTIEL")}
+                        onChange={() =>
+                          basculerListe("sessions", "CONFIDENTIEL")
+                        }
                         libelle="Confidentiel"
                       />
                       <Etiquette ton="confidentiel">habilitation</Etiquette>
@@ -200,14 +251,20 @@ export function Recherche() {
                   <Liste
                     libelle="Structure"
                     invite="Toutes"
-                    options={structures.map((s) => ({ valeur: String(s.id), libelle: s.sigle }))}
+                    options={structures.map((s) => ({
+                      valeur: String(s.id),
+                      libelle: s.sigle,
+                    }))}
                     value={criteres.structureId}
                     onChange={(e) => modifier("structureId", e.target.value)}
                   />
                   <Liste
                     libelle="Nature"
                     invite="Toutes"
-                    options={natures.map((n) => ({ valeur: String(n.id), libelle: n.libelle }))}
+                    options={natures.map((n) => ({
+                      valeur: String(n.id),
+                      libelle: n.libelle,
+                    }))}
                     value={criteres.natureId}
                     onChange={(e) => modifier("natureId", e.target.value)}
                   />
@@ -250,8 +307,31 @@ export function Recherche() {
                     <span className="flex-none text-[10.5px] leading-none font-bold text-encre-tenue tabular-nums">
                       {r.nombre}
                     </span>
+                    {/* Supprime pour de bon : une recherche conservee n'est pas
+                        une trace, c'est un confort. */}
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        oublier.mutate(r.id);
+                      }}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && oublier.mutate(r.id)
+                      }
+                      className="flex-none text-[10.5px] leading-none font-bold text-encre-tenue hover:text-danger"
+                    >
+                      Retirer
+                    </span>
                   </button>
                 ))}
+
+                {enregistrees.length === 0 && (
+                  <p className="text-[11.5px] font-medium text-encre-tenue">
+                    Aucune recherche conservée. Lancez-en une, puis «
+                    Enregistrer la recherche ».
+                  </p>
+                )}
               </div>
             </Carte>
           </div>
@@ -271,8 +351,17 @@ export function Recherche() {
             ) : (
               <div className="mt-3.5 overflow-x-auto">
                 <div className="min-w-[760px]">
-                  <div className={`${GRILLE} border-y border-bordure bg-surface-tete py-2.5`}>
-                    {["Sens", "Objet", "Correspondant", "Structure", "Statut", "Date"].map((t) => (
+                  <div
+                    className={`${GRILLE} border-y border-bordure bg-surface-tete py-2.5`}
+                  >
+                    {[
+                      "Sens",
+                      "Objet",
+                      "Correspondant",
+                      "Structure",
+                      "Statut",
+                      "Date",
+                    ].map((t) => (
                       <span
                         key={t}
                         className="text-[9.5px] leading-none font-bold tracking-[.7px] text-encre-tenue uppercase"
@@ -283,7 +372,9 @@ export function Recherche() {
                   </div>
 
                   {isFetching && (
-                    <p className="px-5 py-8 text-xs font-medium text-encre-tenue">Recherche…</p>
+                    <p className="px-5 py-8 text-xs font-medium text-encre-tenue">
+                      Recherche…
+                    </p>
                   )}
 
                   {resultats?.lignes.map((courrier) => {
@@ -312,7 +403,9 @@ export function Recherche() {
                           {courrier.structuresCotees[0] ?? "—"}
                         </span>
                         <span className="justify-self-start">
-                          <Etiquette ton={statut.ton}>{statut.libelle}</Etiquette>
+                          <Etiquette ton={statut.ton}>
+                            {statut.libelle}
+                          </Etiquette>
                         </span>
                         <span className="text-[11.5px] leading-none font-medium text-encre-faible">
                           {formaterDate(courrier.dateReception)}
@@ -332,6 +425,30 @@ export function Recherche() {
           </Carte>
         </div>
       </div>
+
+      <ModaleFormulaire
+        ouverte={nommage}
+        onFermer={() => setNommage(false)}
+        onEnvoyer={conserver}
+        titre="Enregistrer cette recherche"
+        sousTitre={`${resultats?.total ?? 0} résultats aujourd'hui`}
+        libelleEnvoi="Conserver"
+        consequence="Le nombre de résultats est recalculé à chaque ouverture."
+        enCours={enregistrer.isPending}
+        erreur={erreur}
+      >
+        <Etiqueteur
+          libelle="Nom de la recherche"
+          aide="Un nom déjà utilisé remplace les critères qu'il portait."
+        >
+          <input
+            value={nom}
+            onChange={(e) => setNom(e.target.value)}
+            placeholder="Courriers hors délai de la DAMP"
+            className="w-full rounded-none border border-bordure-forte px-3 py-2.5 text-xs leading-none font-medium text-encre outline-none transition-colors duration-150 placeholder:text-encre-tenue focus:border-accent"
+          />
+        </Etiqueteur>
+      </ModaleFormulaire>
     </>
   );
 }

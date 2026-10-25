@@ -37,6 +37,12 @@ import type { NiveauFeu } from "@/lib/feu";
 
 export type EtatActivite = "Programmée" | "En cours" | "Réalisée" | "En retard" | "Suspendue";
 
+/** Une structure co-responsable d'une activité — ADR 047. */
+export interface StructureAssociee {
+  sigle: string;
+  libelle: string;
+}
+
 export interface Activite {
   id: number;
   reference: string;
@@ -48,21 +54,49 @@ export interface Activite {
    * c'est ce qui rend le regroupement par axe calculable.
    */
   axe: LibelleAxe;
+  /** La structure **porteuse** : celle dont le plan d'actions tient l'activité. */
   structureSigle: string;
   structureLibelle: string;
-  responsable: string;
   /**
-   * L'identifiant du responsable, en plus de son nom.
+   * Les structures qui en répondent avec elle — ADR 047.
+   *
+   * Elles voient l'activité et la déclarent, sans l'inscrire à leur propre
+   * plan : une activité reste comptée une fois, chez sa porteuse.
+   */
+  structuresAssociees: StructureAssociee[];
+  /**
+   * Le **point focal**, facultatif : la responsabilité est institutionnelle.
+   *
+   * `null` là où l'activité n'a que ses structures pour en répondre.
+   */
+  responsable: string | null;
+  /**
+   * L'identifiant du point focal, en plus de son nom.
    *
    * Le nom s'affiche, l'identifiant se renvoie : c'est lui que le sélecteur de
    * la modale de modification repose (ADR 020). Sans lui, rouvrir une activité
    * pour la corriger repartait d'un sélecteur vide.
    */
   responsableId: number | null;
-  initiales: string;
+  initiales: string | null;
+  /**
+   * Bornes de la période, en date pleine (`AAAA-MM-JJ`).
+   *
+   * La saisie, elle, se fait au **mois** : le serveur pose le premier jour du
+   * mois au début et le dernier à la fin (ADR 047). Le retard et l'avancement
+   * attendu se calculent au jour, d'où la date pleine ici ; l'affichage, lui,
+   * s'en tient au mois — `formaterMois()`.
+   */
   debut: string;
   fin: string;
   etat: EtatActivite;
+  /**
+   * Le taux **retenu**, pas nécessairement celui que la structure a déclaré.
+   *
+   * Quand la DSR a recalibré, c'est le sien qui fait foi partout — tableaux de
+   * bord, scores, agrégats (ADR 030). Le désaccord se lit sur la fiche, dans
+   * `recalibrage`.
+   */
   avancement: number;
   /** Avancement attendu à la date du jour, pour mesurer l'écart. */
   avancementAttendu: number;
@@ -97,13 +131,46 @@ export interface IndicateurActivite {
   releveLe: string | null;
 }
 
+/**
+ * Une tâche et sa part de l'activité — ADR 049.
+ *
+ * Toutes les valeurs sont en **points de l'activité** (RG-5) : une tâche prévue
+ * à 30 et déclarée à 15 apporte 15 points. Seul `avancementPropre` s'exprime à
+ * l'échelle de la tâche.
+ */
 export interface TacheActivite {
   id: number;
   libelle: string;
-  echeance: string;
+  /** RG-8. `AAAA-MM` : une tâche se situe au mois. */
+  moisDebut: string;
+  moisFin: string;
+  /** RG-2. Part de l'activité, en points. */
+  valeurPrevue: number;
+  /** RG-5, RG-6. Ce que la structure a déclaré, plafonné à la part prévue. */
+  valeurObtenue: number;
+  /** Ce qui compte dans l'avancement : la valeur recalibrée s'il y en a une. */
+  valeurRetenue: number;
+  /** `valeurRetenue / valeurPrevue × 100`. Affichage seulement. */
+  avancementPropre: number;
+  /** La valeur retenue atteint la part prévue. */
   fait: boolean;
   dateRealisation: string | null;
+  /** Le désaccord de la DSR sur cette tâche, `null` dans le cas ordinaire. */
+  recalibrage: RecalibrageTache | null;
+  /**
+   * **Héritage.** Les tâches créées jusqu'au 10/09/2026 portent un agent ;
+   * celles d'aujourd'hui arrivent avec la chaîne vide — l'application n'en
+   * attribue plus (ADR 048). Aucun écran ne l'affiche : une tâche relève de
+   * son activité, et qui en répond se lit sur l'activité.
+   */
   responsable: string;
+}
+
+export interface RecalibrageTache {
+  valeurDeclaree: number;
+  valeurRetenue: number;
+  motif: string;
+  le: string | null;
 }
 
 export type TypeEvenementVie =
@@ -114,7 +181,9 @@ export type TypeEvenementVie =
   | "Observation"
   | "Relance"
   | "Validation"
-  | "Pièce jointe";
+  | "Pièce jointe"
+  /** La DSR a retenu un autre taux que le taux déclaré — ADR 030. */
+  | "Recalibrage";
 
 /** Pièce versée à la fiche de vie — §18, dernier point de la liste. */
 export interface PieceVie {
@@ -184,8 +253,29 @@ export interface ActiviteDetail extends Activite {
   instructionsRattachees: InstructionActivite[];
   /** Renseignée seulement lorsque l'état est « Suspendue ». */
   suspension: Suspension | null;
+  /**
+   * Le désaccord entre la structure et la DSR — `null` dans le cas ordinaire.
+   *
+   * La structure déclare son avancement avec sa justification ; si les
+   * réalisations ne sont pas justifiées, seule la DSR retient un autre taux
+   * (ADR 030). Les deux chiffres circulent, parce que n'afficher que le taux
+   * retenu effacerait ce que la structure avait dit — c'est-à-dire l'objet
+   * même de l'arbitrage.
+   */
+  recalibrage: Recalibrage | null;
   /** Date de la dernière relance de la DSR, pour ne pas relancer deux fois. */
   derniereRelance: string | null;
+}
+
+/**
+ * Synthèse des recalibrages de tâches (ADR 049) : le taux déclaré, le taux
+ * retenu — somme des valeurs retenues —, et le motif du dernier recalibrage.
+ */
+export interface Recalibrage {
+  avancementDeclare: number;
+  avancementRetenu: number;
+  motif: string;
+  le: string | null;
 }
 
 export interface RegistreActivites {
@@ -351,20 +441,49 @@ export interface SaisieActivite {
   objectif: string;
   etatReferenceGeneral: string;
   resultatsAttendus: string;
+  /** Le mois, `AAAA-MM` : un plan annuel s'écrit en mois, pas en quantièmes. */
   debut: string;
   fin: string;
   budgetValide: number | null;
   /**
-   * Le responsable de l'activité, distinct de qui la saisit.
+   * Le point focal, distinct de qui saisit — et **facultatif** (ADR 047).
    *
-   * Un point focal inscrit les activités de toute sa direction : le déduire du
-   * compte connecté aurait fait de lui le responsable de tout, et rendu la
-   * colonne « responsable » du registre inutilisable.
+   * Ce qui répond de l'activité, ce sont les structures. Le point focal reste
+   * la personne qu'on appelle ; `null` là où l'on n'en désigne aucune.
    *
    * L'identifiant et non le nom : le champ était libre et le serveur comparait
    * la saisie au nom complet caractère par caractère. Voir l'ADR 020.
    */
-  responsableId: number;
+  responsableId: number | null;
+  /**
+   * Les sigles des structures co-responsables, **hors porteuse**.
+   *
+   * La porteuse vient du plan de l'agent qui enregistre et ne se choisit pas.
+   * La liste envoyée fait foi : ce qui n'y figure plus est retiré.
+   */
+  structuresAssociees: string[];
+}
+
+/**
+ * Une ligne de la liste des tâches — **sans attributaire** (ADR 048).
+ *
+ * `id` absent : la tâche est à créer. Présent : la tâche existante est mise à
+ * jour. La valeur prévue est en points de l'activité, au centième (RG-2) ; les
+ * mois sont au format `AAAA-MM` et restent dans la période de l'activité
+ * (RG-8, RG-9). L'année n'est pas saisie : le sélecteur ne propose que les mois
+ * de l'activité, et c'est lui qui porte l'année.
+ */
+export interface SaisieTacheLigne {
+  id?: number;
+  libelle: string;
+  valeurPrevue: number;
+  moisDebut: string;
+  moisFin: string;
+}
+
+/** Création : les tâches se saisissent avec l'activité (RG-1) et totalisent 100 (RG-3). */
+export interface SaisieCreationActivite extends SaisieActivite {
+  taches: SaisieTacheLigne[];
 }
 
 /** Modification d'une activité inscrite. Le motif alimente la fiche de vie. */
@@ -388,11 +507,33 @@ export interface SaisieReleveIndicateur {
   realise: string;
 }
 
-export interface SaisieTacheActivite {
+/**
+ * La liste **entière** des tâches d'une activité — ADR 049.
+ *
+ * Elle remplace l'ajout unitaire : la somme à 100 (RG-3) ne se contrôle que sur
+ * la liste, puisque passer de 50/50 à 30/70 transite par une somme fausse. Une
+ * tâche absente de la liste est retirée ; le serveur refuse de retirer une
+ * tâche qui porte déjà un avancement.
+ */
+export interface SaisieListeTaches {
   activiteId: number;
-  libelle: string;
-  echeance: string;
-  responsableId: number;
+  taches: SaisieTacheLigne[];
+  motif: string;
+}
+
+/**
+ * Ce que la DSR envoie pour retenir, sur une tâche, une autre valeur que celle
+ * déclarée — ADR 030, descendu à la tâche par l'ADR 049.
+ *
+ * `valeur` à `null` **lève** le recalibrage : la valeur déclarée redevient la
+ * valeur retenue. Le motif reste exigé dans les deux sens — lever un désaccord
+ * est une décision autant que le poser.
+ */
+export interface SaisieRecalibrage {
+  activiteId: number;
+  tacheId: number;
+  valeur: number | null;
+  motif: string;
 }
 
 /**
@@ -405,12 +546,16 @@ export interface SaisieTacheActivite {
  *
  * Les justificatifs se versent par `POST /api/pieces` (`useDeposerPiece`), qui
  * envoie le binaire. La modale d'avancement enchaîne les deux appels.
+ *
+ * **Elle porte sur une tâche, jamais sur l'activité** (RG-4, ADR 049). La valeur
+ * obtenue est en points de l'activité et **cumulative** : elle remplace la
+ * précédente. L'activité en fait la somme.
  */
 export interface SaisieAvancementActivite {
   activiteId: number;
-  avancement: number;
+  tacheId: number;
+  valeurObtenue: number;
   observation: string;
-  tachesFaites: number[];
 }
 
 export interface SaisieSuspension {
@@ -475,7 +620,7 @@ function useEcriture<TCorps>(chemin: string | ((corps: TCorps) => string)) {
   });
 }
 
-export const useCreerActivite = () => useEcriture<SaisieActivite>("/activites");
+export const useCreerActivite = () => useEcriture<SaisieCreationActivite>("/activites");
 
 export const useModifierActivite = () =>
   useEcriture<SaisieModificationActivite>((corps) => `/activites/${corps.activiteId}`);
@@ -488,11 +633,14 @@ export const useReleverIndicateur = () =>
     (corps) => `/activites/${corps.activiteId}/indicateurs/${corps.indicateurId}/releve`,
   );
 
-export const useAjouterTache = () =>
-  useEcriture<SaisieTacheActivite>((corps) => `/activites/${corps.activiteId}/taches`);
+export const useModifierTaches = () =>
+  useEcriture<SaisieListeTaches>((corps) => `/activites/${corps.activiteId}/taches`);
 
 export const useDeclarerAvancement = () =>
   useEcriture<SaisieAvancementActivite>((corps) => `/activites/${corps.activiteId}/avancement`);
+
+export const useRecalibrerAvancement = () =>
+  useEcriture<SaisieRecalibrage>((corps) => `/activites/${corps.activiteId}/recalibrage`);
 
 export const useSuspendreActivite = () =>
   useEcriture<SaisieSuspension>((corps) => `/activites/${corps.activiteId}/suspension`);

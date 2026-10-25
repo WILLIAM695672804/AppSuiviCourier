@@ -41,6 +41,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "NY",
       posteLibelle: "Directeur général",
       structureLibelle: "Direction générale",
+      structureSigle: "DG",
       permissions: [
         PERMISSIONS.LEC,
         PERMISSIONS.COT,
@@ -80,6 +81,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "PE",
       posteLibelle: "Directeur, membre du Comité de direction",
       structureLibelle: "DAF — Direction des affaires financières",
+      structureSigle: "DAF",
       permissions: [
         PERMISSIONS.LEC,
         PERMISSIONS.STAT,
@@ -111,11 +113,16 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "FN",
       posteLibelle: "Chef de la Division du suivi et de la relance",
       structureLibelle: "DSR — Division du suivi et de la relance",
+      structureSigle: "DSR",
       permissions: [
         PERMISSIONS.LEC,
         PERMISSIONS.REL,
         PERMISSIONS.STAT,
         PERMISSIONS.IMP,
+        // Le suivi transversal lit tous les bureaux d'ordre : sans BO_STR, le
+        // registre d'entree-sortie d'une direction lui serait ferme, et le
+        // mapping complet que l'exigence lui reconnait s'arreterait la.
+        PERMISSIONS.BO_STR,
         // Plus d'ADM_STR : les structures s'inscrivent dans la zone
         // d'administration (ADR 021). La DSR les consulte — le referentiel est
         // ouvert a toute session (ADR 007) — et REL lui ouvre l'ecran.
@@ -128,6 +135,12 @@ export const COMPTES_DEMO: CompteDemo[] = [
          */
         PERMISSIONS.ACT_SAI,
         PERMISSIONS.ACT_VAL,
+        /*
+         * Recalibrer un avancement declare — ADR 030. Aucun autre compte de
+         * demonstration ne la porte, pas meme le controle de gestion : la
+         * structure declare, la DSR retient.
+         */
+        PERMISSIONS.ACT_REC,
         PERMISSIONS.DEC,
         PERMISSIONS.INST,
         PERMISSIONS.DISPO,
@@ -156,6 +169,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "SB",
       posteLibelle: "Chef de service comptabilité",
       structureLibelle: "DAF — Direction des affaires financières",
+      structureSigle: "DAF",
       permissions: [
         PERMISSIONS.LEC,
         PERMISSIONS.COT,
@@ -183,14 +197,29 @@ export const COMPTES_DEMO: CompteDemo[] = [
     motDePasse: "demo",
     acteur: "§3.5 — Point focal de structure",
     famille: "Structures",
-    description: "Saisit les activités de sa seule structure, sans voir les autres",
+    description:
+      "Saisit les activités de sa structure et tient son bureau d'ordre — entrées et sorties",
     utilisateur: {
       id: 17,
       nomComplet: "L. Mbarga",
       initiales: "LM",
       posteLibelle: "Point focal de la direction",
       structureLibelle: "DAF — Direction des affaires financières",
-      permissions: [PERMISSIONS.LEC, PERMISSIONS.ACT_LEC, PERMISSIONS.ACT_SAI, PERMISSIONS.DISPO],
+      structureSigle: "DAF",
+      /*
+       * `BO_STR` et `AFF` : au Port, le bureau d'ordre d'une structure **est**
+       * son point focal. `AFF` va avec — un bureau d'ordre qui reçoit sans
+       * pouvoir remettre au collaborateur laisse le courrier sur la table.
+       * Voir ADR 031.
+       */
+      permissions: [
+        PERMISSIONS.LEC,
+        PERMISSIONS.BO_STR,
+        PERMISSIONS.AFF,
+        PERMISSIONS.ACT_LEC,
+        PERMISSIONS.ACT_SAI,
+        PERMISSIONS.DISPO,
+      ],
       perimetre: { portee: "structure", structureId: 3 },
       sessionCourrier: null,
       litToutesSessions: false,
@@ -221,6 +250,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "JE",
       posteLibelle: "Directeur du dragage et de la logistique maritime",
       structureLibelle: "DDLM — Direction du dragage et de la logistique maritime",
+      structureSigle: "DDLM",
       permissions: [
         PERMISSIONS.LEC,
         PERMISSIONS.COT,
@@ -250,6 +280,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "BM",
       posteLibelle: "Chef de la Régie du dragage",
       structureLibelle: "RDD — Régie du dragage",
+      structureSigle: "RDD",
       permissions: [
         PERMISSIONS.LEC,
         PERMISSIONS.TRA,
@@ -275,6 +306,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "GN",
       posteLibelle: "Directeur de l'exploitation",
       structureLibelle: "DEX — Direction de l'exploitation",
+      structureSigle: "DEX",
       permissions: [
         PERMISSIONS.LEC,
         PERMISSIONS.COT,
@@ -303,6 +335,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "VT",
       posteLibelle: "Directeur des finances et de la comptabilité",
       structureLibelle: "DFC — Direction des finances et de la comptabilité",
+      structureSigle: "DFC",
       permissions: [
         PERMISSIONS.LEC,
         PERMISSIONS.COT,
@@ -332,6 +365,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "KT",
       posteLibelle: "Agent de session courrier",
       structureLibelle: "Service du courrier central",
+      structureSigle: "SCC",
       permissions: [
         PERMISSIONS.LEC,
         PERMISSIONS.ENR,
@@ -358,6 +392,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "MD",
       posteLibelle: "Gestionnaire de dossiers",
       structureLibelle: "DAF — Comptabilité",
+      structureSigle: "DAF",
       permissions: [PERMISSIONS.LEC, PERMISSIONS.TRA, PERMISSIONS.DOS_LEC, PERMISSIONS.DOS_INS],
       perimetre: { portee: "poste", structureId: 3 },
       sessionCourrier: null,
@@ -377,6 +412,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "RF",
       posteLibelle: "Archiviste",
       structureLibelle: "Centre de la documentation et des archives",
+      structureSigle: "CDA",
       permissions: [PERMISSIONS.LEC, PERMISSIONS.ARCH, PERMISSIONS.IMP],
       perimetre: { portee: "institution", structureId: null },
       sessionCourrier: null,
@@ -396,6 +432,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "AK",
       posteLibelle: "Administrateur fonctionnel",
       structureLibelle: "Cabinet",
+      structureSigle: "CAB",
       permissions: [PERMISSIONS.ADM_ORG, PERMISSIONS.ADM_HAB, PERMISSIONS.ADM_PAR],
       /*
        * Ni LEC, ni AUDIT.
@@ -425,6 +462,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "TO",
       posteLibelle: "Administrateur technique",
       structureLibelle: "DSI — Direction des systèmes d'information",
+      structureSigle: "DSI",
       permissions: [PERMISSIONS.AUDIT, PERMISSIONS.ADM_PAR, PERMISSIONS.ADM_TEC],
       // Pas de LEC : exploiter la plateforme ne donne pas le droit de lire le
       // courrier qui y circule.
@@ -446,6 +484,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "CA",
       posteLibelle: "Contrôleur de gestion",
       structureLibelle: "DCG — Direction du contrôle de gestion",
+      structureSigle: "DCG",
       permissions: [
         PERMISSIONS.LEC,
         PERMISSIONS.STAT,
@@ -478,6 +517,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "HN",
       posteLibelle: "Auditeur interne",
       structureLibelle: "Division de l'audit interne",
+      structureSigle: "DAI",
       /*
        * AUDIT seul.
        *
@@ -507,6 +547,7 @@ export const COMPTES_DEMO: CompteDemo[] = [
       initiales: "SC",
       posteLibelle: "Entreprise partenaire",
       structureLibelle: "Extérieur à l'institution",
+      structureSigle: "EXT",
       permissions: [PERMISSIONS.EXT],
       perimetre: { portee: "poste", structureId: null },
       sessionCourrier: null,

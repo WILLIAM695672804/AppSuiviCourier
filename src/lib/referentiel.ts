@@ -19,6 +19,8 @@ export interface Nature {
 export interface Correspondant {
   id: number;
   libelle: string;
+  /** « MINFI », « APN ». `null` quand l'entree n'en a pas. */
+  sigle: string | null;
   /** « Institution », « Entreprise », « Usager »… */
   categorie: string;
   initiales: string;

@@ -6,10 +6,15 @@ import { Bouton } from "@/components/ui/Bouton";
 import { Carte } from "@/components/ui/Carte";
 import { Etiqueteur, Liste } from "@/components/ui/Champ";
 import { Encart } from "@/components/ui/Encart";
-import { Etiquette } from "@/components/ui/Etiquette";
+import { Etiquette, type TonEtiquette } from "@/components/ui/Etiquette";
 import { Icone } from "@/components/ui/Icone";
 import { SelecteurSegments } from "@/components/ui/SelecteurSegments";
-import { ficheQuery, signalementsQuery, useSignalerEcart } from "@/features/courrier/api";
+import {
+  ficheQuery,
+  signalementsQuery,
+  useAvancerSignalement,
+  useSignalerEcart,
+} from "@/features/courrier/api";
 import { formaterDate } from "@/lib/format";
 import { structuresQuery } from "@/lib/referentiel";
 
@@ -29,6 +34,13 @@ const TYPES = [
   { code: "DOUBLON", nom: "Doublon d'enregistrement", aide: "Le même courrier porte déjà un numéro" },
 ];
 
+/** Les trois etats, dans l'ordre ou ils se succedent. Rien ne revient en arriere. */
+const TONS_ETAT: Record<string, TonEtiquette> = {
+  ouvert: "alerte",
+  pris_en_compte: "accent",
+  clos: "succes",
+};
+
 const GRAVITES = [
   { valeur: "MINEURE", libelle: "Mineure" },
   { valeur: "NOTABLE", libelle: "Notable" },
@@ -44,6 +56,10 @@ export function SignalementEcart() {
   const { data: structures = [] } = useQuery(structuresQuery());
   const { data: recents = [] } = useQuery(signalementsQuery());
   const signaler = useSignalerEcart(courrierId);
+  const avancer = useAvancerSignalement();
+  //: La suite donnee, saisie ligne par ligne. Un seul champ partage aurait fait
+  //: clore un ecart avec le texte tape pour un autre.
+  const [suites, setSuites] = useState<Record<number, string>>({});
 
   const [type, setType] = useState("");
   const [description, setDescription] = useState("");
@@ -187,35 +203,105 @@ export function SignalementEcart() {
                 {/* Une gravite bloquante suspend le decompte : c'est la seule
                     facon d'eviter qu'une structure soit tenue d'un retard
                     qu'elle n'a pas cause. */}
-                <Encart ton={gravite === "BLOQUANTE" ? "danger" : "alerte"} icone="horloge">
-                  {gravite === "BLOQUANTE"
-                    ? "Gravité bloquante : le décompte du délai de traitement est suspendu jusqu'à résolution."
-                    : "Le décompte du délai de traitement se poursuit pendant l'examen du signalement."}
+                {/*
+                  Deux affirmations ont été retirées ici le 26 août 2026 : « le
+                  décompte du délai est suspendu » et « le destinataire doit se
+                  prononcer sous 24 heures ». Ni l'une ni l'autre n'était vraie —
+                  aucun code ne suspend un délai, aucun ne compte 24 heures.
+                  Un écran qui promet une règle que le serveur n'applique pas
+                  vaut moins qu'un écran qui se tait.
+                */}
+                <Encart ton="alerte" icone="horloge">
+                  Le décompte du délai de traitement se poursuit pendant l'examen du
+                  signalement.
                 </Encart>
 
                 <Encart ton="succes" icone="cloche">
-                  Le destinataire du signalement est notifié immédiatement et doit se prononcer sous
-                  24 heures.
+                  Le responsable de la structure visée est prévenu. C'est lui qui prend
+                  l'écart en charge, puis le clôt en disant ce qui a été fait.
                 </Encart>
               </div>
             </Carte>
 
             <Carte titre="Signalements récents">
               <div className="mt-3.5 flex flex-col gap-2.5">
-                {recents.map((s) => (
-                  <div key={s.id} className="flex flex-col gap-1.5 rounded-none border border-bordure px-3 py-2.5">
+                {recents.length === 0 && (
+                  <p className="text-[12.5px] font-medium text-encre-tenue">
+                    Aucun écart signalé qui vous concerne.
+                  </p>
+                )}
+                {recents.map((ecart) => (
+                  <div
+                    key={ecart.id}
+                    className="flex flex-col gap-1.5 rounded-none border border-bordure px-3 py-2.5"
+                  >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[11px] leading-none font-bold text-encre-faible tabular-nums">
-                        {s.reference}
+                        {ecart.reference}
                       </span>
-                      <Etiquette ton={s.etat === "Résolu" ? "succes" : "alerte"}>{s.etat}</Etiquette>
+                      <Etiquette ton={TONS_ETAT[ecart.etatCode]}>{ecart.etat}</Etiquette>
                     </div>
                     <span className="text-[11.5px] leading-none font-semibold text-encre">
-                      {s.type}
+                      {ecart.type}
                     </span>
                     <span className="text-[10.5px] leading-[1.4] font-medium text-encre-tenue">
-                      {s.detail}
+                      {ecart.detail}
                     </span>
+                    {ecart.suiteDonnee && (
+                      <span className="text-[10.5px] leading-[1.4] font-medium text-succes">
+                        Suite donnée : {ecart.suiteDonnee}
+                      </span>
+                    )}
+                    {/*
+                      L'avancement n'apparaît qu'à la structure visée, et le
+                      serveur le dit lui-même (`peutAvancer`) : le front ne
+                      rejoue pas la règle, il l'affiche.
+                    */}
+                    {ecart.peutAvancer && (
+                      <div className="mt-1 flex flex-col gap-2">
+                        {ecart.etatCode === "clos" ? null : ecart.etatCode === "ouvert" ? (
+                          <Bouton
+                            className="justify-center py-2"
+                            onClick={() =>
+                              avancer.mutate({
+                                signalementId: ecart.id,
+                                etat: "pris_en_compte",
+                              })
+                            }
+                            disabled={avancer.isPending}
+                          >
+                            Prendre en compte
+                          </Bouton>
+                        ) : (
+                          <>
+                            <input
+                              value={suites[ecart.id] ?? ""}
+                              onChange={(e) =>
+                                setSuites({ ...suites, [ecart.id]: e.target.value })
+                              }
+                              placeholder="Ce qui a été fait…"
+                              className="w-full rounded-none border border-bordure-forte px-3 py-2 text-[11.5px] leading-none font-medium text-encre outline-none placeholder:text-encre-tenue focus:border-accent"
+                            />
+                            <Bouton
+                              variante="principal"
+                              className="justify-center py-2"
+                              onClick={() =>
+                                avancer.mutate({
+                                  signalementId: ecart.id,
+                                  etat: "clos",
+                                  suiteDonnee: suites[ecart.id],
+                                })
+                              }
+                              disabled={
+                                avancer.isPending || !(suites[ecart.id] ?? "").trim()
+                              }
+                            >
+                              Clore l'écart
+                            </Bouton>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

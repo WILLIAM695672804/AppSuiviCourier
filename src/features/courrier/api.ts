@@ -1,15 +1,33 @@
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { NiveauFeu } from "@/lib/feu";
-import type { CourrierDetail, CourrierResume, SensCourrier } from "@/types/courrier";
+import type {
+  CourrierDetail,
+  CourrierResume,
+  SensCourrier,
+  Signalement,
+} from "@/types/courrier";
 
 /**
  * Seul point de contact entre le domaine « courrier » et le serveur.
  * Aucun composant n'appelle `api` directement.
  */
 
-/** Les six vues du registre. Ce sont des filtres, pas des etapes. */
-export type VueRegistre = "tous" | "nonCotes" | "affectes" | "horsDelai" | "urgents" | "clotures";
+/**
+ * Les sept vues du registre. Ce sont des filtres, pas des etapes.
+ *
+ * `affectes` et `aAffecter` ne sont pas symetriques et ne portent pas sur le
+ * meme geste : `affectes` liste ce qui m'est affecte **a moi, personne**,
+ * `aAffecter` ce qui est cote **a ma structure** et que personne n'a encore
+ * pris en charge. La cotation vise une structure, l'affectation une personne.
+ */
+export type VueRegistre =
+  | "tous"
+  | "nonCotes"
+  | "aAffecter"
+  | "affectes"
+  | "horsDelai"
+  | "urgents"
+  | "clotures";
 
 export interface FiltresRegistre {
   sens?: SensCourrier;
@@ -197,32 +215,68 @@ export const ficheDeVieQuery = (id: number) =>
     queryFn: ({ signal }) => api.get<FicheVie>(`/courriers/${id}/fiche-de-vie`, signal),
   });
 
-/** Pli remis contre decharge : la preuve papier de la transmission. */
-export interface AccusePhysique {
+/* ------------------------------------------------------------------ *
+ *  Le cahier de decharge — A-11
+ *
+ *  Au Port, l'agent cote signe un cahier pour prouver qu'il a recu le pli.
+ *  Une ligne par affectation, et non par courrier : un courrier cote a deux
+ *  structures produit deux remises distinctes.
+ * ------------------------------------------------------------------ */
+
+/** Une ligne du cahier. `etat` est deduit par le serveur, jamais stocke. */
+export interface LigneDecharge {
   id: number;
+  courrierId: number;
   reference: string;
   objet: string;
   destinataire: string;
+  structure: string;
   remise: string;
+  /** Le coursier, quand la structure le note. « — » sinon. */
   coursier: string;
   recepteur: string;
   decharge: string;
+  /** « Signé », « En attente », « Non retourné ». */
   etat: string;
 }
 
 export const accusesQuery = (vue: string) =>
   queryOptions({
     queryKey: ["courrier", "accuses", vue],
-    queryFn: ({ signal }) => api.get<AccusePhysique[]>(`/accuses?vue=${vue}`, signal),
+    queryFn: ({ signal }) => api.get<LigneDecharge[]>(`/accuses?vue=${vue}`, signal),
   });
 
-export interface Signalement {
-  id: number;
-  reference: string;
-  type: string;
-  detail: string;
-  etat: string;
+/**
+ * L'agent signe sa decharge — « j'ai bien reçu ce courrier ».
+ *
+ * Les deux champs sont facultatifs : un pli remis en main propre n'a pas de
+ * coursier, et une structure qui a cesse de tenir le cahier papier n'est pas
+ * empechee d'accuser a l'ecran.
+ */
+export function useAccepterCourrier(courrierId: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      affectationId,
+      ...corps
+    }: {
+      affectationId: number;
+      remisPar?: string;
+      referenceCahier?: string;
+    }) =>
+      api.post<CourrierDetail>(
+        `/courriers/${courrierId}/affectations/${affectationId}/accuse`,
+        corps,
+      ),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: clesCourrier.racine });
+    },
+  });
 }
+
+/* ------------------------------------------------------------------ *
+ *  Les ecarts signales — A-12
+ * ------------------------------------------------------------------ */
 
 export const signalementsQuery = () =>
   queryOptions({
@@ -239,7 +293,119 @@ export function useSignalerEcart(courrierId: number) {
       description: string;
       gravite: string;
       destinataireStructureId: number;
-    }) => api.post<void>(`/courriers/${courrierId}/signalements`, corps),
+    }) => api.post<Signalement>(`/courriers/${courrierId}/signalements`, corps),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: clesCourrier.racine });
+    },
+  });
+}
+
+/**
+ * Fait passer l'ecart a l'etat suivant — ouvert, pris en compte, clos.
+ *
+ * `etat` est ce que l'ecran croit atteindre : le serveur le compare a l'etat
+ * reellement suivant et refuse s'ils different. Deux agents qui ouvrent le meme
+ * signalement voient tous deux « prendre en compte », et le second ne doit pas
+ * clore sans l'avoir voulu.
+ */
+export function useAvancerSignalement() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      signalementId,
+      ...corps
+    }: {
+      signalementId: number;
+      etat?: string;
+      suiteDonnee?: string;
+    }) => api.post<Signalement>(`/signalements/${signalementId}/etat`, corps),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: clesCourrier.racine });
+      client.invalidateQueries({ queryKey: ["courrier", "signalements"] });
+    },
+  });
+}
+
+/**
+ * Porte une observation au fil du courrier.
+ *
+ * Il n'y a ni modification ni suppression, et ce n'est pas un oubli : tout
+ * lecteur ecrit, tout lecteur lit, jamais modifiable (arbitrage du Port,
+ * 26 aout 2026). La table elle-meme ne porte pas les colonnes qui les rendraient
+ * possibles.
+ */
+export function usePublierObservation(courrierId: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (texte: string) =>
+      api.post<CourrierDetail>(`/courriers/${courrierId}/observations`, { texte }),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: clesCourrier.racine });
+    },
+  });
+}
+
+/**
+ * Enregistre le traitement de l'agent — le brouillon.
+ *
+ * Un seul traitement par agent et par courrier, repris a chaque
+ * enregistrement : d'ou une ressource au singulier. Le serveur refuse tant que
+ * la decharge n'est pas signee (ADR 035), et le message qu'il rend le dit.
+ */
+export function useEnregistrerTraitement(courrierId: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (contenu: string) =>
+      api.post<CourrierDetail>(`/courriers/${courrierId}/traitement`, { contenu }),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: clesCourrier.racine });
+    },
+  });
+}
+
+/**
+ * Rend le traitement au responsable de structure — l'etape RESTITUE.
+ *
+ * Ce n'est pas une soumission a validation : le Port ne connait aucun visa sur
+ * le courrier arrive (ADR 034). Le responsable lit, puis cloture ou retourne.
+ */
+export function useRestituerTraitement(courrierId: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (contenu: string) =>
+      api.post<CourrierDetail>(`/courriers/${courrierId}/restitution`, { contenu }),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: clesCourrier.racine });
+    },
+  });
+}
+
+/** Le responsable rend le traitement a son auteur, avec un motif obligatoire. */
+export function useRetournerTraitement(courrierId: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (corps: { traitementId: number; motif: string }) =>
+      api.post<CourrierDetail>(
+        `/courriers/${courrierId}/traitements/${corps.traitementId}/retour`,
+        { motif: corps.motif },
+      ),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: clesCourrier.racine });
+    },
+  });
+}
+
+/**
+ * Cloture le courrier — la fin du trajet, et elle est definitive.
+ *
+ * `malgreLesBrouillons` est un second clic, pas une option : le premier appel
+ * echoue en nommant qui ecrit encore, et le responsable confirme ensuite.
+ */
+export function useCloturerCourrier(courrierId: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (corps: { observation?: string; malgreLesBrouillons?: boolean }) =>
+      api.post<CourrierDetail>(`/courriers/${courrierId}/cloture`, corps),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: clesCourrier.racine });
     },
@@ -314,40 +480,136 @@ export function useCorriger(courrierId: number) {
 }
 
 /* ------------------------------------------------------------------ *
- *  File d'import — §3.6
+ *  L'import d'e-mails n'existe pas — §3.6
  *
- *  Ni l'import par lot ni l'interception d'e-mails n'enregistrent
- *  directement : les pieces atterrissent dans une file ou l'agent qualifie
- *  avant de valider. Un import sans controle remplirait le registre de
- *  doublons et de messages sans objet.
+ *  « Pas d'import d'e-mail pour le moment » : le Port, 26 aout 2026. La file
+ *  d'interception, son ecran et ses types ont ete retires ce jour-la plutot que
+ *  laisses a repondre 404. Ils reviendront quand la boite existera, et §3.6
+ *  restera a documenter d'ici la — ni le protocole, ni qui qualifie, ne sont
+ *  connus.
  * ------------------------------------------------------------------ */
 
-export type EtatImport = "À qualifier" | "Qualifié" | "Doublon" | "Écarté";
+/* ---------------------------------------------------------------------
+   Bureau d'ordre de structure — A-02b
 
-export interface MessageIntercepte {
+   Au Port, le bureau d'ordre d'une structure est son **point focal**.
+   --------------------------------------------------------------------- */
+
+/** Les trois piles d'un bureau d'ordre réel. */
+export type EtatPassage = "a_accuser" | "en_cours" | "sortis";
+
+/** Les cinq façons de sortir d'une structure. */
+export type MotifSortie = "reponse" | "retour" | "transmission" | "cloture" | "autre";
+
+export const LIBELLES_MOTIF_SORTIE: Record<MotifSortie, string> = {
+  reponse: "Réponse transmise",
+  retour: "Retour au bureau d'ordre central",
+  transmission: "Transmis à une autre structure",
+  cloture: "Clôturé",
+  autre: "Autre",
+};
+
+export interface LignePassage {
   id: number;
+  courrierId: number;
+  numero: string;
   objet: string;
-  expediteur: string;
-  recuLe: string;
-  pieces: number;
-  /** Nature deduite par la reconnaissance, a confirmer par l'agent. */
-  naturePresumee: string | null;
-  /** Score de confiance de la deduction — RF-IA-02, affiche comme l'exige RF-IA-04. */
-  confiance: number | null;
-  etat: EtatImport;
-  motif: string | null;
-  traitePar: string | null;
+  correspondant: string;
+  nature: string | null;
+  structure: string;
+  structureId: number;
+  etape: string;
+  entreLe: string;
+  accuseLe: string | null;
+  accusePar: string | null;
+  sortiLe: string | null;
+  sortiPar: string | null;
+  motifSortie: MotifSortie | null;
+  noteSortie: string | null;
+  joursDansLaStructure: number;
+  /**
+   * Le temps mort du bureau d'ordre : entre l'arrivée et le tampon.
+   *
+   * `null` tant que l'accusé n'est pas posé, et non zéro : le compteur court
+   * toujours, et l'afficher comme une durée acquise ferait passer un courrier
+   * oublié depuis trois jours pour un courrier reçu à l'instant.
+   */
+  heuresAvantAccuse: number | null;
 }
 
-export interface FileImport {
-  boite: string;
-  dernierReleve: string | null;
-  messages: MessageIntercepte[];
-  compteurs: { libelle: string; valeur: number | string; note: string; feu: NiveauFeu }[];
-}
-
-export const fileImportQuery = () =>
+export const bureauOrdreQuery = (etat: EtatPassage, structureId?: number) =>
   queryOptions({
-    queryKey: ["courrier", "import"],
-    queryFn: ({ signal }) => api.get<FileImport>("/courriers/import", signal),
+    queryKey: ["courrier", "bureau-ordre", etat, structureId ?? null],
+    queryFn: ({ signal }) => {
+      const p = new URLSearchParams({ etat });
+      if (structureId) p.set("structure", String(structureId));
+      return api.get<LignePassage[]>(`/courriers/bureau-ordre?${p}`, signal);
+    },
+  });
+
+export function useAccuserReception() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (passageId: number) =>
+      api.post<LignePassage>(`/courriers/passages/${passageId}/accuse`, {}),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: clesCourrier.racine });
+    },
+  });
+}
+
+export function usePrononcerSortie() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      passageId,
+      ...corps
+    }: {
+      passageId: number;
+      motif: MotifSortie | "";
+      note: string | null;
+    }) => api.post<LignePassage>(`/courriers/passages/${passageId}/sortie`, corps),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: clesCourrier.racine });
+    },
+  });
+}
+
+/* ---------------------------------------------------------------------
+   Supervision des délais — le mapping de la DSR
+   --------------------------------------------------------------------- */
+
+export interface LigneBlocage {
+  courrierId: number;
+  numero: string;
+  objet: string;
+  correspondant: string;
+  etape: string;
+  echeance: string | null;
+  joursDepassement: number;
+  /** Le responsable exact. `null` quand personne n'est encore nommé — c'est le blocage. */
+  detenteur: string | null;
+  structure: string | null;
+  motif: string;
+  depuis: string;
+  joursImmobilise: number;
+}
+
+export interface CarteBlocages {
+  lignes: LigneBlocage[];
+  total: number;
+  arreteLe: string;
+  resume: { libelle: string; valeur: string; ton: "neutre" | "succes" | "alerte" }[];
+}
+
+export const supervisionQuery = (structureId?: number, seuil = 0) =>
+  queryOptions({
+    queryKey: ["courrier", "supervision", structureId ?? null, seuil],
+    queryFn: ({ signal }) => {
+      const p = new URLSearchParams();
+      if (structureId) p.set("structure", String(structureId));
+      if (seuil) p.set("seuil", String(seuil));
+      const chaine = p.toString();
+      return api.get<CarteBlocages>(`/courriers/supervision${chaine ? `?${chaine}` : ""}`, signal);
+    },
   });

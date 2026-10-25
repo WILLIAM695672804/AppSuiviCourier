@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useForm, useWatch, Controller } from "react-hook-form";
+import { useRef, useState } from "react";
+import { useForm, useWatch, Controller, type FieldErrors } from "react-hook-form";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
@@ -13,6 +13,7 @@ import { Interrupteur } from "@/components/ui/Interrupteur";
 import { SelecteurSegments } from "@/components/ui/SelecteurSegments";
 import { contexteEnregistrementQuery, useEnregistrer } from "@/features/courrier/api";
 import { BlocNumerisation } from "@/features/courrier/components/BlocNumerisation";
+import { ModaleCorrespondant } from "@/features/courrier/components/ModaleCorrespondant";
 import { SelecteurCorrespondant } from "@/features/courrier/components/SelecteurCorrespondant";
 import { deposerPiece } from "@/features/pieces/api";
 import {
@@ -67,10 +68,43 @@ async function deposerNumerisation(courrierId: number, fichiers: File[]): Promis
   return echecs;
 }
 
+/**
+ * Nom lisible de chaque champ, pour dire a l'agent *ce qui* manque.
+ *
+ * `errors` de react-hook-form porte les noms du schema (`correspondantId`) ;
+ * l'agent, lui, connait le libelle de l'ecran. Sans cette table, le refus se
+ * lit « correspondantId » — c'est-a-dire ne se lit pas.
+ */
+const LIBELLES: Record<string, string> = {
+  typeSession: "la session d'enregistrement",
+  natureId: "la nature du courrier",
+  correspondantId: "l'expéditeur",
+  referenceExpediteur: "la référence de l'expéditeur",
+  dateLettre: "la date de la lettre",
+  nombrePages: "le nombre de pages",
+  objet: "l'objet",
+  delaiJours: "le délai imparti",
+};
+
+function enumerer(elements: string[]): string {
+  if (elements.length <= 1) return elements[0] ?? "";
+  return `${elements.slice(0, -1).join(", ")} et ${elements[elements.length - 1]}`;
+}
+
 export function EnregistrementCourrier() {
   const naviguer = useNavigate();
   const [correspondant, setCorrespondant] = useState<Correspondant | null>(null);
   const [fichiers, setFichiers] = useState<File[]>([]);
+  // Pourquoi un refus en etat plutot qu'un simple `errors` : le bouton est
+  // dans l'en-tete fixe, les erreurs de champ sont dans la zone qui defile.
+  // Sans ce bandeau, cliquer « Enregistrer » sur une saisie incomplete ne
+  // produit **rien de visible** — l'agent conclut que le bouton est mort.
+  const [refus, setRefus] = useState<string | null>(null);
+  // La recherche infructueuse de l'agent sert d'amorce a la creation : il a
+  // deja tape le nom une fois, le lui faire retaper serait une punition.
+  const [rechercheExpediteur, setRechercheExpediteur] = useState("");
+  const [creationOuverte, setCreationOuverte] = useState(false);
+  const zone = useRef<HTMLDivElement>(null);
 
   const { data: contexte } = useQuery(contexteEnregistrementQuery());
   const { data: natures = [] } = useQuery(naturesQuery());
@@ -93,8 +127,42 @@ export function EnregistrementCourrier() {
   const coterMaintenant = useWatch({ control, name: "coterMaintenant" });
   const delaiJours = useWatch({ control, name: "delaiJours" });
 
+  /** Retient l'expediteur — depuis la liste de recherche comme depuis la creation. */
+  function retenirCorrespondant(choisi: Correspondant | null) {
+    setCorrespondant(choisi);
+    setValue("correspondantId", choisi?.id ?? 0, { shouldValidate: true });
+  }
+
+  /**
+   * Refus de validation : dit lesquels, et ramene la vue sur eux.
+   *
+   * `shouldFocusError` de react-hook-form ne suffit pas ici — `correspondantId`
+   * est pose par `setValue` depuis le selecteur d'expediteur, sans `ref`, donc
+   * sans champ a focaliser. C'est justement le champ le plus souvent oublie.
+   */
+  function refuser(erreurs: FieldErrors<SaisieEnregistrement>) {
+    const manquants = Object.keys(erreurs).map((champ) => LIBELLES[champ] ?? champ);
+    setRefus(
+      manquants.length > 0
+        ? `Enregistrement impossible : vérifiez ${enumerer(manquants)}.`
+        : "Enregistrement impossible : la saisie est incomplète.",
+    );
+    zone.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function soumettre(valeurs: SaisieEnregistrement) {
-    const courrier = await enregistrer.mutateAsync(valeurs);
+    setRefus(null);
+
+    // `mutateAsync` rejette quand le serveur refuse. Sans ce filet, la promesse
+    // remonte non traitee jusqu'a la console, et l'ecran ne bouge pas : le
+    // bandeau ci-dessous lit `enregistrer.error` et le montre a sa place.
+    let courrier;
+    try {
+      courrier = await enregistrer.mutateAsync(valeurs);
+    } catch {
+      zone.current?.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
 
     // Les pieces se deposent **apres** l'enregistrement : `POST /pieces` exige
     // l'objet auquel il rattache, et le courrier n'a pas d'identifiant avant sa
@@ -114,7 +182,17 @@ export function EnregistrementCourrier() {
   }
 
   return (
-    <form onSubmit={handleSubmit(soumettre)} className="contents">
+    <form
+      // Filet : n'accepter que l'envoi de ce formulaire-ci, pas d'un envoi
+      // remonte d'ailleurs. `Modale` passe par un portail depuis, donc plus
+      // aucun formulaire n'est imbrique ici — mais l'ecran est un `<form>` qui
+      // couvre tout, et la prochaine saisie posee dedans ne le saura pas.
+      onSubmit={(evenement) => {
+        if (evenement.target !== evenement.currentTarget) return;
+        void handleSubmit(soumettre, refuser)(evenement);
+      }}
+      className="contents"
+    >
       <EnTetePage
         titre="Enregistrer un courrier arrivé"
         miettes={[
@@ -145,7 +223,19 @@ export function EnregistrementCourrier() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto bg-fond px-[26px] pt-5 pb-[30px]">
+      <div ref={zone} className="flex-1 overflow-y-auto bg-fond px-[26px] pt-5 pb-[30px]">
+        {(refus || enregistrer.isError) && (
+          <div className="mb-4">
+            <Encart ton="danger" icone="aide">
+              {enregistrer.isError
+                ? enregistrer.error instanceof Error
+                  ? enregistrer.error.message
+                  : "L'enregistrement a échoué."
+                : refus}
+            </Encart>
+          </div>
+        )}
+
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_336px]">
           <div className="flex min-w-0 flex-col gap-4">
             <BlocNumerisation
@@ -245,6 +335,7 @@ export function EnregistrementCourrier() {
               aDroite={
                 <button
                   type="button"
+                  onClick={() => setCreationOuverte(true)}
                   className="text-[11.5px] leading-none font-bold text-accent hover:text-accent-fonce"
                 >
                   Créer un correspondant
@@ -253,10 +344,9 @@ export function EnregistrementCourrier() {
             >
               <SelecteurCorrespondant
                 choisi={correspondant}
-                onChoisir={(c) => {
-                  setCorrespondant(c);
-                  setValue("correspondantId", c?.id ?? 0, { shouldValidate: true });
-                }}
+                onChoisir={retenirCorrespondant}
+                onSaisieChange={setRechercheExpediteur}
+                onCreer={() => setCreationOuverte(true)}
                 erreur={errors.correspondantId?.message}
               />
             </Carte>
@@ -390,6 +480,20 @@ export function EnregistrementCourrier() {
           </div>
         </div>
       </div>
+
+      {creationOuverte && (
+        <ModaleCorrespondant
+          ouverte
+          saisieInitiale={rechercheExpediteur}
+          onFermer={() => setCreationOuverte(false)}
+          onCree={(cree) => {
+            // Cree puis retenu : l'agent voulait cet expediteur-la, le lui
+            // faire rechercher a nouveau juste apres serait absurde.
+            retenirCorrespondant(cree);
+            setCreationOuverte(false);
+          }}
+        />
+      )}
     </form>
   );
 }

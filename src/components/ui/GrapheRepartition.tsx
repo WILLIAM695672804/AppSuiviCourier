@@ -1,3 +1,5 @@
+import { PiedGraphe } from "@/components/ui/PiedGraphe";
+
 export interface PartRepartition {
   libelle: string;
   valeur: number;
@@ -35,18 +37,28 @@ const INTERLIGNE = 18;
  *
  * L'anneau plutot que le disque : le centre libere sert au total, qui est le
  * chiffre que l'on cherche en premier.
+ *
+ * Il n'y a donc pas de legende, et c'est le seul trace dans ce cas : les
+ * etiquettes reliees *sont* la legende, posee au contact de la part. Le pied ne
+ * sert ici qu'a la mention d'unite et a la note, au meme endroit qu'ailleurs.
  */
 export function GrapheRepartition({
   parts,
   total,
   libelleTotal,
   format = (valeur) => valeur.toLocaleString("fr-FR"),
+  mention,
+  note,
 }: {
   parts: PartRepartition[];
   /** Total inscrit au centre. Par defaut, la somme des parts affichees. */
   total?: number;
   libelleTotal?: string;
   format?: (valeur: number) => string;
+  /** Mention posee au pied : l'unite, la periode couverte. */
+  mention?: string;
+  /** Reserve de lecture, posee a droite du pied. */
+  note?: string;
 }) {
   const somme = parts.reduce((cumul, part) => cumul + part.valeur, 0) || 1;
   const circonference = 2 * Math.PI * RAYON;
@@ -83,7 +95,7 @@ export function GrapheRepartition({
     ...repartirVerticalement(segments.filter((s) => s.droite)),
   ];
 
-  return (
+  const trace = (
     <svg
       viewBox={`0 0 ${LARGEUR} ${HAUTEUR}`}
       className="w-full"
@@ -164,6 +176,17 @@ export function GrapheRepartition({
         );
       })}
     </svg>
+  );
+
+  // Sans mention ni note, le trace se rend seul : un conteneur de plus
+  // decalerait les panneaux qui le posent deja dans leur propre grille.
+  if (!mention && !note) return trace;
+
+  return (
+    <div className="flex flex-col gap-2">
+      {trace}
+      <PiedGraphe mention={mention} note={note} />
+    </div>
   );
 }
 

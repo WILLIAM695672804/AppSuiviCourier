@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { EnTetePage } from "@/components/EnTetePage";
 import { Avatar } from "@/components/ui/Avatar";
@@ -10,7 +10,11 @@ import { Pastilles } from "@/components/ui/Pastilles";
 import { Tableau, type Colonne } from "@/components/ui/Tableau";
 import { BandeauCompteurs } from "@/components/ui/BandeauCompteurs";
 import { ModaleDeclarerAbsence } from "@/features/gouvernance/components/ModalesRegistre";
-import { registreDisponibilitesQuery, type Disponibilite, type TypeAbsence } from "@/features/gouvernance/api";
+import {
+  registreDisponibilitesQuery,
+  type Disponibilite,
+  type TypeAbsence,
+} from "@/features/gouvernance/api";
 import { formaterDate } from "@/lib/format";
 
 /**
@@ -24,8 +28,21 @@ import { formaterDate } from "@/lib/format";
  * Sans cette information, une décision confiée à un directeur en mission
  * attend son retour sans que personne ne le sache, et la relance part vers
  * quelqu'un qui ne la lira pas.
+ *
+ * **Le registre est nominatif et ne s'arrête plus aux hauts responsables.**
+ * Depuis la migration 0024, le chef de structure y voit ses agents comme la
+ * DSR voit les directeurs, et le Directeur général y voit tout le Port. La
+ * colonne « Structure » porte alors la tête de structure, pas le service :
+ * au-dessus d'un directeur, la sous-structure n'existe pas.
  */
-const FILTRES = ["Toutes", "En cours", "Sans intérim", "Congé annuel", "Mission", "Intérim"] as const;
+const FILTRES = [
+  "Toutes",
+  "En cours",
+  "Sans intérim",
+  "Congé annuel",
+  "Mission",
+  "Intérim",
+] as const;
 
 const TONS_TYPE: Record<TypeAbsence, TonEtiquette> = {
   "Congé annuel": "accent",
@@ -35,12 +52,34 @@ const TONS_TYPE: Record<TypeAbsence, TonEtiquette> = {
   "Absence exceptionnelle": "alerte",
 };
 
+const TOUTES = "Toutes structures";
+
 export function Disponibilites() {
   const [filtre, setFiltre] = useState<(typeof FILTRES)[number]>("Toutes");
+  const [structure, setStructure] = useState<string>(TOUTES);
   const [modaleOuverte, setModaleOuverte] = useState(false);
 
-  const { data, isPending } = useQuery(registreDisponibilitesQuery(filtre));
+  // Le filtre part au serveur : filtré à l'affichage, il laisserait les
+  // compteurs faux — ils comptent ce que le serveur a rendu.
+  const { data, isPending } = useQuery(
+    registreDisponibilitesQuery(filtre, structure === TOUTES ? "" : structure),
+  );
   const lignes = data?.disponibilites ?? [];
+
+  // Les options viennent du registre **non filtré**, et non du référentiel des
+  // structures : proposer une direction sans absence donnerait un écran vide
+  // sans raison lisible. Non filtré, sans quoi choisir une direction ferait
+  // disparaître toutes les autres du sélecteur.
+  const { data: complet } = useQuery(registreDisponibilitesQuery("Toutes"));
+  const structures = useMemo(
+    () => [
+      TOUTES,
+      ...[...new Set((complet?.disponibilites ?? []).map((d) => d.structure))]
+        .filter(Boolean)
+        .sort(),
+    ],
+    [complet],
+  );
 
   const colonnes: Colonne<Disponibilite>[] = [
     {
@@ -59,6 +98,16 @@ export function Disponibilites() {
               {d.poste} · {d.structure}
             </span>
           </span>
+        </span>
+      ),
+    },
+    {
+      cle: "structure",
+      entete: "Structure",
+      largeur: "120px",
+      rendu: (d) => (
+        <span className="truncate text-[11.5px] leading-none font-semibold text-encre-moyenne">
+          {d.structure || "—"}
         </span>
       ),
     },
@@ -126,11 +175,15 @@ export function Disponibilites() {
   return (
     <>
       <EnTetePage
-        titre="Disponibilité des responsables"
+        titre="Disponibilité des agents"
         compte={lignes.length}
-        sousTitre="Congés, missions et intérims des directeurs et membres du Cabinet"
+        sousTitre="Congés, missions et intérims — nominatif, dans la limite de votre périmètre"
         actions={
-          <Bouton variante="principal" icone="plus" onClick={() => setModaleOuverte(true)}>
+          <Bouton
+            variante="principal"
+            icone="plus"
+            onClick={() => setModaleOuverte(true)}
+          >
             Déclarer une absence
           </Bouton>
         }
@@ -138,13 +191,18 @@ export function Disponibilites() {
 
       <div className="flex-1 overflow-y-auto bg-fond p-4 md:p-[26px]">
         <div className="flex flex-col gap-3.5">
-          <BandeauCompteurs compteurs={data?.compteurs ?? []} chargement={isPending} />
+          <BandeauCompteurs
+            compteurs={data?.compteurs ?? []}
+            chargement={isPending}
+          />
 
           {(data?.sansInterim ?? 0) > 0 && (
             <Encart ton="danger" icone="cloche">
-              {data?.sansInterim} responsable{(data?.sansInterim ?? 0) > 1 ? "s sont absents" : " est absent"} sans
-              intérimaire désigné. Les décisions et les courriers qui leur reviennent n'avanceront
-              pas, et les relances partiront dans le vide.
+              {data?.sansInterim} responsable
+              {(data?.sansInterim ?? 0) > 1 ? "s sont absents" : " est absent"}{" "}
+              sans intérimaire désigné. Les décisions et les courriers qui leur
+              reviennent n'avanceront pas, et les relances partiront dans le
+              vide.
             </Encart>
           )}
 
@@ -155,6 +213,17 @@ export function Disponibilites() {
               onChange={setFiltre}
               libelle="Filtrer les absences"
             />
+
+            {structures.length > 1 && (
+              <div className="mt-2.5">
+                <Pastilles
+                  options={structures}
+                  actif={structure}
+                  onChange={setStructure}
+                  libelle="Filtrer par structure"
+                />
+              </div>
+            )}
 
             <div className="mt-3.5">
               <Tableau
@@ -169,7 +238,10 @@ export function Disponibilites() {
         </div>
       </div>
 
-      <ModaleDeclarerAbsence ouverte={modaleOuverte} onFermer={() => setModaleOuverte(false)} />
+      <ModaleDeclarerAbsence
+        ouverte={modaleOuverte}
+        onFermer={() => setModaleOuverte(false)}
+      />
     </>
   );
 }

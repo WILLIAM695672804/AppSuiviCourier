@@ -9,9 +9,18 @@ import { Encart } from "@/components/ui/Encart";
 import { EtatChargement, EtatErreur } from "@/components/ui/EtatChargement";
 import { Etiquette } from "@/components/ui/Etiquette";
 import { Icone } from "@/components/ui/Icone";
-import { ficheQuery } from "@/features/courrier/api";
+import {
+  ficheQuery,
+  useAccepterCourrier,
+  useCloturerCourrier,
+  useEnregistrerTraitement,
+  usePublierObservation,
+  useRestituerTraitement,
+  useRetournerTraitement,
+} from "@/features/courrier/api";
 import { actionsDisponibles } from "@/features/courrier/actionsDisponibles";
 import { BlocDelai } from "@/features/courrier/components/BlocDelai";
+import { BlocTraitement } from "@/features/courrier/components/BlocTraitement";
 import { Chronologie } from "@/features/courrier/components/Chronologie";
 import { FilObservations } from "@/features/courrier/components/FilObservations";
 import { ModaleAffectation } from "@/features/courrier/components/ModaleAffectation";
@@ -57,6 +66,12 @@ export function FicheCourrier() {
   // Corriger une saisie relève de qui tient le registre.
   const peutCorriger = usePermission(PERMISSIONS.ENR);
   const { data, isPending, isError, error } = useQuery(ficheQuery(Number(id)));
+  const publier = usePublierObservation(Number(id));
+  const accepter = useAccepterCourrier(Number(id));
+  const enregistrerTraitement = useEnregistrerTraitement(Number(id));
+  const restituer = useRestituerTraitement(Number(id));
+  const retourner = useRetournerTraitement(Number(id));
+  const cloturer = useCloturerCourrier(Number(id));
 
   // « Enregistrer et coter » depose ?coter=1 : la fenetre s'ouvre d'elle-meme.
   const [parametres, setParametres] = useSearchParams();
@@ -148,6 +163,32 @@ export function FicheCourrier() {
               <Bouton icone="reglages" onClick={() => setCorrectionOuverte(true)}>
                 Corriger
               </Bouton>
+            )}
+            {/* La décharge — au Port, l'agent coté signe un cahier quand le pli
+                lui est remis. Le bouton n'apparaît qu'à celui qui l'a reçu et
+                ne l'a pas encore signé : c'est ce que dit `monAffectation`.
+                Tant qu'il n'est pas pressé, « Traiter » n'apparaît pas. */}
+            {data.monAffectation && !data.monAffectation.accepteLe && (
+              <Bouton
+                variante="principal"
+                icone="coche"
+                onClick={() =>
+                  accepter.mutate({ affectationId: data.monAffectation!.id })
+                }
+                disabled={accepter.isPending}
+              >
+                J'ai reçu ce courrier
+              </Bouton>
+            )}
+            {/* Signaler un écart — pli incomplet, mal dirigé, jamais reçu.
+                C'est aussi la seule sortie de l'agent mal coté : il ne porte,
+                par définition, aucun autre droit sur ce courrier-là. */}
+            {actions.includes("signaler") && (
+              <BoutonIcone
+                icone="cloche"
+                libelle="Signaler un écart"
+                onClick={() => naviguer(`/courriers/${data.id}/ecart`)}
+              />
             )}
             {actions.includes("affecter") && (
               <Bouton
@@ -285,9 +326,40 @@ export function FicheCourrier() {
             >
               <FilObservations
                 observations={data.observations}
+                onPublier={(texte) => publier.mutate(texte)}
                 peutEcrire={peutObserver}
               />
             </Carte>
+
+            {/* Le traitement — ce que l'agent coté écrit, et ce que le
+                responsable en fait. Le bloc ne s'affiche qu'à qui a l'un des
+                deux rôles : un lecteur de passage n'a rien à y faire, et les
+                traitements des autres structures ne lui parviennent pas
+                (cloisonnement, ADR 032). */}
+            {(actions.includes("traiter") ||
+              actions.includes("cloturer") ||
+              data.monTraitement ||
+              data.traitements.length > 0) && (
+              <BlocTraitement
+                // Remonter le bloc quand le serveur rend un autre état du
+                // traitement : c'est ce qui recharge la zone de saisie après un
+                // retour du responsable, sans effet qui recopie une propriété.
+                key={`${data.monTraitement?.id ?? 0}-${data.monTraitement?.version ?? 0}-${data.monTraitement?.statut ?? "vide"}`}
+                courrier={data}
+                peutRediger={actions.includes("traiter") || actions.includes("restituer")}
+                peutClore={actions.includes("cloturer")}
+                enCours={
+                  enregistrerTraitement.isPending ||
+                  restituer.isPending ||
+                  retourner.isPending ||
+                  cloturer.isPending
+                }
+                onEnregistrer={(contenu) => enregistrerTraitement.mutate(contenu)}
+                onRestituer={(contenu) => restituer.mutate(contenu)}
+                onRetourner={(traitementId, motif) => retourner.mutate({ traitementId, motif })}
+                onCloturer={(observation) => cloturer.mutate({ observation })}
+              />
+            )}
 
             {data.reponses.length > 0 && (
               <Carte titre="Réponses rattachées">

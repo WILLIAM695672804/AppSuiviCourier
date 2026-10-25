@@ -1,3 +1,4 @@
+import { PiedGraphe } from "@/components/ui/PiedGraphe";
 import type { NiveauFeu } from "@/lib/feu";
 
 /**
@@ -12,8 +13,8 @@ import type { NiveauFeu } from "@/lib/feu";
  * chaque chargement, dans une administration où le réseau est lent.
  *
  * Deux garde-fous, parce qu'un nuage suggère toujours plus qu'il ne démontre :
- * chaque point porte son libellé au survol, et la légende rappelle en toutes
- * lettres qu'une proximité n'est pas une cause.
+ * chaque point porte son libellé au survol, et le pied du graphique rappelle
+ * en toutes lettres qu'une proximité n'est pas une cause.
  */
 export interface Point {
   libelle: string;
@@ -131,15 +132,10 @@ export function NuageDePoints({
         </svg>
       </div>
 
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <span className="text-[10.5px] leading-none font-semibold text-encre-tenue">
-          Abscisse : {libelleX} · Ordonnée : {libelleY}
-        </span>
-        <span className="text-[10.5px] leading-[1.4] font-medium text-encre-tenue">
-          Une proximité n'est pas une cause : ce nuage montre ce qui varie ensemble, pas ce qui
-          explique quoi.
-        </span>
-      </div>
+      <PiedGraphe
+        mention={`Abscisse : ${libelleX} · Ordonnée : ${libelleY}`}
+        note="Une proximité n'est pas une cause : ce nuage montre ce qui varie ensemble, pas ce qui explique quoi."
+      />
     </div>
   );
 }

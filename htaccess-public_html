@@ -1,0 +1,62 @@
+# ---------------------------------------------------------------------
+#  A deposer dans public_html/ sous le nom « .htaccess » (avec le point).
+#
+#  ATTENTION. Si « Setup Python App » a deja ecrit des lignes dans ce
+#  fichier — un bloc encadre de « # DO NOT REMOVE. CLOUDLINUX PASSENGER
+#  CONFIGURATION BEGIN/END » —, ne les supprimez pas et ne les deplacez
+#  pas : elles montent l'application sur /api. Ajoutez ce qui suit
+#  APRES ce bloc.
+# ---------------------------------------------------------------------
+
+# HTTPS obligatoire. Les agents s'authentifient avec leurs identifiants
+# reels ; une seule requete en clair les expose. La redirection est faite
+# ici et non par Django (`SECURE_SSL_REDIRECT = False` dans cpanel.py) :
+# deux redirections en cascade n'ajouteraient rien.
+RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# ---------------------------------------------------------------------
+#  Les pieces jointes ne sont JAMAIS servies en direct.
+#
+#  Elles doivent vivre HORS de public_html (voir la procedure). Cette
+#  regle est la seconde barriere, au cas ou un depot les y placerait : le
+#  seul acces legitime est GET /api/pieces/{uid}/contenu, qui verifie le
+#  perimetre de l'appelant et inscrit un acces au journal. Servir le
+#  fichier directement contournerait les deux.
+# ---------------------------------------------------------------------
+RedirectMatch 404 ^/media/
+
+# Le .env porte la cle de signature des sessions et le mot de passe de la
+# base. Il n'a rien a faire dans public_html — et s'il s'y trouve, il ne
+# se telecharge pas.
+<FilesMatch "^\.env">
+    Require all denied
+</FilesMatch>
+
+# ---------------------------------------------------------------------
+#  Routage du navigateur.
+#
+#  `react-router` porte les chemins cote client : le serveur rend toujours
+#  index.html, sauf pour un fichier qui existe reellement. Sans cela, un
+#  rechargement sur /courriers/registre rendrait 404.
+#
+#  /api est exclu explicitement : cette regle passe avant celles de
+#  Passenger, et sans l'exclusion l'API repondrait du HTML.
+# ---------------------------------------------------------------------
+RewriteCond %{REQUEST_URI} !^/api
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ /index.html [L]
+
+# Les fichiers d'assets portent une empreinte dans leur nom : immuables.
+# index.html ne doit jamais etre cache, sinon une livraison ne parvient a
+# personne.
+<IfModule mod_headers.c>
+    <FilesMatch "\.(js|css|woff2|svg|png|jpg)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+    <FilesMatch "^index\.html$">
+        Header set Cache-Control "no-store"
+    </FilesMatch>
+</IfModule>

@@ -1,4 +1,8 @@
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { NiveauFeu } from "@/lib/feu";
 
@@ -22,9 +26,14 @@ import type { NiveauFeu } from "@/lib/feu";
  */
 
 /** Instance qui a rendu la décision. Détermine qui peut la clore. */
-export type Instance = "Conseil d'administration" | "CODIR" | "Directeur général" | "Assemblée générale";
+export type Instance =
+  | "Conseil d'administration"
+  | "CODIR"
+  | "Directeur général"
+  | "Assemblée générale";
 
-export type EtatDecision = "À lancer" | "En cours" | "Exécutée" | "En retard" | "Suspendue";
+export type EtatDecision =
+  "À lancer" | "En cours" | "Exécutée" | "En retard" | "Suspendue";
 
 export interface StructureChargee {
   id: number;
@@ -74,16 +83,30 @@ export interface ObservationDecision {
 
 export interface DecisionDetail extends Decision {
   contexte: string;
-  origine: { type: "Réunion" | "Session" | "Instruction verbale"; libelle: string; id: number | null };
+  origine: {
+    type: "Réunion" | "Session" | "Instruction verbale";
+    libelle: string;
+    id: number | null;
+  };
   jalons: JalonDecision[];
   observations: ObservationDecision[];
   /** Ce que la décision a produit : courriers, activités, dossiers. */
-  retombees: { type: string; libelle: string; reference: string; chemin: string | null }[];
+  retombees: {
+    type: string;
+    libelle: string;
+    reference: string;
+    chemin: string | null;
+  }[];
 }
 
 export interface RegistreDecisions {
   decisions: Decision[];
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
   total: number;
 }
 
@@ -116,7 +139,12 @@ export interface Seance {
 
 export interface DocumentSeance {
   id: number;
-  nature: "Ordre du jour" | "Compte rendu" | "Procès-verbal" | "Dossier de séance" | "Rapport";
+  nature:
+    | "Ordre du jour"
+    | "Compte rendu"
+    | "Procès-verbal"
+    | "Dossier de séance"
+    | "Rapport";
   libelle: string;
   depose: boolean;
   dateDepot: string | null;
@@ -125,25 +153,54 @@ export interface DocumentSeance {
 }
 
 export interface SeanceDetail extends Seance {
-  ordreDuJour: { id: number; rang: number; point: string; rapporteur: string }[];
+  ordreDuJour: {
+    id: number;
+    rang: number;
+    point: string;
+    rapporteur: string;
+  }[];
   documents: DocumentSeance[];
-  presents: { nom: string; initiales: string; poste: string; present: boolean }[];
-  decisions: { id: number; reference: string; objet: string; etat: EtatDecision }[];
+  presents: {
+    nom: string;
+    initiales: string;
+    poste: string;
+    present: boolean;
+  }[];
+  decisions: {
+    id: number;
+    reference: string;
+    objet: string;
+    etat: EtatDecision;
+  }[];
 }
 
 export interface RegistreSeances {
   seances: Seance[];
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
   total: number;
 }
 
-export type TypeAbsence = "Congé annuel" | "Mission" | "Intérim" | "Formation" | "Absence exceptionnelle";
+export type TypeAbsence =
+  | "Congé annuel"
+  | "Mission"
+  | "Intérim"
+  | "Formation"
+  | "Absence exceptionnelle";
 
 export interface Disponibilite {
   id: number;
   responsable: string;
   initiales: string;
   poste: string;
+  /**
+   * La tête de structure pour qui consolide, le service pour un directeur :
+   * au-dessus d'un directeur, la sous-structure n'existe pas.
+   */
   structure: string;
   type: TypeAbsence;
   du: string;
@@ -160,7 +217,12 @@ export interface Disponibilite {
 
 export interface RegistreDisponibilites {
   disponibilites: Disponibilite[];
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
   /** Responsables absents sans intérim désigné, à la date du jour. */
   sansInterim: number;
 }
@@ -174,7 +236,12 @@ export interface RegistreDisponibilites {
  * celle de l'administration, qui est réservée au paramétrage de l'outil.
  */
 export interface TableauDeBordGouvernance {
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
   /** Décisions qui appellent une relance, les plus critiques d'abord. */
   aRelancer: Decision[];
   /** Comptes rendus attendus ou déjà hors délai. */
@@ -199,9 +266,11 @@ export interface TableauDeBordGouvernance {
 
 export type NatureEntite = "Filiale" | "Succursale";
 
-export type OrganeType = "Conseil d'administration" | "Assemblée générale" | "Comité de gestion";
+export type OrganeType =
+  "Conseil d'administration" | "Assemblée générale" | "Comité de gestion";
 
-export type EtatPreparation = "À préparer" | "Dossier en cours" | "Dossier transmis" | "Tenue";
+export type EtatPreparation =
+  "À préparer" | "Dossier en cours" | "Dossier transmis" | "Tenue";
 
 export interface OrganeGestion {
   id: number;
@@ -234,7 +303,12 @@ export interface PrescriptionFiliale {
 export interface SuiviFiliales {
   organes: OrganeGestion[];
   prescriptions: PrescriptionFiliale[];
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
 }
 
 /* ------------------------------------------------------------------ *
@@ -289,7 +363,12 @@ export interface RecommandationExterne {
 export interface SuiviRepresentations {
   representations: Representation[];
   recommandations: RecommandationExterne[];
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
 }
 
 /* ------------------------------------------------------------------ *
@@ -337,7 +416,12 @@ export interface PlanningConges {
   annee: number;
   lignes: LigneConges[];
   conflits: ConflitConges[];
-  compteurs: { libelle: string; valeur: number; note: string; feu: NiveauFeu }[];
+  compteurs: {
+    libelle: string;
+    valeur: number;
+    note: string;
+    feu: NiveauFeu;
+  }[];
 }
 
 const CLE = "gouvernance";
@@ -345,19 +429,22 @@ const CLE = "gouvernance";
 export const filialesQuery = () =>
   queryOptions({
     queryKey: [CLE, "filiales"],
-    queryFn: ({ signal }) => api.get<SuiviFiliales>("/gouvernance/filiales", signal),
+    queryFn: ({ signal }) =>
+      api.get<SuiviFiliales>("/gouvernance/filiales", signal),
   });
 
 export const representationsQuery = () =>
   queryOptions({
     queryKey: [CLE, "representations"],
-    queryFn: ({ signal }) => api.get<SuiviRepresentations>("/gouvernance/representations", signal),
+    queryFn: ({ signal }) =>
+      api.get<SuiviRepresentations>("/gouvernance/representations", signal),
   });
 
 export const planningCongesQuery = (annee: number) =>
   queryOptions({
     queryKey: [CLE, "conges", annee],
-    queryFn: ({ signal }) => api.get<PlanningConges>(`/gouvernance/conges?annee=${annee}`, signal),
+    queryFn: ({ signal }) =>
+      api.get<PlanningConges>(`/gouvernance/conges?annee=${annee}`, signal),
     placeholderData: (precedent) => precedent,
   });
 
@@ -382,29 +469,40 @@ export const registreDecisionsQuery = (instance: string, etat: string) =>
 export const decisionQuery = (id: number) =>
   queryOptions({
     queryKey: [CLE, "decision", id],
-    queryFn: ({ signal }) => api.get<DecisionDetail>(`/gouvernance/decisions/${id}`, signal),
+    queryFn: ({ signal }) =>
+      api.get<DecisionDetail>(`/gouvernance/decisions/${id}`, signal),
   });
 
 export const registreSeancesQuery = (type: string) =>
   queryOptions({
     queryKey: [CLE, "seances", type],
     queryFn: ({ signal }) =>
-      api.get<RegistreSeances>(`/gouvernance/seances?type=${encodeURIComponent(type)}`, signal),
+      api.get<RegistreSeances>(
+        `/gouvernance/seances?type=${encodeURIComponent(type)}`,
+        signal,
+      ),
     placeholderData: (precedent) => precedent,
   });
 
 export const seanceQuery = (id: number) =>
   queryOptions({
     queryKey: [CLE, "seance", id],
-    queryFn: ({ signal }) => api.get<SeanceDetail>(`/gouvernance/seances/${id}`, signal),
+    queryFn: ({ signal }) =>
+      api.get<SeanceDetail>(`/gouvernance/seances/${id}`, signal),
   });
 
-export const registreDisponibilitesQuery = (filtre: string) =>
+/**
+ * `structure` filtre par **tête** pour qui consolide — le code d'une direction,
+ * jamais d'un service. Le filtre part au serveur : filtré à l'affichage, il
+ * laisserait les compteurs faux.
+ */
+export const registreDisponibilitesQuery = (filtre: string, structure = "") =>
   queryOptions({
-    queryKey: [CLE, "disponibilites", filtre],
+    queryKey: [CLE, "disponibilites", filtre, structure],
     queryFn: ({ signal }) =>
       api.get<RegistreDisponibilites>(
-        `/gouvernance/disponibilites?filtre=${encodeURIComponent(filtre)}`,
+        `/gouvernance/disponibilites?filtre=${encodeURIComponent(filtre)}` +
+          `&structure=${encodeURIComponent(structure)}`,
         signal,
       ),
     placeholderData: (precedent) => precedent,
@@ -480,12 +578,40 @@ export interface SaisieAbsence {
   interimaireId: number | null;
 }
 
+export interface SaisieDroitConges {
+  /** L'agent bénéficiaire, par identifiant — ADR 020. */
+  agentId: number;
+  annee: number;
+  /**
+   * Le nombre de jours vient de la DRH. L'ancienneté, les reports et les
+   * majorations sont son affaire : l'écran le saisit, il ne le calcule pas.
+   */
+  droitsJours: number;
+}
+
+export interface SaisiePeriodeConges {
+  droitId: number;
+  du: string;
+  au: string;
+}
+
+export interface SaisieArbitrageConges {
+  /** Nécessaire à `useEcriture`, qui construit le chemin depuis le corps. */
+  periodeId: number;
+  etat: EtatConge;
+  /** Obligatoire pour un report : le serveur refuse un report nu. */
+  motif?: string;
+}
+
 function useEcriture<TCorps>(chemin: string | ((corps: TCorps) => string)) {
   const client = useQueryClient();
 
   return useMutation({
     mutationFn: (corps: TCorps) =>
-      api.post<{ id: number }>(typeof chemin === "function" ? chemin(corps) : chemin, corps),
+      api.post<{ id: number }>(
+        typeof chemin === "function" ? chemin(corps) : chemin,
+        corps,
+      ),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: [CLE] });
       // Le cockpit et les tableaux de bord agregent la gouvernance : ils
@@ -495,7 +621,9 @@ function useEcriture<TCorps>(chemin: string | ((corps: TCorps) => string)) {
       // Creer une structure change le referentiel de l'organigramme, qui est
       // garde une heure en cache (`structuresQuery`) : sans cette ligne, la
       // nouvelle direction n'apparaitrait dans aucun selecteur avant une heure.
-      void client.invalidateQueries({ queryKey: ["referentiel", "structures"] });
+      void client.invalidateQueries({
+        queryKey: ["referentiel", "structures"],
+      });
       // Creer une structure ouvre aussi son poste responsable, vacant : les
       // selecteurs de poste et l'organigramme de l'administration doivent le
       // voir apparaitre, sans quoi la structure existerait sans poste ou l'on
@@ -506,17 +634,44 @@ function useEcriture<TCorps>(chemin: string | ((corps: TCorps) => string)) {
   });
 }
 
-export const useCreerDecision = () => useEcriture<SaisieDecision>("/gouvernance/decisions");
+export const useCreerDecision = () =>
+  useEcriture<SaisieDecision>("/gouvernance/decisions");
 
 export const useConsignerAvancement = () =>
-  useEcriture<SaisieAvancement>((corps) => `/gouvernance/decisions/${corps.decisionId}/avancement`);
+  useEcriture<SaisieAvancement>(
+    (corps) => `/gouvernance/decisions/${corps.decisionId}/avancement`,
+  );
 
 export const useRelancer = () =>
-  useEcriture<SaisieRelance>((corps) => `/gouvernance/decisions/${corps.decisionId}/relance`);
+  useEcriture<SaisieRelance>(
+    (corps) => `/gouvernance/decisions/${corps.decisionId}/relance`,
+  );
 
-export const useCreerSeance = () => useEcriture<SaisieSeance>("/gouvernance/seances");
+export const useCreerSeance = () =>
+  useEcriture<SaisieSeance>("/gouvernance/seances");
 
 export const useDeposerDocument = () =>
-  useEcriture<SaisieDocument>((corps) => `/gouvernance/seances/${corps.seanceId}/documents`);
+  useEcriture<SaisieDocument>(
+    (corps) => `/gouvernance/seances/${corps.seanceId}/documents`,
+  );
 
-export const useDeclarerAbsence = () => useEcriture<SaisieAbsence>("/gouvernance/disponibilites");
+export const useDeclarerAbsence = () =>
+  useEcriture<SaisieAbsence>("/gouvernance/disponibilites");
+
+/**
+ * Les trois gestes du planning des congés.
+ *
+ * Portés par `DISPO` comme la disponibilité : c'est le chef de structure qui
+ * planifie les congés de ses agents, et le serveur borne au périmètre. L'écran
+ * n'a donc rien à filtrer — il envoie, le serveur refuse ce qui n'est pas à lui.
+ */
+export const useOuvrirDroitConges = () =>
+  useEcriture<SaisieDroitConges>("/gouvernance/conges");
+
+export const usePlanifierConges = () =>
+  useEcriture<SaisiePeriodeConges>("/gouvernance/conges/periodes");
+
+export const useArbitrerConges = () =>
+  useEcriture<SaisieArbitrageConges>(
+    (corps) => `/gouvernance/conges/periodes/${corps.periodeId}/arbitrage`,
+  );

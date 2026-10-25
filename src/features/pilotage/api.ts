@@ -12,12 +12,13 @@ import type { NiveauFeu } from "@/lib/feu";
  * onglet resté ouvert après un changement d'habilitation n'est pas une
  * tentative d'intrusion.
  *
- * Ces deux écrans décrivaient auparavant le courrier : volumes enregistrés et
- * clôturés, délais de traitement, expéditeurs distincts. Le pilier courrier
- * n'est pas en service, et le contrat porte désormais ce que l'application
- * mesure vraiment — les productions attendues du calendrier officiel et les
- * décisions d'instance exécutées. Ce qu'elle ne mesure pas est énuméré dans
- * `nonMesure`, plutôt que tu ou remplacé par un zéro. Voir l'ADR 011 et A30.
+ * Ces deux écrans décrivaient auparavant le courrier, puis ne l'ont plus décrit
+ * du tout : le pilier n'avait pas de clôture, donc aucun délai ne s'arrêtait.
+ * Depuis le 27 août 2026 le courrier a de nouveau sa ligne — courriers traités
+ * dans le délai, volume enregistré, délai moyen — aux côtés des productions du
+ * calendrier officiel et des décisions d'instance. Ce que l'application ne
+ * mesure toujours pas est énuméré dans `nonMesure`, plutôt que tu ou remplacé
+ * par un zéro. Voir l'ADR 011 et A30.
  */
 export type PerimetreVue = "institution" | "structure" | "mesDossiers";
 

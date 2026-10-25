@@ -1,13 +1,28 @@
-/** Etapes du circuit. Ce sont des codes de la base, jamais des libelles d'ecran. */
+/**
+ * Les sept etapes du trajet d'un courrier arrive. Ce sont des codes de la base,
+ * jamais des libelles d'ecran.
+ *
+ * Le Port a decrit ce trajet le 26 aout 2026 :
+ *
+ *     enregistre -> cote -> affecte -> accepte -> en traitement
+ *                -> restitue -> cloture
+ *
+ * `TRANSMIS`, `SIGNE` et `PARTI` ont ete **retires** ce jour-la. Ils relevent du
+ * pilier depart, et le serveur ne les a jamais emis : un type qui annonce une
+ * valeur impossible se lit comme une specification et fait filtrer un ecran sur
+ * du vide.
+ *
+ * `ACCEPTE` est la decharge — l'agent cote a signe le cahier. `RESTITUE`
+ * remplace `EN_VALIDATION` : le traitement rendu attend son responsable de
+ * structure, pas une validation hierarchique qui n'existe pas.
+ */
 export type EtapeCourrier =
   | "ENREGISTRE"
   | "COTE"
-  | "TRANSMIS"
   | "AFFECTE"
+  | "ACCEPTE"
   | "EN_TRAITEMENT"
-  | "EN_VALIDATION"
-  | "SIGNE"
-  | "PARTI"
+  | "RESTITUE"
   | "CLOTURE";
 
 /**
@@ -132,12 +147,80 @@ export interface CourrierDetail extends CourrierResume {
   cotations: Cotation[];
   chronologie: EtapeChronologie[];
   observations: Observation[];
+  /**
+   * L'affectation de CELUI qui lit, s'il en a une. `null` pour tous les autres :
+   * un courrier qu'on lit sans l'avoir recu ne se decharge pas.
+   */
+  monAffectation: MonAffectation | null;
+  /** Le traitement de CELUI qui lit, s'il en a ouvert un : ce que la zone de
+   *  redaction recharge. `null` pour qui n'a rien ecrit. */
+  monTraitement: Traitement | null;
+  /** Les traitements des autres, cloisonnes comme les gestes internes. Un
+   *  brouillon n'y figure jamais : seul son auteur le voit. */
+  traitements: Traitement[];
+  /** Les ecarts signales sur ce courrier que ce lecteur a le droit de suivre. */
+  signalements: Signalement[];
   piecesJointes: PieceJointe[];
   reponses: ReponseRattachee[];
   /** Trois derniers evenements ; le journal complet est dans la tracabilite. */
   derniersEvenements: EvenementCourrier[];
   /** Permissions de l'utilisateur sur CE courrier, calculees par le serveur. */
   actionsPossibles: string[];
+}
+
+/**
+ * Ce que le lecteur de la fiche a recu, et s'il l'a decharge.
+ *
+ * `accepteLe` a `null` veut dire « le pli m'est attribue, je n'ai pas signe » :
+ * c'est le seul etat ou le bouton de decharge s'affiche.
+ */
+export interface MonAffectation {
+  id: number;
+  affecteLe: string;
+  consigne: string | null;
+  accepteLe: string | null;
+}
+
+/**
+ * Ce qu'un agent a ecrit du courrier, et ou en est ce texte.
+ *
+ * `statut` porte le code du socle, `statutLibelle` la phrase que l'ecran
+ * affiche : le front filtre sur l'un et rend l'autre, plutot que d'entretenir
+ * une seconde table de traduction.
+ */
+export interface Traitement {
+  id: number;
+  redacteur: string;
+  redacteurId: number;
+  structure: string;
+  version: number;
+  contenu: string;
+  statut: "brouillon" | "soumis" | "retourne" | "valide";
+  statutLibelle: string;
+  /** L'heure de la restitution. `null` tant que c'est un brouillon. */
+  restitueLe: string | null;
+  modifieLe: string;
+}
+
+/** Un ecart constate sur le circuit papier — A-12. */
+export interface Signalement {
+  id: number;
+  courrierId: number;
+  reference: string;
+  /** Libelle du type, deja traduit par le serveur. */
+  type: string;
+  typeCode: string;
+  gravite: string;
+  detail: string;
+  destinataire: string;
+  emisPar: string;
+  emisLe: string;
+  /** « Ouvert », « Pris en compte », « Clos ». */
+  etat: string;
+  etatCode: "ouvert" | "pris_en_compte" | "clos";
+  suiteDonnee: string | null;
+  /** Calcule par le serveur : seule la structure visee fait avancer l'ecart. */
+  peutAvancer: boolean;
 }
 
 /** Le chef de file d'un courrier, ou null s'il n'est pas encore cote. */

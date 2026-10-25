@@ -1,18 +1,19 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { EnTetePage } from "@/components/EnTetePage";
 import { Avatar } from "@/components/ui/Avatar";
 import { BandeauCompteurs } from "@/components/ui/BandeauCompteurs";
 import { BarreProgression } from "@/components/ui/BarreProgression";
 import { Bouton } from "@/components/ui/Bouton";
 import { Etiquette, type TonEtiquette } from "@/components/ui/Etiquette";
+import { ChoixStructure } from "@/components/ui/ChoixStructure";
 import { Pastilles } from "@/components/ui/Pastilles";
 import { Tableau, type Colonne } from "@/components/ui/Tableau";
 import { ModaleNouvelleActivite } from "@/features/activite/components/ModalesActivite";
 import { registreActivitesQuery, type Activite, type EtatActivite } from "@/features/activite/api";
 import { usePermission } from "@/lib/contexteSession";
-import { formaterDate } from "@/lib/format";
+import { formaterMois } from "@/lib/format";
 import { PERMISSIONS } from "@/types/habilitation";
 
 /**
@@ -48,8 +49,23 @@ const RANG_ETAT: Record<EtatActivite, number> = {
 export function RegistreActivites() {
   const naviguer = useNavigate();
   const peutSaisir = usePermission(PERMISSIONS.ACT_SAI);
-  const [structure, setStructure] = useState("Toutes");
-  const [etat, setEtat] = useState<(typeof ETATS)[number]>("Tous");
+  /*
+   * Les filtres s'amorcent sur l'URL, et seulement a l'ouverture.
+   *
+   * C'est ce qui rend le registre atteignable depuis un graphique : la vue
+   * d'ensemble du Directeur general y envoie deja filtre (ADR 027). Ensuite les
+   * selecteurs reprennent la main — reecrire l'URL a chaque changement de
+   * filtre aurait rempli l'historique du navigateur d'etats intermediaires a
+   * derouler un par un.
+   */
+  const [parametres] = useSearchParams();
+  const [structure, setStructure] = useState(parametres.get("structure") ?? "Toutes");
+  const [etat, setEtat] = useState<(typeof ETATS)[number]>(() => {
+    const demande = parametres.get("etat");
+    return ETATS.includes(demande as (typeof ETATS)[number])
+      ? (demande as (typeof ETATS)[number])
+      : "Tous";
+  });
   const [modaleOuverte, setModaleOuverte] = useState(false);
 
   const { data, isPending } = useQuery(registreActivitesQuery(structure, etat));
@@ -92,17 +108,23 @@ export function RegistreActivites() {
     },
     {
       cle: "responsable",
-      entete: "Responsable",
+      entete: "Point focal",
       largeur: "minmax(140px,1fr)",
       role: "meta",
-      rendu: (a) => (
-        <span className="flex min-w-0 items-center gap-2">
-          <Avatar initiales={a.initiales} taille="petit" />
-          <span className="truncate text-[11.5px] leading-none font-semibold text-encre">
-            {a.responsable}
+      // Facultatif depuis l'ADR 047 : ce qui répond de l'activité, ce sont les
+      // structures, portées par la colonne précédente. Un tiret plutôt qu'une
+      // pastille vide, qui se lirait comme un compte sans nom.
+      rendu: (a) =>
+        a.responsable === null ? (
+          <span className="text-[11.5px] leading-none font-medium text-encre-tenue">—</span>
+        ) : (
+          <span className="flex min-w-0 items-center gap-2">
+            <Avatar initiales={a.initiales ?? ""} taille="petit" />
+            <span className="truncate text-[11.5px] leading-none font-semibold text-encre">
+              {a.responsable}
+            </span>
           </span>
-        </span>
-      ),
+        ),
     },
     {
       cle: "periode",
@@ -110,7 +132,7 @@ export function RegistreActivites() {
       largeur: "124px",
       rendu: (a) => (
         <span className="text-[11px] leading-none font-semibold text-encre-douce tabular-nums">
-          {formaterDate(a.fin)}
+          {formaterMois(a.fin)}
         </span>
       ),
     },
@@ -170,12 +192,16 @@ export function RegistreActivites() {
 
           <div className="rounded-none border border-bordure bg-surface px-4 pt-4 pb-2 md:px-5">
             <div className="flex flex-col gap-2.5">
+              {/* Les structures passent par un menu deroulant, les etats
+                  restent en pastilles : cinq etats se lisent d'un coup d'oeil,
+                  soixante-dix-sept structures non (ADR 028). */}
               {structures.length > 2 && (
-                <Pastilles
-                  options={structures}
+                <ChoixStructure
+                  sigles={structures}
                   actif={structure}
                   onChange={setStructure}
                   libelle="Filtrer par structure"
+                  sigleTout="Toutes"
                 />
               )}
               <Pastilles

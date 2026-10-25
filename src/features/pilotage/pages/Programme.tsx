@@ -189,10 +189,9 @@ export function Programme() {
 
           <p className="px-1 text-[11px] leading-[1.5] font-medium text-encre-tenue">
             « Non mesuré » n'est pas zéro, et « cible non fixée » n'est pas une cible de zéro. Un
-            indicateur sans dispositif de mesure — le traitement du courrier, dont le pilier n'est
-            pas en service — s'affiche à ce titre plutôt qu'à zéro, qui se lirait comme un échec.
-            Les cibles chiffrées du programme n'ont pas été communiquées ; elles s'administrent, et
-            l'écran les montre absentes tant qu'elles le sont.
+            indicateur sans dispositif de mesure s'affiche à ce titre plutôt qu'à zéro, qui se
+            lirait comme un échec. Les cibles chiffrées du programme n'ont pas été communiquées ;
+            elles s'administrent, et l'écran les montre absentes tant qu'elles le sont.
           </p>
         </div>
       </div>

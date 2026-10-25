@@ -32,6 +32,14 @@ import { PERMISSIONS } from "@/types/habilitation";
 const ONGLETS: readonly Onglet<VueRegistre>[] = [
   { cle: "tous", libelle: "Tous" },
   { cle: "nonCotes", libelle: "Non cotés" },
+  /*
+   * « À affecter » et « Qui m'est affecté » se suivent parce qu'ils encadrent le
+   * même geste : ce que ma structure doit distribuer, puis ce qui m'est revenu.
+   * Le premier n'existait pas, et c'était un trou dans le trajet du courrier —
+   * un directeur coté à sa direction relisait son registre entier pour retrouver
+   * ce qu'il avait à distribuer.
+   */
+  { cle: "aAffecter", libelle: "À affecter" },
   { cle: "affectes", libelle: "Qui m'est affecté" },
   { cle: "horsDelai", libelle: "Hors délai" },
   { cle: "urgents", libelle: "Urgents" },
@@ -66,6 +74,10 @@ export function RegistreCourriers({
   // serveur refuse l'export sans `IMP` (`courrier/documents.py`). Montrer le
   // bouton à qui ne la porte pas ferait promettre un fichier refusé.
   const peutImprimer = usePermission(PERMISSIONS.IMP);
+  // « À affecter » est la file de qui affecte. Montrer l'onglet à qui ne porte
+  // pas `AFF` afficherait une liste sur laquelle il n'a aucun geste à faire.
+  const peutAffecter = usePermission(PERMISSIONS.AFF);
+  const onglets = peutAffecter ? ONGLETS : ONGLETS.filter((o) => o.cle !== "aAffecter");
 
   const [cotationOuverte, setCotationOuverte] = useState(false);
 
@@ -146,7 +158,7 @@ export function RegistreCourriers({
       )}
 
       <div className="flex-none">
-        <Onglets onglets={ONGLETS} actif={vue} onChange={changerVue} />
+        <Onglets onglets={onglets} actif={vue} onChange={changerVue} />
       </div>
 
       <div className="flex flex-none flex-wrap items-center gap-2.5 px-[26px] py-[13px]">

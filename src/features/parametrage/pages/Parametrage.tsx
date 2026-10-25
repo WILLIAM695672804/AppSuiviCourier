@@ -86,7 +86,7 @@ export function Parametrage() {
                     variante="doux"
                     icone="plus"
                     disabled
-                    title="Aucune écriture n'est ouverte sur ce référentiel : le pilier courrier qui le consomme n'est pas livré."
+                    title="Le trajet du courrier arrivé n'est pas paramétrable : il suit les cotations et les affectations (ADR 034). Ce référentiel reste sans emploi."
                   >
                     Créer un modèle
                   </Bouton>
@@ -151,7 +151,7 @@ export function Parametrage() {
                     variante="doux"
                     icone="plus"
                     disabled
-                    title="Aucune écriture n'est ouverte sur ce référentiel : le pilier courrier qui le consomme n'est pas livré."
+                    title="Le trajet du courrier arrivé n'est pas paramétrable : il suit les cotations et les affectations (ADR 034). Ce référentiel reste sans emploi."
                   >
                     Ajouter une règle
                   </Bouton>
@@ -313,7 +313,7 @@ export function Parametrage() {
                     variante="doux"
                     icone="plus"
                     disabled
-                    title="Aucune écriture n'est ouverte sur ce référentiel : le pilier courrier qui le consomme n'est pas livré."
+                    title="Les délais se fixent à la main, à la cotation puis à l'affectation (arbitrage du Port, 26 août 2026). Aucun engagement standard n'est appliqué."
                   >
                     Ajouter un engagement
                   </Bouton>
@@ -486,7 +486,7 @@ function OngletClassement({ data, recherche }: { data: DonneesParametrage; reche
           variante="principal"
           icone="plus"
           disabled
-          title="Aucune écriture n'est ouverte sur ce référentiel : le pilier courrier qui le consomme n'est pas livré."
+          title="Ce référentiel attend son contenu : ni le plan de classement ni les seuils du Port n'ont été communiqués (question ouverte A24)."
         >
           Ajouter une rubrique
         </Bouton>
@@ -557,7 +557,7 @@ function OngletSeuils({ data }: { data: DonneesParametrage }) {
           variante="principal"
           icone="plus"
           disabled
-          title="Aucune écriture n'est ouverte sur ce référentiel : le pilier courrier qui le consomme n'est pas livré."
+          title="Ce référentiel attend son contenu : ni le plan de classement ni les seuils du Port n'ont été communiqués (question ouverte A24)."
         >
           Ajouter un seuil
         </Bouton>

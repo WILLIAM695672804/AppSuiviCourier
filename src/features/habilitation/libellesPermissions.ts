@@ -10,6 +10,12 @@ import { PERMISSIONS, type Permission } from "@/types/habilitation";
  * Les groupes suivent les piliers du descriptif fonctionnel, parce que c'est
  * ainsi que l'administrateur raisonne : il habilite quelqu'un « au suivi des
  * activités », pas à une liste de verbes épars.
+ *
+ * **La liste doit être complète.** Une permission qui existe en base et qui ne
+ * figure pas ici ne s'accorde par aucun écran : elle devient un droit que seul
+ * un `INSERT` distribue. `BO_STR` et `ACT_REC` étaient dans ce cas — ajoutées
+ * après coup au socle, jamais reportées ici. Le test `test_habilitations_api`
+ * compare désormais les deux listes.
  */
 export interface GroupePermissions {
   titre: string;
@@ -26,6 +32,7 @@ export const GROUPES_PERMISSIONS: GroupePermissions[] = [
       { code: PERMISSIONS.COT_DEL, libelle: "Saisir une cotation pour une autorité" },
       { code: PERMISSIONS.AFF, libelle: "Affecter un dossier à un agent" },
       { code: PERMISSIONS.TRA, libelle: "Traiter un dossier qui lui est affecté" },
+      { code: PERMISSIONS.BO_STR, libelle: "Tenir le bureau d'ordre de sa structure" },
     ],
   },
   {
@@ -52,6 +59,7 @@ export const GROUPES_PERMISSIONS: GroupePermissions[] = [
       { code: PERMISSIONS.ACT_LEC, libelle: "Consulter les plans d'actions et les activités" },
       { code: PERMISSIONS.ACT_SAI, libelle: "Saisir les activités de sa structure" },
       { code: PERMISSIONS.ACT_VAL, libelle: "Valider un plan d'actions annuel" },
+      { code: PERMISSIONS.ACT_REC, libelle: "Recalibrer l'avancement déclaré d'une activité" },
     ],
   },
   {

@@ -1,3 +1,5 @@
+import { PiedGraphe } from "@/components/ui/PiedGraphe";
+
 export interface SerieBarres {
   libelle: string;
   couleur: string;
@@ -13,15 +15,24 @@ export interface SerieBarres {
  *
  * La valeur exacte reste accessible au survol : un graphique ne remplace pas
  * le chiffre, il le situe.
+ *
+ * La legende, la mention d'axe et la note sont deleguees a `PiedGraphe`, qui
+ * les pose au meme endroit sur tous les traces.
  */
 export function GrapheBarres({
   categories,
   series,
   hauteur = 180,
+  libelleAxe,
+  note,
 }: {
   categories: string[];
   series: SerieBarres[];
   hauteur?: number;
+  /** Mention posee au pied : ce que comptent les barres, la periode couverte. */
+  libelleAxe?: string;
+  /** Reserve de lecture, posee a droite du pied. */
+  note?: string;
 }) {
   const maximum = Math.max(1, ...series.flatMap((s) => s.valeurs));
 
@@ -46,27 +57,19 @@ export function GrapheBarres({
                 );
               })}
             </div>
-            <span className="truncate text-center text-[10px] leading-none font-medium text-encre-tenue">
+            {/* Tronque par construction : le survol rend le libelle entier,
+                sans quoi un sigle coupe ne se decode plus. */}
+            <span
+              title={categorie}
+              className="truncate text-center text-[10px] leading-none font-medium text-encre-tenue"
+            >
               {categorie}
             </span>
           </div>
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3.5">
-        {series.map((serie) => (
-          <span key={serie.libelle} className="flex items-center gap-1.5">
-            <span
-              className="size-2 rounded-none"
-              style={{ background: serie.couleur }}
-              aria-hidden="true"
-            />
-            <span className="text-[11px] leading-none font-medium text-encre-faible">
-              {serie.libelle}
-            </span>
-          </span>
-        ))}
-      </div>
+      <PiedGraphe series={series} mention={libelleAxe} note={note} />
     </div>
   );
 }

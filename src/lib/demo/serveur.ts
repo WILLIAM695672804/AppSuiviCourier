@@ -10,8 +10,8 @@ import type {
 } from "@/features/gouvernance/api";
 import type {
   ActiviteDetail,
-  SaisieActivite,
   SaisieAvancementActivite,
+  SaisieRecalibrage,
   SaisieEtatPlan,
   SaisieIndicateurActivite,
   SaisieInstructionActivite,
@@ -20,7 +20,10 @@ import type {
   SaisieRelanceActivite,
   SaisieReleveIndicateur,
   SaisieSuspension,
-  SaisieTacheActivite,
+  SaisieCreationActivite,
+  SaisieListeTaches,
+  SaisieTacheLigne,
+  TacheActivite,
 } from "@/features/activite/api";
 import type {
   SaisieIndicateur,
@@ -144,6 +147,11 @@ import {
   seancesListe,
 } from "@/lib/demo/donneesGouvernance";
 import { ErreurApi } from "@/lib/erreurApi";
+import {
+  PASSAGES_DEMO,
+  carteBlocagesDemo,
+  passagesDemo,
+} from "@/lib/demo/donneesBureauOrdre";
 
 /**
  * Faux serveur du mode demonstration.
@@ -161,6 +169,9 @@ const jour = (c: CourrierDemo) => c.dateReception.slice(0, 10);
 
 const FILTRES: Record<string, (c: CourrierDemo) => boolean> = {
   nonCotes: (c) => c.etape === "ENREGISTRE",
+  // Cote, et pas encore affecte a une personne. Le jeu de demonstration ne porte
+  // pas les structures cotees de l'utilisateur : l'etape suffit a le dire.
+  aAffecter: (c) => c.etape === "COTE",
   affectes: (c) => c.affecteAMoi,
   horsDelai: (c) => (c.delai?.joursDepassement ?? 0) > 0,
   urgents: (c) => c.priorite !== "NORMALE",
@@ -270,13 +281,11 @@ function chronologie(courrier: CourrierDemo): CourrierDetail["chronologie"] {
 
 const LIBELLES_ETAPE_DEMO: Record<CourrierDemo["etape"], string> = {
   ENREGISTRE: "En attente de cotation",
-  COTE: "Coté, en attente de transmission",
-  TRANSMIS: "Transmis à la structure",
-  AFFECTE: "Affecté, traitement à ouvrir",
+  COTE: "Coté, en attente de distribution",
+  AFFECTE: "Affecté, décharge non signée",
+  ACCEPTE: "Reçu par l'agent",
   EN_TRAITEMENT: "En traitement",
-  EN_VALIDATION: "En validation",
-  SIGNE: "Signé, en attente de départ",
-  PARTI: "Réponse partie",
+  RESTITUE: "Restitué au responsable",
   CLOTURE: "Clôturé",
 };
 
@@ -285,7 +294,11 @@ function fiche(id: number): CourrierDetail | null {
   if (!courrier) return null;
 
   const cote = courrier.structuresCotees.length > 0;
-  const enTraitement = ["EN_TRAITEMENT", "EN_VALIDATION", "SIGNE"].includes(
+  const enTraitement = ["EN_TRAITEMENT", "RESTITUE"].includes(courrier.etape);
+  // La démonstration montre les deux états de la décharge : un courrier affecté
+  // l'attend, un courrier plus avancé l'a déjà. C'est ce qui fait apparaître
+  // « J'ai reçu ce courrier » sur la fiche d'un seul des deux.
+  const affecte = ["AFFECTE", "ACCEPTE", "EN_TRAITEMENT", "RESTITUE"].includes(
     courrier.etape,
   );
 
@@ -328,6 +341,39 @@ function fiche(id: number): CourrierDetail | null {
         ]
       : [],
     chronologie: chronologie(courrier),
+    monAffectation: affecte
+      ? {
+          id: courrier.id,
+          affecteLe: `${jour(courrier)}T10:30:00`,
+          consigne: "Me rendre compte sous huitaine.",
+          accepteLe:
+            courrier.etape === "AFFECTE" ? null : `${jour(courrier)}T14:05:00`,
+        }
+      : null,
+    signalements: [],
+    // Le traitement du lecteur : ouvert des que le courrier est en traitement,
+    // restitue a l'etape RESTITUE. C'est ce qui fait vivre la zone de redaction
+    // et le panneau du responsable dans la demonstration.
+    monTraitement: enTraitement
+      ? {
+          id: courrier.id,
+          redacteur: compteActifDemo()?.utilisateur.nomComplet ?? "Agent",
+          redacteurId: 1,
+          structure: courrier.structuresCotees[0] ?? "Direction",
+          version: 1,
+          contenu:
+            "Facture rapprochée du bon de commande n° 4412 et du procès-verbal de réception du 3 août. Les montants concordent ; le règlement peut être ordonnancé.",
+          statut: courrier.etape === "RESTITUE" ? "soumis" : "brouillon",
+          statutLibelle:
+            courrier.etape === "RESTITUE"
+              ? "Restitué, en attente du responsable"
+              : "En cours de rédaction",
+          restitueLe:
+            courrier.etape === "RESTITUE" ? `${jour(courrier)}T16:40:00` : null,
+          modifieLe: `${jour(courrier)}T16:40:00`,
+        }
+      : null,
+    traitements: [],
     observations: cote
       ? [
           {
@@ -384,7 +430,7 @@ function fiche(id: number): CourrierDetail | null {
               "Règlement de la facture n° 214 du prestataire de maintenance",
             version: 3,
             redigePar: "M. Diallo",
-            etape: "EN_VALIDATION",
+            etape: "RESTITUE",
           },
         ]
       : [],
@@ -406,7 +452,15 @@ function fiche(id: number): CourrierDetail | null {
       },
     ],
     actionsPossibles: cote
-      ? ["affecter", "traiter", "transmettre", "relancer", "imprimer"]
+      ? [
+          "affecter",
+          "traiter",
+          "restituer",
+          "retourner",
+          "cloturer",
+          "relancer",
+          "imprimer",
+        ]
       : ["coter", "imprimer"],
   };
 }
@@ -527,6 +581,16 @@ const DELEGATIONS_DEMO: Delegation[] = [
   },
 ];
 
+/**
+ * L'effectif que la demonstration donne au Port.
+ *
+ * Une constante et non un compte de l'annuaire : le jeu de demonstration ne
+ * porte que les agents qu'un ecran nomme, une trentaine. Un taux de presence
+ * calcule sur trente agents aurait affiche « 87 % presents » pour quatre
+ * absences, ce qui n'est pas ce que le Directeur general lirait en vrai.
+ */
+const EFFECTIF_DEMO = 1_240;
+
 /** Ce que le poste connecte peut deleguer, et aux agents de son perimetre. */
 const DELEGATION_POSSIBLE_DEMO: DelegationPossible = {
   delegataires: [
@@ -620,6 +684,31 @@ function partEcoulee(debut: string, fin: string): number {
 function structureDeLaSession(): string {
   const compte = compteActifDemo()?.utilisateur;
   return compte?.structureLibelle.split(" ")[0] ?? "DAF";
+}
+
+/** Le libelle d'une structure du referentiel de demonstration, sinon son sigle. */
+function libelleStructureDemo(sigle: string): string {
+  return PLANS_DEMO.find((p) => p.structureSigle === sigle)?.structureLibelle ?? sigle;
+}
+
+/**
+ * Les bornes d'un mois saisi — `AAAA-MM`.
+ *
+ * Le vrai serveur pose le premier jour au debut et le dernier a la fin
+ * (ADR 047) ; le faux en fait autant, sans quoi une activite creee en mode
+ * demonstration serait en retard des le 2 du mois de sa fin. `AAAA-MM-JJ` est
+ * rendu tel quel : les activites du jeu initial gardent leur quantieme.
+ */
+function premierJourDuMois(valeur: string): string {
+  return valeur.length === 7 ? `${valeur}-01` : valeur;
+}
+
+function dernierJourDuMois(valeur: string): string {
+  if (valeur.length !== 7) return valeur;
+  const [annee, mois] = valeur.split("-").map(Number);
+  // Le jour 0 du mois suivant est le dernier du mois demande.
+  const dernier = new Date(annee, mois, 0).getDate();
+  return `${valeur}-${String(dernier).padStart(2, "0")}`;
 }
 
 /**
@@ -717,6 +806,119 @@ function inscrireVie(
  * `partEcoulee` : le vrai serveur devra les tirer du parametrage, faute de quoi
  * la regle de mesure ne pourra plus bouger sans redeploiement.
  */
+const auCentieme = (valeur: number) => Math.round(valeur * 100) / 100;
+
+/**
+ * L'avancement d'une activite est la somme de ses taches — RG-7, ADR 049.
+ *
+ * Le vrai serveur le tient par le declencheur `maj_avancement_activite()` :
+ * `avancement_calcule` somme les valeurs obtenues, `avancement_recalibre` les
+ * valeurs retenues des qu'une tache au moins est recalibree. Il n'y a plus
+ * d'avancement a saisir sur l'activite, donc plus rien a ecrire par-dessus.
+ */
+function synchroniserAvancement(activite: ActiviteDetail): void {
+  activite.taches.forEach((tache) => {
+    tache.valeurRetenue = tache.recalibrage?.valeurRetenue ?? tache.valeurObtenue;
+    tache.avancementPropre = auCentieme(
+      (tache.valeurRetenue / tache.valeurPrevue) * 100,
+    );
+    const fait = tache.valeurRetenue >= tache.valeurPrevue;
+    if (fait && !tache.fait) tache.dateRealisation = aujourdhui();
+    if (!fait) tache.dateRealisation = null;
+    tache.fait = fait;
+  });
+
+  const declare = auCentieme(
+    activite.taches.reduce((somme, tache) => somme + tache.valeurObtenue, 0),
+  );
+  const retenu = auCentieme(
+    activite.taches.reduce((somme, tache) => somme + tache.valeurRetenue, 0),
+  );
+  const recalibrees = activite.taches.filter((tache) => tache.recalibrage);
+  const dernier = recalibrees
+    .map((tache) => tache.recalibrage!)
+    .sort((a, b) => (a.le ?? "").localeCompare(b.le ?? ""))
+    .pop();
+
+  activite.recalibrage = dernier
+    ? {
+        avancementDeclare: declare,
+        avancementRetenu: retenu,
+        motif: dernier.motif,
+        le: dernier.le,
+      }
+    : null;
+  activite.avancement = retenu;
+  activite.tachesTotal = activite.taches.length;
+  activite.tachesFaites = activite.taches.filter((tache) => tache.fait).length;
+}
+
+/**
+ * Controle la liste **entiere** des taches — RG-1, RG-2, RG-3, RG-8, RG-9.
+ *
+ * Les messages reprennent ceux de `_taches_valides()` (activite/services.py) :
+ * la demonstration doit refuser ce que le serveur refuse, dans les memes mots,
+ * faute de quoi une saisie validee ici tomberait en production.
+ */
+function controlerTaches(
+  lignes: SaisieTacheLigne[],
+  debutActivite: string,
+  finActivite: string,
+): void {
+  if (lignes.length === 0) {
+    throw new ErreurApi(409, "Une activité se découpe en au moins une tâche (RG-1).");
+  }
+  const debut = debutActivite.slice(0, 7);
+  const fin = finActivite.slice(0, 7);
+  lignes.forEach((ligne, rang) => {
+    const libelle = ligne.libelle.trim();
+    const nom = libelle ? `« ${libelle} »` : `n° ${rang + 1}`;
+    if (!libelle) {
+      throw new ErreurApi(409, `La tâche ${nom} n'a pas de libellé.`);
+    }
+    if (!(ligne.valeurPrevue > 0 && ligne.valeurPrevue <= 100)) {
+      throw new ErreurApi(
+        409,
+        `La tâche ${nom} doit valoir plus de 0 et au plus 100 points (RG-2).`,
+      );
+    }
+    if (ligne.moisFin < ligne.moisDebut) {
+      throw new ErreurApi(409, `Le mois de fin de la tâche ${nom} précède son mois de début.`);
+    }
+    if (ligne.moisDebut < debut || ligne.moisFin > fin) {
+      throw new ErreurApi(
+        409,
+        `La tâche ${nom} (${ligne.moisDebut} à ${ligne.moisFin}) sort de la période de l'activité (${debut} à ${fin}) (RG-9).`,
+      );
+    }
+  });
+  const total = auCentieme(lignes.reduce((somme, l) => somme + l.valeurPrevue, 0));
+  if (total !== 100) {
+    throw new ErreurApi(
+      409,
+      `Les valeurs prévues des tâches totalisent ${total} points : elles doivent faire exactement 100 (RG-3).`,
+    );
+  }
+}
+
+function tacheNeuve(ligne: SaisieTacheLigne): TacheActivite {
+  return {
+    id: prochainIdTache(),
+    libelle: ligne.libelle.trim(),
+    moisDebut: ligne.moisDebut,
+    moisFin: ligne.moisFin,
+    valeurPrevue: ligne.valeurPrevue,
+    valeurObtenue: 0,
+    valeurRetenue: 0,
+    avancementPropre: 0,
+    fait: false,
+    dateRealisation: null,
+    recalibrage: null,
+    // Sans attributaire, comme le serveur réel depuis l'ADR 048.
+    responsable: "",
+  };
+}
+
 function recalculerEtat(activite: ActiviteDetail): void {
   if (activite.etat === "Suspendue") return;
 
@@ -878,6 +1080,145 @@ export function repondreEnDemo(
     return attendre(fiche(COURRIERS_DEMO[0].id));
   }
 
+  /*
+   * Le bureau d'ordre de structure. L'accusé et la sortie renvoient la ligne
+   * modifiée sans muter le jeu : la démonstration montre l'enchaînement des
+   * écrans, elle ne tient pas d'état — c'est la règle du serveur factice, et
+   * l'écran se rafraîchit sur les mêmes données.
+   */
+  const accuseDemande = route.match(/^\/courriers\/passages\/(\d+)\/accuse$/);
+  if (methode === "POST" && accuseDemande) {
+    const passage = PASSAGES_DEMO.find(
+      (p) => p.id === Number(accuseDemande[1]),
+    );
+    if (!passage) return null;
+    return attendre({
+      ...passage,
+      accuseLe: new Date().toISOString(),
+      accusePar: "L. Mbarga",
+      heuresAvantAccuse: 0,
+    });
+  }
+
+  const sortieDemandee = route.match(/^\/courriers\/passages\/(\d+)\/sortie$/);
+  if (methode === "POST" && sortieDemandee) {
+    const passage = PASSAGES_DEMO.find(
+      (p) => p.id === Number(sortieDemandee[1]),
+    );
+    if (!passage) return null;
+    const saisie = (corps ?? {}) as { motif?: string; note?: string | null };
+    // Le serveur réel refuse en 409, et le moteur aussi : une sortie sans motif
+    // se lirait « le courrier a disparu de nos écrans ».
+    if (!saisie.motif) {
+      throw new ErreurApi(
+        409,
+        "Une sortie dit toujours par où : réponse, retour, transmission, clôture ou autre.",
+      );
+    }
+    return attendre({
+      ...passage,
+      sortiLe: new Date().toISOString(),
+      sortiPar: "L. Mbarga",
+      motifSortie: saisie.motif,
+      noteSortie: saisie.note ?? null,
+    });
+  }
+
+  /*
+   * La décharge, le fil d'observations et l'écart signalé — A-11, A-12.
+   *
+   * Même règle que ci-dessus : la démonstration renvoie l'objet modifié sans
+   * muter le jeu. Elle sert à vérifier que le bouton part quelque part, pas à
+   * tenir un registre.
+   */
+  const dechargeDemandee = route.match(
+    /^\/courriers\/(\d+)\/affectations\/(\d+)\/accuse$/,
+  );
+  if (methode === "POST" && dechargeDemandee) {
+    return attendre(fiche(Number(dechargeDemandee[1])));
+  }
+
+  const observationDemandee = route.match(/^\/courriers\/(\d+)\/observations$/);
+  if (methode === "POST" && observationDemandee) {
+    return attendre(fiche(Number(observationDemandee[1])));
+  }
+
+  const ecartDemande = route.match(/^\/courriers\/(\d+)\/signalements$/);
+  if (methode === "POST" && ecartDemande) {
+    const saisie = (corps ?? {}) as { type?: string; description?: string };
+    // Le serveur réel refuse une description trop courte : « pli incomplet » ne
+    // se traite pas. La démonstration applique la même borne, faute de quoi
+    // l'écran laisserait passer ce que la recette refusera.
+    if (!saisie.type || (saisie.description ?? "").trim().length < 10) {
+      throw new ErreurApi(
+        422,
+        "Décrivez l'écart en quelques mots : « pli incomplet » ne se traite pas.",
+      );
+    }
+    return attendre(SIGNALEMENTS_DEMO[0]);
+  }
+
+  /*
+   * Le traitement, la restitution, le retour et la clôture.
+   *
+   * La démonstration ne tient pas de registre : elle rend la fiche telle que
+   * `fiche()` la construit, ce qui suffit à montrer que le bouton part quelque
+   * part. Les deux bornes du serveur réel sont en revanche appliquées — un
+   * traitement vide, un motif de retour trop court —, sinon l'écran laisserait
+   * passer ce que la recette refuse.
+   */
+  const traitementDemande = route.match(/^\/courriers\/(\d+)\/traitement$/);
+  if (methode === "POST" && traitementDemande) {
+    const saisie = (corps ?? {}) as { contenu?: string };
+    if (!(saisie.contenu ?? "").trim()) {
+      throw new ErreurApi(
+        422,
+        "Un traitement vide ne dit pas ce qui a été fait du courrier.",
+      );
+    }
+    return attendre(fiche(Number(traitementDemande[1])));
+  }
+
+  const restitutionDemandee = route.match(/^\/courriers\/(\d+)\/restitution$/);
+  if (methode === "POST" && restitutionDemandee) {
+    return attendre(fiche(Number(restitutionDemandee[1])));
+  }
+
+  const retourTraitement = route.match(
+    /^\/courriers\/(\d+)\/traitements\/(\d+)\/retour$/,
+  );
+  if (methode === "POST" && retourTraitement) {
+    const saisie = (corps ?? {}) as { motif?: string };
+    if ((saisie.motif ?? "").trim().length < 10) {
+      throw new ErreurApi(
+        422,
+        "Dites ce qui manque : un retour sans un mot ne se distingue pas d'un oubli.",
+      );
+    }
+    return attendre(fiche(Number(retourTraitement[1])));
+  }
+
+  const clotureDemandee = route.match(/^\/courriers\/(\d+)\/cloture$/);
+  if (methode === "POST" && clotureDemandee) {
+    return attendre(fiche(Number(clotureDemandee[1])));
+  }
+
+  const avancementEcart = route.match(/^\/signalements\/(\d+)\/etat$/);
+  if (methode === "POST" && avancementEcart) {
+    const ecart = SIGNALEMENTS_DEMO.find(
+      (e) => e.id === Number(avancementEcart[1]),
+    );
+    if (!ecart) return null;
+    const saisie = (corps ?? {}) as { etat?: string; suiteDonnee?: string };
+    return attendre({
+      ...ecart,
+      etat: saisie.etat === "clos" ? "Clos" : "Pris en compte",
+      etatCode: saisie.etat === "clos" ? "clos" : "pris_en_compte",
+      suiteDonnee: saisie.suiteDonnee ?? ecart.suiteDonnee,
+      peutAvancer: saisie.etat !== "clos",
+    });
+  }
+
   if (methode === "POST" && route === "/departs/signatures") {
     return attendre({
       signes: DEPARTS_DEMO.filter((d) => d.etape === "A_SIGNER"),
@@ -886,6 +1227,79 @@ export function repondreEnDemo(
 
   if (methode === "POST" && route === "/suivi/recherche") {
     return attendre({ lignes: COURRIERS_DEMO, total: COURRIERS_DEMO.length });
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Ecritures du pilier suivi
+   *
+   *  Elles acquittent sans rien muter : le dossier de demonstration est
+   *  reconstruit a chaque lecture par `dossier()`, et une tache ajoutee
+   *  disparaitrait au rafraichissement suivant. Un acquittement sec vaut
+   *  mieux qu'une erreur rouge — ce que la demo montre, c'est l'ecran, et
+   *  la persistance vient du serveur.
+   * ------------------------------------------------------------------ */
+  const tacheDossier = route.match(/^\/suivi\/dossiers\/(\d+)\/taches$/);
+  if (methode === "POST" && tacheDossier) {
+    const saisie = corps as { libelle: string };
+    return attendre({
+      id: Date.now(),
+      libelle: saisie.libelle,
+      faite: false,
+      faiteLe: null,
+    });
+  }
+
+  const basculeTache = route.match(/^\/suivi\/dossiers\/(\d+)\/taches\/(\d+)$/);
+  if (methode === "PATCH" && basculeTache) {
+    const saisie = corps as { faite: boolean };
+    return attendre({
+      id: Number(basculeTache[2]),
+      libelle: "",
+      faite: saisie.faite,
+      faiteLe: saisie.faite ? new Date().toISOString() : null,
+    });
+  }
+
+  const noteDossier = route.match(/^\/suivi\/dossiers\/(\d+)\/notes$/);
+  if (methode === "POST" && noteDossier) {
+    const saisie = corps as { texte: string; privee: boolean };
+    return attendre({
+      id: Date.now(),
+      texte: saisie.texte,
+      horodatage: new Date().toISOString(),
+      privee: saisie.privee,
+    });
+  }
+
+  const demandeDelai = route.match(
+    /^\/suivi\/dossiers\/(\d+)\/demandes-delai$/,
+  );
+  if (methode === "POST" && demandeDelai) {
+    return attendre({ id: Date.now(), etat: "en_attente" });
+  }
+
+  if (methode === "POST" && route === "/suivi/recherches") {
+    const saisie = corps as { libelle: string; criteres: unknown };
+    return attendre({
+      id: Date.now(),
+      libelle: saisie.libelle,
+      nombre: COURRIERS_DEMO.length,
+      criteres: saisie.criteres,
+    });
+  }
+
+  if (methode === "POST" && route === "/suivi/relances") {
+    const saisie = corps as { identifiants: number[] };
+    return attendre({
+      emises: saisie.identifiants.length,
+      destinataires: ["S. Bamba", "M. Diallo"],
+      ecartes: [],
+    });
+  }
+
+  const oubliRecherche = route.match(/^\/suivi\/recherches\/(\d+)$/);
+  if (methode === "DELETE" && oubliRecherche) {
+    return attendre({ ok: true });
   }
 
   /* ------------------------------------------------------------------ *
@@ -1103,6 +1517,7 @@ export function repondreEnDemo(
       sigle: saisie.sigle,
       nature: saisie.nature as (typeof STRUCTURES_DEMO)[number]["nature"],
       niveau: saisie.niveau,
+      parentId: saisie.parentId,
       // Vacant : le serveur reel ouvre le poste responsable sans l'occuper.
       responsable: null,
       delaiMoyenJours: null,
@@ -1193,7 +1608,10 @@ export function repondreEnDemo(
    *  (ACT_SAI), ce que l'autorite impose (DEC), ce que la DSR relance (REL).
    * ------------------------------------------------------------------ */
   if (methode === "POST" && route === "/activites") {
-    const saisie = corps as SaisieActivite;
+    // Les taches se saisissent avec l'activite (RG-1) et totalisent 100 (RG-3) :
+    // le controle precede toute ecriture, comme dans `creer_activite()`.
+    const saisie = corps as SaisieCreationActivite;
+    controlerTaches(saisie.taches, saisie.debut, saisie.fin);
     const compte = compteActifDemo()?.utilisateur;
     const id = Math.max(0, ...ACTIVITES_DEMO.map((a) => a.id)) + 1;
     const sigle = structureDeLaSession();
@@ -1205,20 +1623,32 @@ export function repondreEnDemo(
       axe: saisie.axe,
       structureSigle: sigle,
       structureLibelle: compte?.structureLibelle ?? "Structure",
-      // Le responsable est saisi, jamais deduit de qui saisit : un point focal
-      // inscrit les activites de toute sa direction sans en porter aucune.
-      responsable: nomAgentDemo(saisie.responsableId),
+      // Les structures repondent de l'activite ; la porteuse vient du plan de
+      // la session, les autres sont designees a la saisie (ADR 047).
+      structuresAssociees: saisie.structuresAssociees.map((s) => ({
+        sigle: s,
+        libelle: libelleStructureDemo(s),
+      })),
+      // Le point focal est saisi, jamais deduit de qui saisit : un point focal
+      // inscrit les activites de toute sa direction sans en porter aucune. Il
+      // est facultatif — `null` quand aucun n'est designe.
+      responsable: saisie.responsableId === null ? null : nomAgentDemo(saisie.responsableId),
       responsableId: saisie.responsableId,
-      initiales: initialesDe(nomAgentDemo(saisie.responsableId)),
-      debut: saisie.debut,
-      fin: saisie.fin,
+      initiales:
+        saisie.responsableId === null
+          ? null
+          : initialesDe(nomAgentDemo(saisie.responsableId)),
+      // La saisie rend un mois ; les calculs de periode veulent une date
+      // pleine, comme le vrai serveur qui pose la borne du mois.
+      debut: premierJourDuMois(saisie.debut),
+      fin: dernierJourDuMois(saisie.fin),
       etat: "Programmée",
       avancement: 0,
       // L'attendu se calcule sur la part de la periode deja ecoulee.
       avancementAttendu: partEcoulee(saisie.debut, saisie.fin),
       feu: feuDepuisTaux(0),
       tachesFaites: 0,
-      tachesTotal: 0,
+      tachesTotal: saisie.taches.length,
       instructions: 0,
       critique: false,
       objectif: saisie.objectif,
@@ -1226,9 +1656,10 @@ export function repondreEnDemo(
       resultatsAttendus: saisie.resultatsAttendus,
       budgetValide: saisie.budgetValide,
       suspension: null,
+      recalibrage: null,
       derniereRelance: null,
       indicateurs: [],
-      taches: [],
+      taches: saisie.taches.map(tacheNeuve),
       instructionsRattachees: [],
       vie: [
         {
@@ -1261,15 +1692,25 @@ export function repondreEnDemo(
     const activite = trouverActivite(Number(modificationActivite[1]));
     if (!activite) return null;
 
+    const debut = premierJourDuMois(saisie.debut);
+    const fin = dernierJourDuMois(saisie.fin);
+    const focal = saisie.responsableId === null ? null : nomAgentDemo(saisie.responsableId);
+    const associees = saisie.structuresAssociees.join(", ") || "aucune";
+    const associeesAvant =
+      activite.structuresAssociees.map((s) => s.sigle).join(", ") || "aucune";
+
     const change: string[] = [];
     if (activite.intitule !== saisie.intitule) change.push("intitulé");
     if (activite.axe !== saisie.axe) change.push("axe stratégique");
     if (activite.responsableId !== saisie.responsableId) {
-      change.push(
-        `responsable (${activite.responsable} → ${nomAgentDemo(saisie.responsableId)})`,
-      );
+      change.push(`point focal (${activite.responsable ?? "aucun"} → ${focal ?? "aucun"})`);
     }
-    if (activite.debut !== saisie.debut || activite.fin !== saisie.fin) {
+    // Le changement se relit : qui répond de l'activité décide aussi de qui la
+    // voit et la déclare (ADR 047).
+    if (associees !== associeesAvant) {
+      change.push(`structures associées (${associeesAvant} → ${associees})`);
+    }
+    if (activite.debut !== debut || activite.fin !== fin) {
       change.push("période d'exécution");
     }
     if (activite.budgetValide !== saisie.budgetValide) change.push("budget");
@@ -1279,14 +1720,18 @@ export function repondreEnDemo(
     activite.objectif = saisie.objectif;
     activite.etatReferenceGeneral = saisie.etatReferenceGeneral;
     activite.resultatsAttendus = saisie.resultatsAttendus;
-    activite.responsable = nomAgentDemo(saisie.responsableId);
+    activite.structuresAssociees = saisie.structuresAssociees.map((s) => ({
+      sigle: s,
+      libelle: libelleStructureDemo(s),
+    }));
+    activite.responsable = focal;
     activite.responsableId = saisie.responsableId;
-    activite.initiales = initialesDe(nomAgentDemo(saisie.responsableId));
-    activite.debut = saisie.debut;
-    activite.fin = saisie.fin;
+    activite.initiales = focal === null ? null : initialesDe(focal);
+    activite.debut = debut;
+    activite.fin = fin;
     activite.budgetValide = saisie.budgetValide;
     // La periode a pu bouger : l'attendu se recalcule, sinon l'ecart ment.
-    activite.avancementAttendu = partEcoulee(saisie.debut, saisie.fin);
+    activite.avancementAttendu = partEcoulee(debut, fin);
 
     inscrireVie(
       activite,
@@ -1358,25 +1803,60 @@ export function repondreEnDemo(
 
   const tacheActivite = route.match(/^\/activites\/(\d+)\/taches$/);
   if (methode === "POST" && tacheActivite) {
-    const saisie = corps as SaisieTacheActivite;
+    /*
+     * La liste **entiere** remplace l'ancienne — ADR 049. Une tache absente
+     * est retiree, sauf si elle porte deja un avancement : la retirer ferait
+     * disparaitre des points de la somme sans declaration ni motif.
+     */
+    const saisie = corps as SaisieListeTaches;
     const activite = trouverActivite(Number(tacheActivite[1]));
     if (!activite) return null;
 
-    const id = prochainIdTache();
-    activite.taches.push({
-      id,
-      libelle: saisie.libelle,
-      echeance: saisie.echeance,
-      fait: false,
-      dateRealisation: null,
-      responsable: nomAgentDemo(saisie.responsableId),
+    if (!saisie.motif.trim()) {
+      throw new ErreurApi(409, "Un redécoupage de l'activité s'écrit avec son motif.");
+    }
+    controlerTaches(saisie.taches, activite.debut, activite.fin);
+
+    const gardees = new Set(saisie.taches.map((l) => l.id).filter((id) => id !== undefined));
+    const avancees = activite.taches.filter(
+      (tache) => !gardees.has(tache.id) && tache.valeurRetenue + tache.valeurObtenue > 0,
+    );
+    if (avancees.length > 0) {
+      throw new ErreurApi(
+        409,
+        "Une tâche qui porte un avancement ne se retire pas : " +
+          avancees.map((t) => `« ${t.libelle} » (${Math.max(t.valeurObtenue, t.valeurRetenue)} points)`).join(", ") +
+          ". Ramenez-la à zéro par une déclaration, puis retirez-la.",
+      );
+    }
+
+    activite.taches = saisie.taches.map((ligne) => {
+      const existante = activite.taches.find((tache) => tache.id === ligne.id);
+      if (!existante) return tacheNeuve(ligne);
+      const plancher = Math.max(
+        existante.valeurObtenue,
+        existante.recalibrage?.valeurRetenue ?? 0,
+      );
+      if (ligne.valeurPrevue < plancher) {
+        throw new ErreurApi(
+          409,
+          `La tâche « ${ligne.libelle} » a déjà obtenu ${plancher} points : sa valeur prévue ne peut pas descendre en dessous (RG-6).`,
+        );
+      }
+      return {
+        ...existante,
+        libelle: ligne.libelle.trim(),
+        moisDebut: ligne.moisDebut,
+        moisFin: ligne.moisFin,
+        valeurPrevue: ligne.valeurPrevue,
+      };
     });
-    activite.tachesTotal = activite.taches.length;
+    synchroniserAvancement(activite);
+    recalculerEtat(activite);
 
-    inscrireVie(activite, "Modification", `Tâche ajoutée : ${saisie.libelle}.`);
-    recalculerCriticite(activite, aujourdhui());
+    inscrireVie(activite, "Modification", `Tâches redécoupées — ${saisie.motif}`);
 
-    return attendre({ id });
+    return attendre({ id: activite.id });
   }
 
   const avancementActivite = route.match(/^\/activites\/(\d+)\/avancement$/);
@@ -1397,19 +1877,104 @@ export function repondreEnDemo(
       );
     }
 
-    activite.avancement = saisie.avancement;
-    activite.taches.forEach((tache) => {
-      const fait = saisie.tachesFaites.includes(tache.id);
-      if (fait && !tache.fait) tache.dateRealisation = aujourdhui();
-      tache.fait = fait;
-    });
-    activite.tachesFaites = activite.taches.filter((t) => t.fait).length;
+    /*
+     * La justification est exigee — §15, ADR 030. C'est elle qui alimente la
+     * fiche de vie, et c'est sur elle que la DSR s'appuie pour recalibrer : un
+     * taux declare sans un mot ne se conteste pas.
+     */
+    if (!saisie.observation.trim()) {
+      throw new ErreurApi(
+        409,
+        "Une déclaration d'avancement s'accompagne de sa justification.",
+      );
+    }
 
+    /*
+     * La declaration porte sur une tache (RG-4), en points de l'activite
+     * (RG-5), plafonnee a la part prevue (RG-6). Cumulative : la valeur
+     * declaree remplace la precedente, et peut redescendre. Le recalibrage de
+     * la DSR, s'il existe, tient : il ne suit pas la redeclaration (ADR 030).
+     */
+    const tache = activite.taches.find((t) => t.id === saisie.tacheId);
+    if (!tache) throw new ErreurApi(404, "Tâche introuvable.");
+    if (!(saisie.valeurObtenue >= 0 && saisie.valeurObtenue <= tache.valeurPrevue)) {
+      throw new ErreurApi(
+        409,
+        `La tâche « ${tache.libelle} » vaut ${tache.valeurPrevue} points : sa valeur obtenue se déclare entre 0 et ${tache.valeurPrevue} (RG-6).`,
+      );
+    }
+    tache.valeurObtenue = saisie.valeurObtenue;
+    if (tache.recalibrage) {
+      tache.recalibrage = { ...tache.recalibrage, valeurDeclaree: saisie.valeurObtenue };
+    }
+
+    synchroniserAvancement(activite);
     recalculerEtat(activite);
 
     // Sans pièce : la déclaration n'en porte plus. Les justificatifs passent
     // par `POST /api/pieces`, qui envoie le binaire — voir docs/pieges.md.
     inscrireVie(activite, "Observation", saisie.observation, []);
+
+    return attendre({ id: activite.id });
+  }
+
+  /*
+   * Recalibrage de l'avancement — ADR 030.
+   *
+   * La structure declare, la DSR retient. Le taux declare n'est pas reecrit :
+   * les deux circulent, parce que c'est le desaccord qui doit se lire.
+   */
+  const recalibrageActivite = route.match(/^\/activites\/(\d+)\/recalibrage$/);
+  if (methode === "POST" && recalibrageActivite) {
+    const saisie = corps as SaisieRecalibrage;
+    const activite = trouverActivite(Number(recalibrageActivite[1]));
+    if (!activite) return null;
+
+    if (!saisie.motif.trim()) {
+      throw new ErreurApi(409, "Un recalibrage s'écrit avec son motif.");
+    }
+    if (activite.etat === "Suspendue") {
+      throw new ErreurApi(
+        409,
+        "L'activité est suspendue : l'avancement ne peut pas être modifié tant que la suspension n'est pas levée.",
+      );
+    }
+
+    // Descendu a la tache par l'ADR 049 : un taux retenu sur l'activite ne se
+    // repartirait sur aucune tache, et la somme cesserait d'egaler la fiche.
+    const tache = activite.taches.find((t) => t.id === saisie.tacheId);
+    if (!tache) throw new ErreurApi(404, "Tâche introuvable.");
+    const declare = tache.valeurObtenue;
+
+    if (saisie.valeur === null) {
+      tache.recalibrage = null;
+      inscrireVie(
+        activite,
+        "Recalibrage",
+        `« ${tache.libelle} » : recalibrage levé — la valeur déclarée (${declare} points) fait de nouveau foi. ${saisie.motif}`,
+      );
+    } else {
+      if (!(saisie.valeur >= 0 && saisie.valeur <= tache.valeurPrevue)) {
+        throw new ErreurApi(
+          409,
+          `La tâche « ${tache.libelle} » vaut ${tache.valeurPrevue} points : la valeur retenue se situe entre 0 et ${tache.valeurPrevue}.`,
+        );
+      }
+      tache.recalibrage = {
+        valeurDeclaree: declare,
+        valeurRetenue: saisie.valeur,
+        motif: saisie.motif,
+        le: aujourdhui(),
+      };
+      inscrireVie(
+        activite,
+        "Recalibrage",
+        `« ${tache.libelle} » : ${saisie.valeur} points retenus au lieu des ${declare} déclarés — ${saisie.motif}`,
+      );
+    }
+
+    synchroniserAvancement(activite);
+    recalculerEtat(activite);
 
     return attendre({ id: activite.id });
   }
@@ -2116,6 +2681,14 @@ export function repondreEnDemo(
       dateArrivee: new Date().toISOString(),
       sessionLibelle: "Session du 5 août 2026",
     });
+  }
+
+  if (route === "/courriers/bureau-ordre") {
+    return attendre(passagesDemo(parametres.get("etat") ?? "en_cours"));
+  }
+
+  if (route === "/courriers/supervision") {
+    return attendre(carteBlocagesDemo(Number(parametres.get("seuil") ?? 0)));
   }
 
   if (route === "/courriers/indicateurs") return attendre(INDICATEURS_DEMO);
@@ -3771,7 +4344,10 @@ export function repondreEnDemo(
       sous48h: (c) =>
         !enRetard(c) &&
         (c.delai?.joursAlloues ?? 0) - (c.delai?.joursEcoules ?? 0) <= 2,
-      sansAccuse: (c) => c.etape === "TRANSMIS" || c.etape === "COTE",
+      // « Sans accusé » veut dire : coté ou affecté sans que la décharge soit
+      // signée. C'est exactement l'étape AFFECTE, plus le courrier qui n'est
+      // pas encore distribué.
+      sansAccuse: (c) => c.etape === "AFFECTE" || c.etape === "COTE",
       dejaRelances: (c) => c.id % 2 === 0,
       tous: (c) => c.etape !== "CLOTURE",
     };
@@ -4088,131 +4664,6 @@ export function repondreEnDemo(
     return attendre(PREFERENCES_DEMO);
   }
 
-  if (route === "/courriers/import") {
-    /*
-     * File de qualification. Les trois cas qui doivent apparaitre : un message
-     * dont la nature est deduite avec certitude, un doublon detecte, et un
-     * message sous le seuil de confiance de RF-IA-04 — celui-la ne peut pas
-     * etre qualifie automatiquement.
-     */
-    const messages = [
-      {
-        id: 1,
-        objet: "Demande d'autorisation d'accès au terminal — société Camrail",
-        expediteur: "contact@camrail.cm",
-        recuLe: "2026-08-06T08:12:00",
-        pieces: 2,
-        naturePresumee: "Demande",
-        confiance: 92,
-        etat: "À qualifier" as const,
-        motif: null,
-        traitePar: null,
-      },
-      {
-        id: 2,
-        objet: "Transmission du rapport trimestriel de la tutelle",
-        expediteur: "sg@mintransports.cm",
-        recuLe: "2026-08-06T07:48:00",
-        pieces: 1,
-        naturePresumee: "Transmission",
-        confiance: 88,
-        etat: "À qualifier" as const,
-        motif: null,
-        traitePar: null,
-      },
-      {
-        id: 3,
-        objet: "RE: RE: TR: suivi du dossier",
-        expediteur: "j.mbappe@sotrans.cm",
-        recuLe: "2026-08-06T07:20:00",
-        pieces: 0,
-        naturePresumee: null,
-        confiance: 34,
-        etat: "À qualifier" as const,
-        motif:
-          "Sous le seuil de confiance : qualification manuelle obligatoire",
-        traitePar: null,
-      },
-      {
-        id: 4,
-        objet: "Demande d'autorisation d'accès au terminal — société Camrail",
-        expediteur: "contact@camrail.cm",
-        recuLe: "2026-08-06T08:14:00",
-        pieces: 2,
-        naturePresumee: "Demande",
-        confiance: 92,
-        etat: "Doublon" as const,
-        motif: "Identique au message reçu à 08:12",
-        traitePar: null,
-      },
-      {
-        id: 5,
-        objet: "Réclamation sur la facturation des redevances",
-        expediteur: "compta@sotrans.cm",
-        recuLe: "2026-08-05T16:30:00",
-        pieces: 3,
-        naturePresumee: "Réclamation",
-        confiance: 95,
-        etat: "Qualifié" as const,
-        motif: null,
-        traitePar: "K. Traoré",
-      },
-      {
-        id: 6,
-        objet: "Newsletter — Association des ports d'Afrique centrale",
-        expediteur: "info@agpaoc.org",
-        recuLe: "2026-08-05T11:02:00",
-        pieces: 0,
-        naturePresumee: null,
-        confiance: 12,
-        etat: "Écarté" as const,
-        motif: "Message de diffusion, sans objet administratif",
-        traitePar: "K. Traoré",
-      },
-    ];
-
-    const aQualifier = messages.filter((m) => m.etat === "À qualifier").length;
-    const sousSeuil = messages.filter(
-      (m) => m.confiance !== null && m.confiance < 60,
-    ).length;
-    const doublons = messages.filter((m) => m.etat === "Doublon").length;
-
-    return attendre({
-      boite: "courrier@pad.cm",
-      dernierReleve: "2026-08-06T09:30:00",
-      messages,
-      compteurs: [
-        {
-          libelle: "À qualifier",
-          valeur: aQualifier,
-          note: aQualifier > 0 ? "en attente de contrôle" : "file vide",
-          feu: aQualifier > 3 ? "orange" : "vert",
-        },
-        {
-          libelle: "Sous le seuil de confiance",
-          valeur: sousSeuil,
-          note: "qualification manuelle obligatoire",
-          feu: sousSeuil > 0 ? "orange" : "vert",
-        },
-        {
-          libelle: "Doublons détectés",
-          valeur: doublons,
-          note: doublons > 0 ? "à écarter après contrôle" : "aucun",
-          feu: doublons > 0 ? "orange" : "vert",
-        },
-        {
-          libelle: "Qualifiés ce jour",
-          valeur: messages.filter((m) => m.etat === "Qualifié").length,
-          note: "entrés au registre",
-          feu: "vert",
-        },
-      ],
-    });
-  }
-
-  // ------------------------------------------------------------------
-  //  Supervision technique — plateforme et integrations
-  // ------------------------------------------------------------------
   if (route === "/supervision") {
     const CIBLE_DISPONIBILITE = 99.5;
     const CIBLE_REPRISE_MINUTES = 240;
@@ -4885,6 +5336,31 @@ export function repondreEnDemo(
         { mois: "juin", valeur: 11 },
         { mois: "juil.", valeur: 8 },
       ],
+      // Qui est a son poste ce matin. Les presents font une part comme les
+      // autres : un anneau qui ne montrerait que les absents dirait la meme
+      // chose quel que soit l'effectif.
+      disponibilite: (() => {
+        const enCours = DISPONIBILITES_DEMO.filter((d) => d.enCours);
+        const parMotif = new Map<string, number>();
+        for (const absence of enCours) {
+          parMotif.set(absence.type, (parMotif.get(absence.type) ?? 0) + 1);
+        }
+        const presents = Math.max(EFFECTIF_DEMO - enCours.length, 0);
+        return {
+          aLaDate: "2026-08-31",
+          effectif: EFFECTIF_DEMO,
+          absents: enCours.length,
+          presents,
+          tauxPresence: Math.round((presents / EFFECTIF_DEMO) * 1000) / 10,
+          sansInterim: enCours.filter((d) => d.interimaire === null).length,
+          parts: [
+            { libelle: "Présents", valeur: presents },
+            ...[...parMotif.entries()]
+              .sort((a, b) => b[1] - a[1])
+              .map(([libelle, valeur]) => ({ libelle, valeur })),
+          ],
+        };
+      })(),
       // Le point le plus contraint borne l'acces au port : c'est celui-la que
       // le Directeur general doit voir, pas la moyenne des quatre.
       chenal: (() => {

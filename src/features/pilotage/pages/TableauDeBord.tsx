@@ -26,11 +26,12 @@ import { PERMISSIONS } from "@/types/habilitation";
  * rien fait de mal (ADR 009).
  *
  * L'écran décrivait auparavant le courrier : volumes enregistrés et clôturés,
- * jour le plus chargé, courriers en dépassement. Le pilier n'est pas en
- * service ; ce qui le remplace est ce que l'application mesure vraiment — les
- * productions attendues du calendrier officiel et les décisions d'instance.
- * Ce qu'elle ne mesure pas est écrit en toutes lettres au bas de l'écran, et
- * non tu (ADR 011).
+ * jour le plus chargé, courriers en dépassement. Le pilier n'ayant pas de
+ * clôture, ces chiffres n'existaient pas et ont cédé la place aux productions
+ * du calendrier officiel et aux décisions d'instance. La clôture est en service
+ * depuis le 27 août 2026, et « Courriers traités dans le délai » a rejoint les
+ * indicateurs. Ce que l'application ne mesure pas est écrit en toutes lettres
+ * au bas de l'écran, et non tu (ADR 011).
  */
 const PERIODES = [
   { valeur: "mois", libelle: "Dernier mois clos" },

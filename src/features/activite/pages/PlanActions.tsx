@@ -9,13 +9,13 @@ import { Carte } from "@/components/ui/Carte";
 import { Definition, GrilleDefinitions } from "@/components/ui/Definition";
 import { Encart } from "@/components/ui/Encart";
 import { Etiquette, type TonEtiquette } from "@/components/ui/Etiquette";
-import { Pastilles } from "@/components/ui/Pastilles";
+import { ChoixStructure } from "@/components/ui/ChoixStructure";
 import { SelecteurPeriode } from "@/components/ui/SelecteurPeriode";
 import { Tableau, type Colonne } from "@/components/ui/Tableau";
 import { ModaleEtatPlan } from "@/features/activite/components/ModalesActivite";
 import { planActionsQuery, type Activite, type EtatActivite, type EtatPlan } from "@/features/activite/api";
 import { usePermission } from "@/lib/contexteSession";
-import { formaterDate } from "@/lib/format";
+import { formaterDate, formaterMois } from "@/lib/format";
 import { periodeCourante, type Periode } from "@/lib/periode";
 import { PERMISSIONS } from "@/types/habilitation";
 
@@ -108,7 +108,7 @@ export function PlanActions() {
       largeur: "minmax(140px,1fr)",
       rendu: (a) => (
         <span className="text-[11px] leading-none font-semibold text-encre-douce tabular-nums">
-          {formaterDate(a.debut)} → {formaterDate(a.fin)}
+          {formaterMois(a.debut)} → {formaterMois(a.fin)}
         </span>
       ),
     },
@@ -166,8 +166,8 @@ export function PlanActions() {
               proposer laisserait croire qu'on pourrait voir les autres. */}
           {accessibles.length > 1 && (
             <div className="rounded-none border border-bordure bg-surface px-4 py-3.5 md:px-5">
-              <Pastilles
-                options={accessibles.map((s) => s.sigle)}
+              <ChoixStructure
+                sigles={accessibles.map((s) => s.sigle)}
                 actif={plan?.structureSigle ?? ""}
                 onChange={(sigle) => setParametres({ structure: sigle })}
                 libelle="Plan de la structure"

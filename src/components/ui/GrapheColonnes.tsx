@@ -1,3 +1,4 @@
+import { PiedGraphe } from "@/components/ui/PiedGraphe";
 import { calculerGraduations } from "@/lib/graduations";
 
 export interface PointColonne {
@@ -25,12 +26,15 @@ export function GrapheColonnes({
   hauteur = 190,
   format = (valeur) => valeur.toLocaleString("fr-FR"),
   libelleAxe,
+  note,
 }: {
   points: PointColonne[];
   hauteur?: number;
   format?: (valeur: number) => string;
-  /** Mention posee sous les categories : l'exercice, la periode couverte. */
+  /** Mention posee au pied : l'exercice, la periode couverte, l'unite. */
   libelleAxe?: string;
+  /** Reserve de lecture, posee a droite du pied. */
+  note?: string;
 }) {
   const valeurs = points.map((point) => point.valeur);
   const graduations = calculerGraduations(Math.min(0, ...valeurs), Math.max(0, ...valeurs));
@@ -129,6 +133,7 @@ export function GrapheColonnes({
           {points.map((point) => (
             <span
               key={point.libelle}
+              title={point.libelle}
               className="min-w-0 flex-1 truncate text-center text-[10px] leading-none font-medium text-encre-tenue"
             >
               {point.libelle}
@@ -137,11 +142,10 @@ export function GrapheColonnes({
         </div>
       </div>
 
-      {libelleAxe && (
-        <span className="text-center text-[9.5px] leading-none font-medium text-encre-tenue">
-          {libelleAxe}
-        </span>
-      )}
+      {/* Une seule serie : pas de legende, le titre du panneau la nomme. La
+          mention d'axe se pose a gauche, au meme endroit que partout ailleurs
+          — elle etait centree, et l'oeil la cherchait d'un panneau a l'autre. */}
+      <PiedGraphe mention={libelleAxe} note={note} />
     </div>
   );
 }

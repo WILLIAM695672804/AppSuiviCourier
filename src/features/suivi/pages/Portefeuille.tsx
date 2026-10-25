@@ -3,12 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { EnTetePage } from "@/components/EnTetePage";
 import { SqueletteTexte } from "@/components/ui/Squelette";
+import { EtatErreur } from "@/components/ui/EtatChargement";
 import { Bouton } from "@/components/ui/Bouton";
 import { CarteIndicateur } from "@/components/ui/CarteIndicateur";
 import { CaseACocher, MarqueCase } from "@/components/ui/CaseACocher";
 import { Etiquette } from "@/components/ui/Etiquette";
 import { Onglets, type Onglet } from "@/components/ui/Onglets";
 import { JaugeDelai } from "@/features/courrier/components/JaugeDelai";
+import { ModaleRelance } from "@/features/suivi/components/ModaleRelance";
 import { relanceQuery, type VueRelance } from "@/features/suivi/api";
 import { usePermission } from "@/lib/contexteSession";
 import { formaterDate } from "@/lib/format";
@@ -35,16 +37,28 @@ const ONGLETS: readonly Onglet<VueRelance>[] = [
 ];
 
 const GRILLE =
-  "grid grid-cols-[38px_minmax(220px,2fr)_110px_130px_120px_110px_90px_34px] items-center gap-2.5 px-[26px]";
+  "grid grid-cols-[38px_minmax(200px,2fr)_100px_120px_120px_110px_100px_90px_34px] items-center gap-2.5 px-[26px]";
 
-const COLONNES = ["Objet", "Structure", "Agent", "Délai", "Dernière relance", "Escalade"];
+// « Interlocuteur » se lit avant « Escalade » : combien de retard, qui
+// prévenir, à quel niveau on en est. C'est l'ordre de travail de l'agent de la
+// DSR, qui relance en masse depuis ce tableau.
+const COLONNES = [
+  "Objet",
+  "Structure",
+  "Agent",
+  "Délai",
+  "Interlocuteur",
+  "Dernière relance",
+  "Escalade",
+];
 
 export function Portefeuille() {
   const [vue, setVue] = useState<VueRelance>("horsDelai");
   const [selection, setSelection] = useState<Set<number>>(new Set());
+  const [relanceOuverte, setRelanceOuverte] = useState(false);
   const peutRelancer = usePermission(PERMISSIONS.REL);
 
-  const { data, isPending } = useQuery(relanceQuery(vue));
+  const { data, isPending, isError, refetch } = useQuery(relanceQuery(vue));
   const lignes = data?.lignes ?? [];
 
   function basculer(id: number) {
@@ -65,7 +79,12 @@ export function Portefeuille() {
           <div className="flex items-center gap-2">
             <Bouton icone="exporter">Exporter</Bouton>
             {peutRelancer && (
-              <Bouton variante="principal" icone="cloche" disabled={selection.size === 0}>
+              <Bouton
+                variante="principal"
+                icone="cloche"
+                disabled={selection.size === 0}
+                onClick={() => setRelanceOuverte(true)}
+              >
                 Relancer{selection.size > 0 && ` (${selection.size})`}
               </Bouton>
             )}
@@ -75,29 +94,34 @@ export function Portefeuille() {
 
       {data && (
         <div className="grid flex-none grid-cols-2 divide-x divide-bordure border-b border-bordure xl:grid-cols-4">
+          {/* Les variations affichaient « ▲ 2 », « ▲ 6 », « ▼ 12 pts » : des
+              nombres écrits en dur dans la maquette, que rien ne mesurait. Une
+              variation suppose une période de référence que rien n'archive
+              (ADR 011). Elles sont retirées plutôt que remplacées par un
+              « Non mesuré » de plus : la note sous le chiffre dit déjà ce que
+              celui-ci recouvre, et un chiffre faux décide d'une relance. */}
           <CarteIndicateur
             libelle="Hors délai"
             valeur={String(data.indicateurs.horsDelai)}
-            variation={{ texte: "▲ 2", ton: "danger" }}
-            note={`dont ${data.indicateurs.horsDelaiGrave} au-delà de 5 jours`}
+            note={`dont ${data.indicateurs.horsDelaiGrave} au-delà du seuil de retard grave`}
+            ton="danger"
           />
           <CarteIndicateur
             libelle="Échéance sous 48 h"
             valeur={String(data.indicateurs.sous48h)}
             variation={{ texte: "à surveiller", ton: "alerte" }}
             note={`${data.indicateurs.structuresConcernees} structures concernées`}
+            ton="alerte"
           />
           <CarteIndicateur
             libelle="Relances envoyées ce mois"
             valeur={String(data.indicateurs.relancesMois)}
-            variation={{ texte: "▲ 6", ton: "accent" }}
             note={`${data.indicateurs.escalades} escalades au niveau supérieur`}
           />
           <CarteIndicateur
             libelle="Taux de respect des délais"
             valeur={`${data.indicateurs.tauxRespect} %`}
-            variation={{ texte: "▼ 12 pts", ton: "danger" }}
-            note="objectif 80 %"
+            note="sur douze mois glissants"
           />
         </div>
       )}
@@ -115,12 +139,16 @@ export function Portefeuille() {
 
       <div className="flex-1 overflow-auto">
         <div className="min-w-[1020px]">
-          <div className={`${GRILLE} sticky top-0 z-2 border-b border-bordure bg-surface-tete py-2.5`}>
+          <div
+            className={`${GRILLE} sticky top-0 z-2 border-b border-bordure bg-surface-tete py-2.5`}
+          >
             <CaseACocher
               cochee={lignes.length > 0 && selection.size === lignes.length}
               partielle={selection.size > 0 && selection.size < lignes.length}
               onChange={(cochee) =>
-                setSelection(cochee ? new Set(lignes.map((l) => l.id)) : new Set())
+                setSelection(
+                  cochee ? new Set(lignes.map((l) => l.id)) : new Set(),
+                )
               }
               libelle="Sélectionner tous les dossiers"
             />
@@ -141,6 +169,18 @@ export function Portefeuille() {
             </div>
           )}
 
+          {/* Un tableau vide et un tableau qui n'a pas chargé disent deux choses
+              opposées, et l'écran affirmait la première dans les deux cas :
+              « Les délais sont tenus » alors que le serveur n'avait rien
+              répondu. Un écran ne conclut jamais à partir de ce qu'il n'a pas
+              reçu. */}
+          {isError && (
+            <EtatErreur
+              message="Le suivi des délais n'a pas pu être chargé."
+              onReessayer={() => void refetch()}
+            />
+          )}
+
           {lignes.map((ligne) => (
             <div
               key={ligne.id}
@@ -158,7 +198,10 @@ export function Portefeuille() {
                 <MarqueCase cochee={selection.has(ligne.id)} />
               </button>
 
-              <Link to={`/courriers/${ligne.id}`} className="flex min-w-0 flex-col gap-1">
+              <Link
+                to={`/courriers/${ligne.id}`}
+                className="flex min-w-0 flex-col gap-1"
+              >
                 <span className="text-[10.5px] leading-none font-semibold text-encre-tenue tabular-nums">
                   {ligne.numero}
                 </span>
@@ -176,15 +219,27 @@ export function Portefeuille() {
 
               <JaugeDelai delai={ligne.delai} />
 
+              {/* Le directeur de la tête de structure, à qui la relance
+                  s'adresse — jamais l'agent nommé. */}
+              <span className="truncate text-[11.5px] leading-none font-medium text-encre-moyenne">
+                {ligne.interlocuteur}
+              </span>
+
               <span className="text-[11.5px] leading-none font-medium text-encre-faible">
-                {ligne.derniereRelance ? formaterDate(ligne.derniereRelance) : "jamais"}
+                {ligne.derniereRelance
+                  ? formaterDate(ligne.derniereRelance)
+                  : "jamais"}
               </span>
 
               <span className="justify-self-start">
                 {ligne.niveauEscalade > 0 ? (
-                  <Etiquette ton="danger">Niveau {ligne.niveauEscalade}</Etiquette>
+                  <Etiquette ton="danger">
+                    Niveau {ligne.niveauEscalade}
+                  </Etiquette>
                 ) : (
-                  <span className="text-[11px] leading-none font-medium text-encre-tenue">Aucune</span>
+                  <span className="text-[11px] leading-none font-medium text-encre-tenue">
+                    Aucune
+                  </span>
                 )}
               </span>
 
@@ -198,13 +253,25 @@ export function Portefeuille() {
             </div>
           ))}
 
-          {lignes.length === 0 && !isPending && (
+          {lignes.length === 0 && !isPending && !isError && (
             <p className="px-[26px] py-16 text-center text-[12.5px] font-medium text-encre-tenue">
               Aucun dossier dans cette vue. Les délais sont tenus.
             </p>
           )}
         </div>
       </div>
+
+      <ModaleRelance
+        identifiants={[...selection]}
+        ouverte={relanceOuverte}
+        onFermer={(relancees) => {
+          setRelanceOuverte(false);
+          // Vidée seulement si des relances sont parties : relancer une seconde
+          // fois d'un clic distrait écrirait deux fois au même agent. Annuler,
+          // en revanche, ne défait pas une sélection de quatorze lignes.
+          if (relancees) setSelection(new Set());
+        }}
+      />
     </>
   );
 }

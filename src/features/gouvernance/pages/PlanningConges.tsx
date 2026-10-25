@@ -7,16 +7,30 @@ import { Bouton } from "@/components/ui/Bouton";
 import { Carte } from "@/components/ui/Carte";
 import { Encart } from "@/components/ui/Encart";
 import { Etiquette, type TonEtiquette } from "@/components/ui/Etiquette";
+import { PiedGraphe } from "@/components/ui/PiedGraphe";
 import { SelecteurPeriode } from "@/components/ui/SelecteurPeriode";
-import { planningCongesQuery, type EtatConge } from "@/features/gouvernance/api";
+import {
+  ModaleArbitrerPeriode,
+  ModaleOuvrirDroit,
+  ModalePlanifierPeriode,
+} from "@/features/gouvernance/components/ModalesConges";
+import {
+  planningCongesQuery,
+  type EtatConge,
+} from "@/features/gouvernance/api";
 import { formaterDate } from "@/lib/format";
 import { periodeCourante, type Periode } from "@/lib/periode";
 
 /**
- * Planning annuel des congés des directeurs — §3.3.
+ * Planning annuel des congés — §3.3.
  *
  * « Confectionner les projets de planning des congés annuels des Directeurs de
  * services et membres du Cabinet du DG, en liaison avec la DRH. »
+ *
+ * L'écran ne s'arrête pas aux directeurs : chaque chef de structure y planifie
+ * les congés des agents de son sous-arbre. Le serveur borne au périmètre — la
+ * page envoie, il refuse ce qui n'est pas à lui. Ce que la DSR et le Directeur
+ * général voient, en retour, se lit par tête de structure.
  *
  * À ne pas confondre avec le registre de disponibilité, qui enregistre des
  * absences déjà décidées, une par une. Ici on arbitre des souhaits avant
@@ -55,21 +69,46 @@ function segment(du: string, au: string, annee: number) {
   const depart = Math.max(0, (new Date(du).getTime() - debutAnnee) / duree);
   const arrivee = Math.min(1, (new Date(au).getTime() - debutAnnee) / duree);
 
-  return { gauche: `${depart * 100}%`, largeur: `${Math.max(0.8, (arrivee - depart) * 100)}%` };
+  return {
+    gauche: `${depart * 100}%`,
+    largeur: `${Math.max(0.8, (arrivee - depart) * 100)}%`,
+  };
 }
 
 export function PlanningConges() {
-  const [periode, setPeriode] = useState<Periode>(() => periodeCourante("annee"));
+  const [periode, setPeriode] = useState<Periode>(() =>
+    periodeCourante("annee"),
+  );
   const { data } = useQuery(planningCongesQuery(periode.annee));
+
+  // Trois modales, trois cibles. La cible est retenue plutot que la ligne
+  // entiere : le planning se rafraichit apres chaque envoi, et un objet garde
+  // en etat aurait affiche des chiffres perimes derriere la modale suivante.
+  const [ouvrirDroit, setOuvrirDroit] = useState(false);
+  const [droitPlanifie, setDroitPlanifie] = useState<{
+    id: number;
+    agent: string;
+  } | null>(null);
+  const [periodeArbitree, setPeriodeArbitree] = useState<{
+    id: number;
+    libelle: string;
+  } | null>(null);
 
   return (
     <>
       <EnTetePage
         titre="Planning des congés"
-        sousTitre="Directeurs de services et membres du Cabinet — projet établi avec la DRH"
+        sousTitre="Agents de votre périmètre — projet établi avec la DRH"
         actions={
           <>
-            <SelecteurPeriode periode={periode} onChange={setPeriode} bornerAuPresent={false} />
+            <SelecteurPeriode
+              periode={periode}
+              onChange={setPeriode}
+              bornerAuPresent={false}
+            />
+            <Bouton icone="personneAjout" onClick={() => setOuvrirDroit(true)}>
+              Ouvrir un droit
+            </Bouton>
             <Bouton variante="principal" icone="exporter">
               Transmettre à la DRH
             </Bouton>
@@ -89,8 +128,8 @@ export function PlanningConges() {
               {data?.conflits
                 .map((c) => `${c.responsables.join(" et ")} — ${c.structure}`)
                 .join(" ; ")}
-              . Une structure privée de toute sa ligne hiérarchique n'a plus personne pour valider,
-              coter ni signer.
+              . Une structure privée de toute sa ligne hiérarchique n'a plus
+              personne pour valider, coter ni signer.
             </Encart>
           )}
 
@@ -142,7 +181,11 @@ export function PlanningConges() {
                     ))}
 
                     {ligne.periodes.map((p) => {
-                      const { gauche, largeur } = segment(p.du, p.au, data?.annee ?? periode.annee);
+                      const { gauche, largeur } = segment(
+                        p.du,
+                        p.au,
+                        data?.annee ?? periode.annee,
+                      );
                       return (
                         <span
                           key={p.id}
@@ -157,19 +200,22 @@ export function PlanningConges() {
               ))}
             </ul>
 
-            <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-separateur pt-3.5">
-              {(["Souhaité", "Arbitré", "Validé", "Reporté"] as EtatConge[]).map((etat) => (
-                <span key={etat} className="flex items-center gap-1.5">
-                  <span className={`size-2.5 rounded-none ${TEINTES_ETAT[etat]}`} />
-                  <span className="text-[10.5px] leading-none font-semibold text-encre-tenue">
-                    {etat}
-                  </span>
-                </span>
-              ))}
+            {/* Meme pied que les graphiques : la frise est un trace comme un
+                autre, sa legende se lit au meme endroit et de la meme facon. */}
+            <div className="mt-4 border-t border-separateur pt-3.5">
+              <PiedGraphe
+                series={(
+                  ["Souhaité", "Arbitré", "Validé", "Reporté"] as EtatConge[]
+                ).map((etat) => ({
+                  libelle: etat,
+                  classe: TEINTES_ETAT[etat],
+                }))}
+                mention={`Année ${data?.annee ?? periode.annee}`}
+              />
             </div>
           </Carte>
 
-          <Carte titre="Détail par responsable">
+          <Carte titre="Détail par agent">
             <ul className="mt-3.5 flex flex-col">
               {(data?.lignes ?? []).map((ligne, index) => (
                 <li
@@ -196,34 +242,80 @@ export function PlanningConges() {
                     </span>
                   </span>
 
-                  <span className="flex flex-wrap gap-1.5 md:w-[300px]">
+                  <span className="flex flex-wrap items-center gap-1.5 md:w-[300px]">
                     {ligne.periodes.length === 0 ? (
                       <Etiquette ton="alerte">Aucune période posée</Etiquette>
                     ) : (
                       ligne.periodes.map((p) => (
-                        <span
+                        // La pastille est le bouton d'arbitrage : un second
+                        // bouton par periode aurait fait quatre commandes par
+                        // ligne pour un ecran qui en compte deja trois.
+                        <button
                           key={p.id}
-                          className="flex items-center gap-1.5 rounded-none border border-bordure px-2 py-1.5"
+                          type="button"
+                          title={`Arbitrer la période du ${formaterDate(p.du)} au ${formaterDate(p.au)}`}
+                          onClick={() =>
+                            setPeriodeArbitree({
+                              id: p.id,
+                              libelle: `${ligne.responsable} · ${formaterDate(p.du)} → ${formaterDate(p.au)} · ${p.jours} j`,
+                            })
+                          }
+                          className="flex items-center gap-1.5 rounded-none border border-bordure px-2 py-1.5 transition-colors duration-150 hover:border-bordure-forte hover:bg-surface-douce"
                         >
                           <span className="text-[10.5px] leading-none font-semibold text-encre tabular-nums">
                             {formaterDate(p.du)} → {formaterDate(p.au)}
                           </span>
-                          <Etiquette ton={TONS_ETAT[p.etat]}>{p.etat}</Etiquette>
-                        </span>
+                          <Etiquette ton={TONS_ETAT[p.etat]}>
+                            {p.etat}
+                          </Etiquette>
+                        </button>
                       ))
                     )}
+                  </span>
+
+                  <span className="flex-none">
+                    <Bouton
+                      icone="calendrier"
+                      onClick={() =>
+                        setDroitPlanifie({
+                          id: ligne.id,
+                          agent: ligne.responsable,
+                        })
+                      }
+                    >
+                      Planifier
+                    </Bouton>
                   </span>
                 </li>
               ))}
             </ul>
 
             <p className="mt-3.5 border-t border-separateur pt-3.5 text-[11px] leading-[1.5] font-medium text-encre-tenue">
-              Un solde intact en milieu d'année n'est pas une vertu : c'est un responsable qui n'a
-              rien planifié, et qui posera ses trente jours au dernier trimestre.
+              Un solde intact en milieu d'année n'est pas une vertu : c'est un
+              responsable qui n'a rien planifié, et qui posera ses trente jours
+              au dernier trimestre.
             </p>
           </Carte>
         </div>
       </div>
+
+      <ModaleOuvrirDroit
+        ouverte={ouvrirDroit}
+        onFermer={() => setOuvrirDroit(false)}
+        annee={periode.annee}
+      />
+      <ModalePlanifierPeriode
+        ouverte={droitPlanifie !== null}
+        onFermer={() => setDroitPlanifie(null)}
+        droitId={droitPlanifie?.id ?? null}
+        agent={droitPlanifie?.agent ?? ""}
+      />
+      <ModaleArbitrerPeriode
+        ouverte={periodeArbitree !== null}
+        onFermer={() => setPeriodeArbitree(null)}
+        periodeId={periodeArbitree?.id ?? null}
+        periode={periodeArbitree?.libelle ?? ""}
+      />
     </>
   );
 }

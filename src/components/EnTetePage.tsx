@@ -15,8 +15,13 @@ import { useSession } from "@/lib/contexteSession";
  * decompte et ses actions. C'est ce que montrent les maquettes, et c'est
  * coherent — l'action principale depend toujours de l'ecran affiche.
  *
- * Les ecrans de saisie remplacent les outils systeme (aide, notifications)
+ * Les ecrans de saisie remplacent les outils systeme (notifications, profil)
  * par un fil d'Ariane : on y entre pour une tache, on en sort en la finissant.
+ *
+ * Le glossaire fait exception depuis : il est au meme endroit sur **tous** les
+ * ecrans. Il partait avec les autres outils, c'est-a-dire qu'il disparaissait
+ * des les fiches et les formulaires — la ou les sigles sont les plus denses et
+ * ou l'on en a le plus besoin.
  */
 export function EnTetePage({
   titre,
@@ -77,15 +82,14 @@ export function EnTetePage({
           </span>
         )}
 
+        {/* Le bouton d'aide ouvre le glossaire des sigles — §3.12 et note
+            finale du descriptif. Il est le seul outil systeme a rester sur tous
+            les ecrans, telephone compris : un sigle incompris arrete la lecture
+            la ou elle se trouve, et le renvoi vers un autre ecran la perdrait. */}
+        <BoutonGlossaire onClick={() => setGlossaireOuvert(true)} />
+
         {outilsSysteme && (
           <>
-            {/* Le bouton d'aide ouvre le glossaire des sigles — §3.12 et note
-                finale du descriptif. Il cede la place sur telephone, comme les
-                preferences : le titre et l'action principale passent avant. Les
-                notifications restent, elles appellent une action. */}
-            <span className="hidden md:block">
-              <BoutonGlossaire onClick={() => setGlossaireOuvert(true)} />
-            </span>
             <button
               type="button"
               aria-label="Préférences"

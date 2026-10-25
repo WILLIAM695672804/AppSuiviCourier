@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { EnTetePage } from "@/components/EnTetePage";
 import { BarreProgression } from "@/components/ui/BarreProgression";
 import { Bouton } from "@/components/ui/Bouton";
@@ -46,8 +46,24 @@ const RANG_ETAT: Record<EtatDecision, number> = {
 
 export function RegistreDecisions() {
   const naviguer = useNavigate();
-  const [instance, setInstance] = useState<(typeof INSTANCES)[number]>("Toutes");
-  const [etat, setEtat] = useState<(typeof ETATS)[number]>("Tous");
+  /*
+   * Les filtres s'amorcent sur l'URL, et seulement a l'ouverture : c'est ce qui
+   * rend le registre atteignable depuis un graphique de la vue d'ensemble du
+   * Directeur general (ADR 027). Ensuite les selecteurs reprennent la main.
+   */
+  const [parametres] = useSearchParams();
+  const [instance, setInstance] = useState<(typeof INSTANCES)[number]>(() => {
+    const demande = parametres.get("instance");
+    return INSTANCES.includes(demande as (typeof INSTANCES)[number])
+      ? (demande as (typeof INSTANCES)[number])
+      : "Toutes";
+  });
+  const [etat, setEtat] = useState<(typeof ETATS)[number]>(() => {
+    const demande = parametres.get("etat");
+    return ETATS.includes(demande as (typeof ETATS)[number])
+      ? (demande as (typeof ETATS)[number])
+      : "Tous";
+  });
   const [modaleOuverte, setModaleOuverte] = useState(false);
 
   const { data, isPending } = useQuery(registreDecisionsQuery(instance, etat));

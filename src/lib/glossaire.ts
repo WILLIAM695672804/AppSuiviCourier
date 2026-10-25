@@ -14,12 +14,18 @@
  * (DSR, CODIR), ceux du programme (GED, BPM), et ceux du métier administratif
  * (DUA, PAA). Un auditeur qui ouvre une restitution ne sait pas d'avance
  * auquel des trois registres appartient le sigle qui l'arrête.
+ *
+ * Une quatrième famille s'y ajoute à l'affichage sans être écrite ici :
+ * l'organigramme. Les soixante-dix-sept sigles de structures sont une donnée
+ * administrée, pas une constante — les figer dans ce fichier aurait fait
+ * mentir le glossaire au premier remaniement. Le composant `Glossaire` les
+ * verse depuis le référentiel, ouvert à toute session (ADR 007).
  */
 export interface EntreeGlossaire {
   sigle: string;
   intitule: string;
   definition: string;
-  famille: "Institution" | "Programme" | "Métier";
+  famille: "Institution" | "Programme" | "Métier" | "Organigramme";
 }
 
 export const GLOSSAIRE: EntreeGlossaire[] = [
@@ -240,10 +246,19 @@ export const GLOSSAIRE: EntreeGlossaire[] = [
     famille: "Métier",
   },
   {
+    sigle: "Bureau d'ordre",
+    intitule: "Bureau d'ordre de structure",
+    definition:
+      "Registre des entrées et des sorties du courrier d'une structure. Au Port, il est tenu par " +
+      "le point focal. Distinct du bureau d'ordre central, qui enregistre l'arrivée au Port.",
+    famille: "Métier",
+  },
+  {
     sigle: "Point focal",
     intitule: "Point focal de structure",
     definition:
-      "Agent désigné pour alimenter les données de sa structure : activités, rapports, disponibilité.",
+      "Agent désigné pour alimenter les données de sa structure — activités, rapports, disponibilité — " +
+      "et pour en tenir le bureau d'ordre : entrées et sorties du courrier.",
     famille: "Métier",
   },
   {
@@ -256,20 +271,26 @@ export const GLOSSAIRE: EntreeGlossaire[] = [
 ];
 
 /** Recherche insensible à la casse et aux accents, sur le sigle et l'intitulé. */
-export function chercherGlossaire(terme: string): EntreeGlossaire[] {
-  const recherche = terme
-    .trim()
+export function chercherGlossaire(terme: string, entrees: EntreeGlossaire[] = GLOSSAIRE) {
+  const recherche = aplatir(terme.trim());
+
+  if (!recherche) return entrees;
+
+  return entrees.filter((entree) =>
+    aplatir(`${entree.sigle} ${entree.intitule} ${entree.definition}`).includes(recherche),
+  );
+}
+
+/**
+ * Minuscules sans accent : on cherche « metier » et on trouve « métier ».
+ *
+ * La saisie d'un sigle se fait au clavier, souvent sans accent et sans
+ * majuscule ; comparer les chaines telles quelles ferait echouer la recherche
+ * sur la moitie des intitules.
+ */
+export function aplatir(texte: string): string {
+  return texte
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "");
-
-  if (!recherche) return GLOSSAIRE;
-
-  return GLOSSAIRE.filter((entree) =>
-    `${entree.sigle} ${entree.intitule} ${entree.definition}`
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .includes(recherche),
-  );
 }

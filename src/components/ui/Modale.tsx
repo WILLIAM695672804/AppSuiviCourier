@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { Icone } from "@/components/ui/Icone";
 
@@ -32,11 +33,27 @@ export function Modale({
 }) {
   const boite = useRef<HTMLDivElement>(null);
 
+  /**
+   * `onFermer` tenu dans une reference, et **hors** des dependances de l'effet.
+   *
+   * Les appelants passent une closure ecrite dans leur JSX : elle est donc
+   * nouvelle a chaque rendu. En dependance, elle rejouait l'effet a chaque
+   * frappe — et l'effet pose le focus sur la boite. L'agent tapait une lettre,
+   * perdait le champ, devait recliquer, tapait la suivante.
+   *
+   * L'effet ne doit dependre que de l'ouverture : le focus se pose **une fois**,
+   * a l'ouverture, ce qui est tout ce qu'on lui demande.
+   */
+  const fermer = useRef(onFermer);
+  useEffect(() => {
+    fermer.current = onFermer;
+  }, [onFermer]);
+
   useEffect(() => {
     if (!ouverte) return;
 
     function surTouche(e: KeyboardEvent) {
-      if (e.key === "Escape") onFermer();
+      if (e.key === "Escape") fermer.current();
     }
 
     document.addEventListener("keydown", surTouche);
@@ -49,9 +66,23 @@ export function Modale({
       document.removeEventListener("keydown", surTouche);
       document.body.style.overflow = debordement;
     };
-  }, [ouverte, onFermer]);
+  }, [ouverte]);
 
-  return (
+  /**
+   * Rendue dans `document.body`, hors de l'arbre de l'ecran appelant.
+   *
+   * **Pourquoi c'est necessaire et pas cosmetique.** Une modale porte son propre
+   * `<form>`. Ouverte depuis un ecran de saisie — l'enregistrement d'un courrier
+   * est un `<form>` unique qui couvre tout l'ecran — elle produisait deux
+   * formulaires imbriques, ce que le HTML interdit : le bouton d'envoi de la
+   * modale ne trouvait pas fiablement le formulaire qu'il vise, et la creation
+   * ne partait pas. Aucune erreur, aucune trace : un bouton qui ne fait rien.
+   *
+   * Le portail sort le contenu de l'arbre DOM du formulaire appelant. L'arbre
+   * React, lui, ne change pas : le contexte, les evenements React et les etats
+   * continuent de remonter a l'appelant.
+   */
+  return createPortal(
     <AnimatePresence>
       {ouverte && (
         <motion.div
@@ -109,6 +140,7 @@ export function Modale({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

@@ -10,7 +10,13 @@ import { EtatChargement, EtatErreur } from "@/components/ui/EtatChargement";
 import { Etiquette } from "@/components/ui/Etiquette";
 import { Icone } from "@/components/ui/Icone";
 import { JaugeDelai } from "@/features/courrier/components/JaugeDelai";
-import { dossierQuery, useAjouterNote, useBasculerTache } from "@/features/suivi/api";
+import { ModaleDemandeDelai } from "@/features/suivi/components/ModaleDemandeDelai";
+import {
+  dossierQuery,
+  useAjouterNote,
+  useAjouterTache,
+  useBasculerTache,
+} from "@/features/suivi/api";
 import { formaterDate, formaterDateHeure } from "@/lib/format";
 
 /**
@@ -28,13 +34,22 @@ export function DossierTraitement() {
 
   const { data, isPending, isError, error } = useQuery(dossierQuery(dossierId));
   const basculer = useBasculerTache(dossierId);
+  const ajouterTache = useAjouterTache(dossierId);
   const ajouterNote = useAjouterNote(dossierId);
   const [note, setNote] = useState("");
+  // Privee par defaut : le doute profite a la discretion. L'agent qui veut
+  // ecrire a tous les lecteurs du courrier decoche, et il le fait sciemment.
+  const [notePrivee, setNotePrivee] = useState(true);
+  const [etape, setEtape] = useState("");
+  const [reportOuvert, setReportOuvert] = useState(false);
 
   if (isPending) {
     return (
       <>
-        <EnTetePage titre="Dossier" miettes={[{ libelle: "Mes dossiers", chemin: "/suivi" }]} />
+        <EnTetePage
+          titre="Dossier"
+          miettes={[{ libelle: "Mes dossiers", chemin: "/suivi" }]}
+        />
         <EtatChargement message="Chargement du dossier…" />
       </>
     );
@@ -43,39 +58,71 @@ export function DossierTraitement() {
   if (isError || !data) {
     return (
       <>
-        <EnTetePage titre="Dossier" miettes={[{ libelle: "Mes dossiers", chemin: "/suivi" }]} />
-        <EtatErreur message={error instanceof Error ? error.message : "Dossier introuvable."} />
+        <EnTetePage
+          titre="Dossier"
+          miettes={[{ libelle: "Mes dossiers", chemin: "/suivi" }]}
+        />
+        <EtatErreur
+          message={
+            error instanceof Error ? error.message : "Dossier introuvable."
+          }
+        />
       </>
     );
   }
 
   const { courrier, instruction, taches, notes, autresDossiers } = data;
   const faites = taches.filter((t) => t.faite).length;
+  const estAffecte = data.actionsPossibles.includes("traiter");
 
   function publierNote() {
     const propre = note.trim();
     if (!propre) return;
-    ajouterNote.mutate({ texte: propre, privee: true });
+    ajouterNote.mutate({ texte: propre, privee: notePrivee });
     setNote("");
+  }
+
+  function publierEtape() {
+    const propre = etape.trim();
+    if (!propre) return;
+    ajouterTache.mutate({ libelle: propre });
+    setEtape("");
   }
 
   return (
     <>
       <EnTetePage
         titre={courrier.objet}
-        miettes={[{ libelle: "Mes dossiers", chemin: "/suivi" }, { libelle: courrier.numero }]}
+        miettes={[
+          { libelle: "Mes dossiers", chemin: "/suivi" },
+          { libelle: courrier.numero },
+        ]}
         actions={
           <div className="flex items-center gap-2">
-            <Etiquette ton="accent">Affecté à moi</Etiquette>
+            {/* « Affecté à moi » se dit sur la foi des actions que le serveur
+                ouvre, et non parce que l'écran est ouvert : un responsable lit
+                le dossier de son agent sans l'avoir sur les bras. */}
+            <Etiquette ton={estAffecte ? "accent" : "neutre"}>
+              {estAffecte ? "Affecté à moi" : "En lecture"}
+            </Etiquette>
             <span className="mx-1 h-5 w-px bg-bordure" />
             {data.actionsPossibles.includes("demanderDelai") && (
-              <Bouton icone="horloge">Demander un délai</Bouton>
+              <Bouton icone="horloge" onClick={() => setReportOuvert(true)}>
+                Demander un délai
+              </Bouton>
             )}
             <Bouton onClick={() => naviguer(`/courriers/${courrier.id}`)}>
               Voir la fiche complète
             </Bouton>
-            {data.actionsPossibles.includes("traiter") && (
-              <Bouton variante="principal" icone="coche">
+            {/* La rédaction du projet de réponse vit sur la fiche, avec ses
+                versions et son circuit de visa : deux endroits pour écrire le
+                même texte auraient produit deux brouillons. */}
+            {estAffecte && (
+              <Bouton
+                variante="principal"
+                icone="coche"
+                onClick={() => naviguer(`/courriers/${courrier.id}`)}
+              >
                 Soumettre un projet de réponse
               </Bouton>
             )}
@@ -96,14 +143,18 @@ export function DossierTraitement() {
             >
               {instruction ? (
                 <div className="mt-4 flex gap-[11px]">
-                  <Avatar initiales={instruction.initiales} titre={instruction.auteur} />
+                  <Avatar
+                    initiales={instruction.initiales}
+                    titre={instruction.auteur}
+                  />
                   <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs leading-none font-bold text-encre">
                         {instruction.auteur}
                       </span>
                       <span className="text-[10.5px] leading-none font-medium text-encre-tenue">
-                        {instruction.fonction} · {formaterDateHeure(instruction.horodatage)}
+                        {instruction.fonction} ·{" "}
+                        {formaterDateHeure(instruction.horodatage)}
                       </span>
                     </div>
                     <p className="text-[13px] leading-[1.6] font-medium text-pretty text-encre-moyenne">
@@ -135,40 +186,86 @@ export function DossierTraitement() {
                       type="button"
                       role="checkbox"
                       aria-checked={tache.faite}
-                      onClick={() => basculer.mutate({ tacheId: tache.id, faite: !tache.faite })}
+                      onClick={() =>
+                        basculer.mutate({
+                          tacheId: tache.id,
+                          faite: !tache.faite,
+                        })
+                      }
                       className="flex w-full items-center gap-2.5 border-b border-separateur py-2.5 text-left last:border-b-0 hover:bg-surface-douce"
                     >
                       <MarqueCase cochee={tache.faite} />
                       <span
                         className={`flex-1 text-xs leading-none font-semibold ${
-                          tache.faite ? "text-encre-tenue line-through" : "text-encre-douce"
+                          tache.faite
+                            ? "text-encre-tenue line-through"
+                            : "text-encre-douce"
                         }`}
                       >
                         {tache.libelle}
                       </span>
                       <span className="text-[10.5px] leading-none font-medium text-encre-tenue">
-                        {tache.faiteLe ? formaterDate(tache.faiteLe) : "à faire"}
+                        {tache.faiteLe
+                          ? formaterDate(tache.faiteLe)
+                          : "à faire"}
                       </span>
                     </button>
                   </li>
                 ))}
               </ul>
+
+              {taches.length === 0 && (
+                <p className="mt-3.5 text-[12.5px] font-medium text-encre-tenue">
+                  Aucune étape. Découpez votre traitement si cela vous aide :
+                  ces étapes n'engagent que vous.
+                </p>
+              )}
+
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  value={etape}
+                  onChange={(e) => setEtape(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && publierEtape()}
+                  placeholder="Ajouter une étape…"
+                  className="min-w-0 flex-1 rounded-none border border-bordure-forte px-3 py-2.5 text-xs leading-none font-medium text-encre outline-none transition-colors duration-150 placeholder:text-encre-tenue focus:border-accent"
+                />
+                <Bouton
+                  variante="doux"
+                  onClick={publierEtape}
+                  disabled={!etape.trim()}
+                >
+                  Ajouter
+                </Bouton>
+              </div>
             </Carte>
 
             <Carte
               titre="Mes notes de traitement"
               aDroite={
                 <span className="text-[11px] leading-none font-medium text-encre-tenue">
-                  Note privée · visible par ma hiérarchie
+                  {notePrivee
+                    ? "Note privée · visible par ma hiérarchie"
+                    : "Note ouverte · visible par tout lecteur du courrier"}
                 </span>
               }
             >
               <div className="mt-3.5 flex flex-col gap-3">
                 {notes.map((n) => (
-                  <div key={n.id} className="rounded-none border border-bordure px-3 py-2.5">
-                    <p className="text-xs leading-[1.6] font-medium text-encre-moyenne">{n.texte}</p>
-                    <span className="mt-1.5 block text-[10.5px] leading-none font-medium text-encre-tenue">
+                  <div
+                    key={n.id}
+                    className="rounded-none border border-bordure px-3 py-2.5"
+                  >
+                    <p className="text-xs leading-[1.6] font-medium text-encre-moyenne">
+                      {n.texte}
+                    </p>
+                    <span className="mt-1.5 flex items-center gap-2 text-[10.5px] leading-none font-medium text-encre-tenue">
                       {formaterDateHeure(n.horodatage)}
+                      {/* Dit sur chaque ligne et pas seulement en tête de carte :
+                          une note écrite privée hier se relit à côté d'une note
+                          ouverte, et rien d'autre ne les distingue. */}
+                      <span className="font-bold">
+                        {n.privee ? "· privée" : "· ouverte"}
+                      </span>
                     </span>
                   </div>
                 ))}
@@ -181,10 +278,27 @@ export function DossierTraitement() {
                     placeholder="Ajouter une note…"
                     className="min-w-0 flex-1 rounded-none border border-bordure-forte px-3 py-2.5 text-xs leading-none font-medium text-encre outline-none transition-colors duration-150 placeholder:text-encre-tenue focus:border-accent"
                   />
-                  <Bouton variante="doux" onClick={publierNote} disabled={!note.trim()}>
+                  <Bouton
+                    variante="doux"
+                    onClick={publierNote}
+                    disabled={!note.trim()}
+                  >
                     Ajouter
                   </Bouton>
                 </div>
+
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={!notePrivee}
+                  onClick={() => setNotePrivee((precedent) => !precedent)}
+                  className="flex items-center gap-2 self-start text-left"
+                >
+                  <MarqueCase cochee={!notePrivee} />
+                  <span className="text-[11px] leading-none font-medium text-encre-faible">
+                    Ouvrir cette note à tous les lecteurs du courrier
+                  </span>
+                </button>
               </div>
             </Carte>
           </div>
@@ -194,7 +308,8 @@ export function DossierTraitement() {
               <div className="mt-3 flex flex-col gap-2.5">
                 <JaugeDelai delai={data.delai} />
                 <p className="text-[11px] leading-[1.5] font-medium text-encre-tenue">
-                  Délai imparti de {data.delai?.joursAlloues ?? 0} jours à compter de la cotation.
+                  Délai imparti de {data.delai?.joursAlloues ?? 0} jours à
+                  compter de la cotation.
                 </p>
               </div>
             </Carte>
@@ -228,7 +343,11 @@ export function DossierTraitement() {
                     to={`/suivi/${autre.id}`}
                     className="flex items-center gap-2.5 rounded-none border border-bordure px-3 py-2.5 transition-colors duration-150 hover:bg-surface-douce"
                   >
-                    <Icone nom="courrier" taille={14} className="flex-none text-encre-tenue" />
+                    <Icone
+                      nom="courrier"
+                      taille={14}
+                      className="flex-none text-encre-tenue"
+                    />
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
                       <span className="text-[10.5px] leading-none font-semibold text-encre-tenue tabular-nums">
                         {autre.numero}
@@ -239,7 +358,9 @@ export function DossierTraitement() {
                     </span>
                     <span
                       className={`flex-none text-[10.5px] leading-none font-bold tabular-nums ${
-                        (autre.delai?.joursDepassement ?? 0) > 0 ? "text-danger" : "text-encre-faible"
+                        (autre.delai?.joursDepassement ?? 0) > 0
+                          ? "text-danger"
+                          : "text-encre-faible"
                       }`}
                     >
                       {(autre.delai?.joursDepassement ?? 0) > 0
@@ -259,6 +380,15 @@ export function DossierTraitement() {
           </div>
         </div>
       </div>
+
+      <ModaleDemandeDelai
+        dossierId={dossierId}
+        numero={courrier.numero}
+        objet={courrier.objet}
+        echeance={data.echeance}
+        ouverte={reportOuvert}
+        onFermer={() => setReportOuvert(false)}
+      />
     </>
   );
 }

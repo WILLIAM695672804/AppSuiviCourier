@@ -25,11 +25,23 @@ export const PERMISSIONS = {
   IMP: "IMP",
   CONF: "CONF",
   STAT: "STAT",
+  /**
+   * Tenir le bureau d'ordre de sa structure — accuser réception d'une entrée,
+   * prononcer une sortie. Au Port, le bureau d'ordre d'une structure **est**
+   * son point focal. Voir ADR 047.
+   */
+  BO_STR: "BO_STR",
 
   // Activités des structures — plans d'actions, réalisations, rapports
   ACT_LEC: "ACT_LEC",
   ACT_SAI: "ACT_SAI",
   ACT_VAL: "ACT_VAL",
+  /**
+   * Recalibrer un avancement déclaré. Le seul profil DSR la porte — pas le
+   * contrôle de gestion, qui porte pourtant ACT_VAL : l'exigence dit « seule
+   * la DSR ». Voir ADR 030.
+   */
+  ACT_REC: "ACT_REC",
 
   // Gouvernance — décisions des instances, réunions, disponibilité
   DEC: "DEC",
@@ -162,6 +174,14 @@ export interface UtilisateurConnecte {
   initiales: string;
   posteLibelle: string;
   structureLibelle: string;
+  /**
+   * Le sigle de la structure de rattachement — vide si l'agent n'en a aucune.
+   *
+   * Le libelle ne suffit pas la ou une saisie designe des structures par
+   * sigle : la modale d'activite ecarte de son selecteur la structure
+   * porteuse, qu'elle ne connait que par la session (ADR 047).
+   */
+  structureSigle: string;
   permissions: Permission[];
   perimetre: Perimetre;
   /** Session courrier de rattachement. Un agent n'en a qu'une. */

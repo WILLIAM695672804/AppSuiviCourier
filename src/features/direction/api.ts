@@ -51,9 +51,11 @@ export interface VueEnsembleDirection {
   /**
    * Les cinq structures dont l'execution du plan est la plus forte.
    *
-   * C'etait « la charge de courrier par structure » : le pilier courrier n'est
-   * pas en service, et un histogramme vide n'aurait rien appris. Ce qui le
-   * remplace est ce que l'application mesure vraiment. Voir l'ADR 011 et A30.
+   * C'etait « la charge de courrier par structure » : le pilier n'avait alors
+   * aucune cloture, et un histogramme vide n'aurait rien appris. Le courrier se
+   * mesure depuis le 27 aout 2026 ; ce graphique n'a pas ete rebascule, faute
+   * de savoir ce que « charge » designe — volume recu, en cours, ou en retard.
+   * Voir l'ADR 011 et A30.
    */
   executionParStructure: PartDirection[];
   /**
@@ -83,6 +85,29 @@ export interface VueEnsembleDirection {
    */
   chenal: CoteChenal | null;
   recouvrements: SyntheseRecouvrements | null;
+  /**
+   * Qui est a son poste ce matin. `null` quand la session ne porte pas
+   * `DISPO`, ou quand le perimetre ne rend aucun agent.
+   */
+  disponibilite: BilanDisponibilite | null;
+}
+
+/**
+ * Le bilan de presence du jour.
+ *
+ * Les presents font une part comme les autres : un anneau qui ne montrerait
+ * que les absents dirait la meme chose quel que soit l'effectif.
+ */
+export interface BilanDisponibilite {
+  aLaDate: string;
+  effectif: number;
+  absents: number;
+  presents: number;
+  tauxPresence: number;
+  /** Les absences en cours que personne ne supplee — ce qui arrete un dossier. */
+  sansInterim: number;
+  /** « Presents » en tete, puis un motif d'absence par part. */
+  parts: PartDirection[];
 }
 
 /** La cote qui borne l'acces au port, et depuis quand. */
@@ -114,5 +139,6 @@ const CLE = "direction";
 export const vueEnsembleDirectionQuery = () =>
   queryOptions({
     queryKey: [CLE, "vue-ensemble"],
-    queryFn: ({ signal }) => api.get<VueEnsembleDirection>("/direction/vue-ensemble", signal),
+    queryFn: ({ signal }) =>
+      api.get<VueEnsembleDirection>("/direction/vue-ensemble", signal),
   });

@@ -7,7 +7,7 @@ import { Bouton } from "@/components/ui/Bouton";
 import { Carte } from "@/components/ui/Carte";
 import { Feu } from "@/components/ui/Feu";
 import { Icone } from "@/components/ui/Icone";
-import { Pastilles } from "@/components/ui/Pastilles";
+import { ChoixStructure } from "@/components/ui/ChoixStructure";
 import { tableauStructureQuery, type BlocTableauStructure } from "@/features/pilotage/apiCockpit";
 
 /**
@@ -45,10 +45,13 @@ export function TableauStructure() {
 
       <div className="flex-1 overflow-y-auto bg-fond p-4 md:p-[26px]">
         <div className="flex flex-col gap-3.5">
-          {/* Le sélecteur n'existe que pour qui a plus d'une structure à voir. */}
+          {/* Le sélecteur n'existe que pour qui a plus d'une structure à voir.
+              Un menu déroulant et non une rangée de pastilles : la DSR en voit
+              soixante-dix-sept, et une rangée de soixante-dix-sept boutons
+              repousse le tableau de bord hors de l'écran (ADR 028). */}
           {choix.length > 1 && (
-            <Pastilles
-              options={choix}
+            <ChoixStructure
+              sigles={choix}
               actif={data?.structureSigle ?? choix[0]}
               onChange={setSigle}
               libelle="Choisir la structure observée"

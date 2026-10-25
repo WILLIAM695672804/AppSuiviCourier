@@ -17,10 +17,11 @@ import {
   ModaleInstructionActivite,
   ModaleLeveeInstruction,
   ModaleModifierActivite,
+  ModaleRecalibrage,
   ModaleRelanceActivite,
   ModaleReleveIndicateur,
   ModaleSuspensionActivite,
-  ModaleTacheActivite,
+  ModaleTachesActivite,
 } from "@/features/activite/components/ModalesActivite";
 import { PiecesJointes } from "@/features/pieces/components/PiecesJointes";
 import {
@@ -32,7 +33,7 @@ import {
 } from "@/features/activite/api";
 import { axeComplet } from "@/lib/axesStrategiques";
 import { usePermission } from "@/lib/contexteSession";
-import { formaterDate } from "@/lib/format";
+import { formaterDate, formaterMois } from "@/lib/format";
 import { PERMISSIONS } from "@/types/habilitation";
 
 /**
@@ -75,16 +76,27 @@ const TONS_VIE: Record<TypeEvenementVie, TonEtiquette> = {
   Relance: "danger",
   Validation: "succes",
   "Pièce jointe": "neutre",
+  // Le ton de l'alerte, et non celui d'une modification : c'est le seul geste
+  // de la fiche où une autorité extérieure contredit la structure.
+  Recalibrage: "alerte",
 };
 
 const MONNAIE = new Intl.NumberFormat("fr-FR");
 
+/** « 33,33 » — des points de l'activité (ADR 049, RG-5). */
+function points(valeur: number): string {
+  return valeur.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+}
+
 type ModaleOuverte =
-  | { nom: "avancement" }
+  // La tâche est facultative : l'en-tête ouvre la modale sans en désigner,
+  // la ligne d'une tâche l'ouvre sur elle.
+  | { nom: "avancement"; tacheId?: number }
+  | { nom: "recalibrage"; tacheId?: number }
   | { nom: "modifier" }
   | { nom: "indicateur" }
   | { nom: "releve"; indicateur: IndicateurActivite }
-  | { nom: "tache" }
+  | { nom: "taches" }
   | { nom: "suspension"; action: "suspendre" | "reprendre" }
   | { nom: "instruction" }
   | { nom: "levee"; instruction: InstructionActivite }
@@ -96,6 +108,8 @@ export function FicheActivite() {
   const peutSaisir = usePermission(PERMISSIONS.ACT_SAI);
   const peutDecider = usePermission(PERMISSIONS.DEC);
   const peutRelancer = usePermission(PERMISSIONS.REL);
+  // La seule DSR. Le contrôle de gestion porte ACT_VAL et n'a pas ce geste.
+  const peutRecalibrer = usePermission(PERMISSIONS.ACT_REC);
   const [modale, setModale] = useState<ModaleOuverte>(null);
   const { data: activite } = useQuery(activiteQuery(Number(id)));
 
@@ -112,6 +126,9 @@ export function FicheActivite() {
   const suspendue = activite.etat === "Suspendue";
   const instructionsOuvertes = activite.instructionsRattachees.filter((i) => !i.levee);
   const aujourdhui = new Date().toISOString().slice(0, 10);
+  // Au mois : une tâche se situe au mois (RG-8), et n'est en retard qu'une
+  // fois son dernier mois écoulé.
+  const moisCourant = aujourdhui.slice(0, 7);
 
   return (
     <>
@@ -132,6 +149,11 @@ export function FicheActivite() {
             {peutSaisir && (
               <Bouton icone="reglages" onClick={() => setModale({ nom: "modifier" })}>
                 Modifier
+              </Bouton>
+            )}
+            {peutRecalibrer && !suspendue && (
+              <Bouton icone="bouclier" onClick={() => setModale({ nom: "recalibrage" })}>
+                Recalibrer
               </Bouton>
             )}
             {peutSaisir && !suspendue && (
@@ -171,9 +193,18 @@ export function FicheActivite() {
                 {/* La fiche porte l'énoncé officiel ; les registres se contentent
                     du libellé court, faute de place. */}
                 <Definition libelle="Axe stratégique">{axeComplet(activite.axe)}</Definition>
-                <Definition libelle="Responsable">{activite.responsable}</Definition>
+                {/* Les structures d'abord : ce sont elles qui répondent de
+                    l'activité, le point focal n'est que la personne qu'on
+                    appelle — ADR 047. */}
+                <Definition libelle="Structures responsables">
+                  {[
+                    activite.structureSigle,
+                    ...activite.structuresAssociees.map((s) => s.sigle),
+                  ].join(" · ")}
+                </Definition>
+                <Definition libelle="Point focal">{activite.responsable ?? "—"}</Definition>
                 <Definition libelle="Période d'exécution">
-                  {formaterDate(activite.debut)} → {formaterDate(activite.fin)}
+                  {formaterMois(activite.debut)} → {formaterMois(activite.fin)}
                 </Definition>
                 <Definition libelle="Budget validé">
                   {activite.budgetValide === null
@@ -205,6 +236,24 @@ export function FicheActivite() {
                   Le repère sur la barre marque l'avancement attendu au{" "}
                   {formaterDate(new Date().toISOString())}.
                 </p>
+
+                {/* Les deux chiffres, jamais le seul taux retenu : n'afficher
+                    que celui de la DSR effacerait ce que la structure avait
+                    déclaré, c'est-à-dire l'objet même de l'arbitrage. */}
+                {activite.recalibrage && (
+                  <div className="mt-3">
+                    <Encart ton="alerte" icone="bouclier">
+                      Tâches recalibrées par la Division du suivi et de la relance
+                      {activite.recalibrage.le
+                        ? `, en dernier lieu le ${formaterDate(activite.recalibrage.le)}`
+                        : ""}{" "}
+                      : {points(activite.recalibrage.avancementRetenu)} % retenus au lieu des{" "}
+                      {points(activite.recalibrage.avancementDeclare)} % déclarés. Le détail et les
+                      motifs figurent sur chaque tâche. C'est le taux retenu qui alimente les
+                      tableaux de bord et le score de la structure.
+                    </Encart>
+                  </div>
+                )}
               </div>
 
               {suspendue && activite.suspension && (
@@ -302,8 +351,8 @@ export function FicheActivite() {
                     {activite.tachesFaites} / {activite.tachesTotal}
                   </span>
                   {peutSaisir && (
-                    <Bouton icone="plus" onClick={() => setModale({ nom: "tache" })}>
-                      Ajouter
+                    <Bouton icone="reglages" onClick={() => setModale({ nom: "taches" })}>
+                      Modifier les tâches
                     </Bouton>
                   )}
                 </span>
@@ -311,16 +360,17 @@ export function FicheActivite() {
             >
               {activite.taches.length === 0 ? (
                 <p className="mt-3 text-[11.5px] leading-[1.5] font-medium text-encre-tenue">
-                  Aucune tâche inscrite.
+                  Aucune tâche inscrite. L'avancement se déclare sur une tâche : découpez l'activité
+                  pour pouvoir le déclarer.
                 </p>
               ) : (
                 <ul className="mt-3.5 flex flex-col">
                   {activite.taches.map((tache, index) => {
-                    const enRetard = !tache.fait && tache.echeance < aujourdhui;
+                    const enRetard = !tache.fait && tache.moisFin < moisCourant;
                     const enRetardDeDepot =
                       tache.fait &&
                       tache.dateRealisation !== null &&
-                      tache.dateRealisation > tache.echeance;
+                      tache.dateRealisation.slice(0, 7) > tache.moisFin;
 
                     return (
                       <li
@@ -342,15 +392,74 @@ export function FicheActivite() {
                         </span>
 
                         <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-                          <span className="text-[12.5px] leading-[1.35] font-semibold text-encre">
-                            {tache.libelle}
+                          <span className="flex flex-wrap items-baseline justify-between gap-2">
+                            <span className="text-[12.5px] leading-[1.35] font-semibold text-encre">
+                              {tache.libelle}
+                            </span>
+                            {/* Les points de l'activité d'abord, l'avancement
+                                propre ensuite : c'est la somme des premiers
+                                qui fait l'avancement de l'activité — RG-5, RG-7. */}
+                            <span className="flex-none text-[11px] leading-none font-bold text-encre tabular-nums">
+                              {points(tache.valeurRetenue)} / {points(tache.valeurPrevue)} pts
+                              <span className="ml-1.5 font-medium text-encre-tenue">
+                                {points(tache.avancementPropre)} %
+                              </span>
+                            </span>
                           </span>
-                          <span className="text-[10.5px] leading-none font-medium text-encre-tenue">
-                            {tache.responsable} · échéance {formaterDate(tache.echeance)}
+                          <BarreProgression taux={tache.avancementPropre} />
+                          <span className="text-[10.5px] leading-[1.4] font-medium text-encre-tenue">
+                            {/* Plus d'agent : la tâche relève de l'activité, et
+                                ses structures responsables en répondent — ADR 048. */}
+                            {formaterMois(tache.moisDebut)} → {formaterMois(tache.moisFin)}
                             {tache.fait && tache.dateRealisation
-                              ? ` · fait le ${formaterDate(tache.dateRealisation)}`
+                              ? ` · faite le ${formaterDate(tache.dateRealisation)}`
                               : ""}
                           </span>
+                          {/* Les deux chiffres, comme sur l'activité : la valeur
+                              déclarée ne disparaît pas derrière la valeur
+                              retenue — ADR 030, ADR 049. */}
+                          {tache.recalibrage && (
+                            <span className="text-[10.5px] leading-[1.4] font-semibold text-alerte">
+                              Recalibrée par la DSR
+                              {tache.recalibrage.le
+                                ? ` le ${formaterDate(tache.recalibrage.le)}`
+                                : ""}{" "}
+                              : {points(tache.recalibrage.valeurRetenue)} retenus au lieu des{" "}
+                              {points(tache.recalibrage.valeurDeclaree)} déclarés —{" "}
+                              {tache.recalibrage.motif}
+                            </span>
+                          )}
+                          {((peutSaisir && !suspendue && !tache.fait) ||
+                            (peutRecalibrer && !suspendue)) && (
+                            <span className="mt-1 flex flex-wrap gap-2">
+                              {peutSaisir && !suspendue && !tache.fait && (
+                                <Bouton
+                                  icone="coche"
+                                  onClick={() =>
+                                    setModale({
+                                      nom: "avancement",
+                                      tacheId: tache.id,
+                                    })
+                                  }
+                                >
+                                  Déclarer
+                                </Bouton>
+                              )}
+                              {peutRecalibrer && !suspendue && (
+                                <Bouton
+                                  icone="bouclier"
+                                  onClick={() =>
+                                    setModale({
+                                      nom: "recalibrage",
+                                      tacheId: tache.id,
+                                    })
+                                  }
+                                >
+                                  Recalibrer
+                                </Bouton>
+                              )}
+                            </span>
+                          )}
                         </span>
 
                         {enRetard && <Etiquette ton="danger">En retard</Etiquette>}
@@ -469,7 +578,8 @@ export function FicheActivite() {
                 <span className="flex items-center gap-2">
                   {activite.instructions > 0 && (
                     <Etiquette ton="alerte">
-                      {activite.instructions} instruction{activite.instructions > 1 ? "s" : ""}
+                      {activite.instructions} instruction
+                      {activite.instructions > 1 ? "s" : ""}
                     </Etiquette>
                   )}
                 </span>
@@ -528,11 +638,17 @@ export function FicheActivite() {
         </div>
       </div>
 
-      <ModaleAvancementActivite
-        ouverte={modale?.nom === "avancement"}
-        onFermer={() => setModale(null)}
-        activite={activite}
-      />
+      {/* Montées à l'ouverture seulement : leurs valeurs initiales dépendent de
+          la tâche désignée et des déclarations en vigueur, qu'une modale montée
+          une fois pour toutes aurait figées à leur état du premier rendu. */}
+      {modale?.nom === "avancement" && (
+        <ModaleAvancementActivite
+          ouverte
+          onFermer={() => setModale(null)}
+          activite={activite}
+          tacheInitiale={modale.tacheId}
+        />
+      )}
       {modale?.nom === "modifier" && (
         <ModaleModifierActivite ouverte onFermer={() => setModale(null)} activite={activite} />
       )}
@@ -547,11 +663,17 @@ export function FicheActivite() {
         activite={activite}
         indicateur={modale?.nom === "releve" ? modale.indicateur : null}
       />
-      <ModaleTacheActivite
-        ouverte={modale?.nom === "tache"}
-        onFermer={() => setModale(null)}
-        activite={activite}
-      />
+      {modale?.nom === "taches" && (
+        <ModaleTachesActivite ouverte onFermer={() => setModale(null)} activite={activite} />
+      )}
+      {modale?.nom === "recalibrage" && (
+        <ModaleRecalibrage
+          ouverte
+          onFermer={() => setModale(null)}
+          activite={activite}
+          tacheInitiale={modale.tacheId}
+        />
+      )}
       {modale?.nom === "suspension" && (
         <ModaleSuspensionActivite
           ouverte

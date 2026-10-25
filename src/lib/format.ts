@@ -12,6 +12,8 @@ const DATE_LONGUE = new Intl.DateTimeFormat("fr-FR", {
   year: "numeric",
 });
 
+const MOIS = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
+
 const HEURE = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
 /**
@@ -39,6 +41,32 @@ export function formaterDate(iso: string | null): string {
   const texte = DATE_COURTE.format(date);
   // Intl ecrit « 1 août » ; le francais veut « 1er août ».
   return date.getDate() === 1 ? texte.replace(/^1\s/, "1er ") : texte;
+}
+
+/**
+ * « août 2026 » — la période d'une activité, qui se saisit au mois.
+ *
+ * Un plan d'actions annuel s'écrit en mois : « de mars à décembre ». Le
+ * serveur garde une date pleine, parce que le retard et l'avancement attendu
+ * se calculent au jour (ADR 047) ; afficher ce quantième donnerait à croire
+ * qu'il a été décidé, alors qu'il est posé par convention — premier jour du
+ * mois au début, dernier à la fin.
+ *
+ * Accepte aussi bien `AAAA-MM` que `AAAA-MM-JJ` : la saisie envoie le premier,
+ * la lecture rend le second.
+ */
+export function formaterMois(iso: string | null): string {
+  if (!iso) return "—";
+  // « 2026-08 » n'est pas une date pour `new Date` selon les moteurs : le jour
+  // est ajouté avant l'analyse plutôt que de dépendre de leur tolérance.
+  const date = dateValide(iso.length === 7 ? `${iso}-01` : iso);
+  if (!date) return "—";
+  return MOIS.format(date);
+}
+
+/** Le mois d'une date pleine, pour pré-remplir un `<input type="month">`. */
+export function moisDeLaDate(iso: string | null): string {
+  return iso ? iso.slice(0, 7) : "";
 }
 
 /**

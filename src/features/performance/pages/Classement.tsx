@@ -159,9 +159,9 @@ export function Classement() {
 
           <p className="px-1 text-[11px] leading-[1.5] font-medium text-encre-tenue">
             Le score global est la moyenne des critères mesurables, pondérée par les taux affichés
-            en en-tête. Un critère sans source — le courrier, tant que son pilier n'est pas livré —
-            sort du calcul au lieu de compter zéro. Ouvrez une structure pour voir la décomposition
-            de sa note, indicateur par indicateur.
+            en en-tête. Un critère sans matière ce mois-ci — aucune activité au plan, aucun courrier
+            clôturé, aucune obligation échue — sort du calcul au lieu de compter zéro. Ouvrez une
+            structure pour voir la décomposition de sa note, indicateur par indicateur.
           </p>
         </div>
       </div>

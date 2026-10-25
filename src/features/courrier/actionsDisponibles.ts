@@ -12,24 +12,27 @@ import type { CourrierDetail } from "@/types/courrier";
 export type ActionCourrier =
   | "coter"
   | "affecter"
+  | "accepter"
   | "traiter"
-  | "valider"
-  | "transmettre"
+  | "restituer"
+  | "retourner"
   | "cloturer"
   | "relancer"
+  | "signaler"
   | "imprimer";
 
 const TOUTES_ETAPES: CourrierDetail["etape"][] = [
   "ENREGISTRE",
   "COTE",
-  "TRANSMIS",
   "AFFECTE",
+  "ACCEPTE",
   "EN_TRAITEMENT",
-  "EN_VALIDATION",
-  "SIGNE",
-  "PARTI",
+  "RESTITUE",
   "CLOTURE",
 ];
+
+/** Tout sauf la cloture : un courrier clos ne se signale plus. */
+const AVANT_CLOTURE = TOUTES_ETAPES.filter((etape) => etape !== "CLOTURE");
 
 /**
  * Une action peut etre ouverte par plusieurs permissions.
@@ -41,13 +44,28 @@ const REGLES: Record<
   { etapes: CourrierDetail["etape"][]; permissions: Permission[] }
 > = {
   coter: { etapes: ["ENREGISTRE", "COTE"], permissions: [PERMISSIONS.COT, PERMISSIONS.COT_DEL] },
-  affecter: { etapes: ["COTE", "TRANSMIS"], permissions: [PERMISSIONS.AFF] },
-  traiter: { etapes: ["AFFECTE", "EN_TRAITEMENT"], permissions: [PERMISSIONS.TRA] },
-  valider: { etapes: ["EN_VALIDATION"], permissions: [PERMISSIONS.VAL] },
-  transmettre: { etapes: ["COTE", "SIGNE"], permissions: [PERMISSIONS.TRANS] },
-  cloturer: { etapes: ["PARTI"], permissions: [PERMISSIONS.CLO] },
+  affecter: { etapes: ["COTE"], permissions: [PERMISSIONS.AFF] },
+  // Signer la decharge et signaler un ecart s'ouvrent sous LEC : ce sont des
+  // gestes de celui qui RECOIT le pli, pas de celui qui le traite. Exiger TRA
+  // pour accuser aurait empeche d'accuser un courrier mal dirige — le cas ou le
+  // cahier sert justement.
+  accepter: { etapes: ["AFFECTE"], permissions: [PERMISSIONS.LEC] },
+  signaler: { etapes: AVANT_CLOTURE, permissions: [PERMISSIONS.LEC] },
+  traiter: { etapes: ["ACCEPTE", "EN_TRAITEMENT"], permissions: [PERMISSIONS.TRA] },
+  restituer: { etapes: ["EN_TRAITEMENT"], permissions: [PERMISSIONS.TRA] },
+  // Retourner et cloturer sont le meme role : celui du responsable a qui
+  // l'agent rend le courrier. `valider` et `transmettre` ont disparu — il n'y a
+  // ni visa ni transmission sur le courrier arrive (ADR 034), et une action
+  // declaree sans route se lit comme une promesse.
+  retourner: { etapes: ["RESTITUE"], permissions: [PERMISSIONS.CLO] },
+  cloturer: {
+    // La cloture n'attend pas un traitement : beaucoup de courriers arrivent
+    // pour information et se referment sans que personne n'ecrive.
+    etapes: ["COTE", "AFFECTE", "ACCEPTE", "EN_TRAITEMENT", "RESTITUE"],
+    permissions: [PERMISSIONS.CLO],
+  },
   relancer: {
-    etapes: ["TRANSMIS", "AFFECTE", "EN_TRAITEMENT", "EN_VALIDATION"],
+    etapes: ["AFFECTE", "ACCEPTE", "EN_TRAITEMENT", "RESTITUE"],
     permissions: [PERMISSIONS.REL],
   },
   imprimer: { etapes: TOUTES_ETAPES, permissions: [PERMISSIONS.IMP] },

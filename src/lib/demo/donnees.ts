@@ -107,7 +107,7 @@ export const COURRIERS_DEMO: CourrierDemo[] = [
     "A-2026-0418",
     "Mairie du Plateau",
     "Convocation à la réunion de coordination",
-    "EN_VALIDATION",
+    "RESTITUE",
     ["Cabinet"],
     "Convocation",
     4,
@@ -185,7 +185,7 @@ export const COURRIERS_DEMO: CourrierDemo[] = [
     "A-2026-0388",
     "Cabinet du Gouverneur",
     "Transmission du rapport trimestriel",
-    "EN_VALIDATION",
+    "RESTITUE",
     ["DCG"],
     "Transmission",
     5,
@@ -280,12 +280,21 @@ export const STRUCTURES_DEMO: {
   sigle: string;
   nature: "Direction" | "Service" | "Division" | "Filiale" | "Succursale";
   niveau: number;
+  /**
+   * La structure de rattachement — `null` au sommet.
+   *
+   * Le vrai `/referentiels/structures` le sert, et c'est ce champ qui fait
+   * l'organigramme : sans lui, tout selecteur arborescent affiche ce jeu
+   * d'essai a plat, ce qui ne ressemble a rien de ce que le serveur rend.
+   */
+  parentId: number | null;
   responsable: string | null;
   delaiMoyenJours: number | null;
   courriersEnCours: number;
 }[] = [
   {
     id: 1,
+    parentId: null,
     libelle: "Direction générale",
     sigle: "DG",
     nature: "Direction",
@@ -296,6 +305,7 @@ export const STRUCTURES_DEMO: {
   },
   {
     id: 2,
+    parentId: 1,
     libelle: "Cabinet",
     sigle: "CAB",
     nature: "Division",
@@ -306,6 +316,7 @@ export const STRUCTURES_DEMO: {
   },
   {
     id: 3,
+    parentId: 1,
     libelle: "DAF — Direction des affaires financières",
     sigle: "DAF",
     nature: "Direction",
@@ -316,6 +327,7 @@ export const STRUCTURES_DEMO: {
   },
   {
     id: 4,
+    parentId: 1,
     libelle: "Direction du Foncier",
     sigle: "DF",
     nature: "Direction",
@@ -326,6 +338,7 @@ export const STRUCTURES_DEMO: {
   },
   {
     id: 5,
+    parentId: 1,
     libelle: "DCG — Contrôle de gestion",
     sigle: "DCG",
     nature: "Direction",
@@ -336,6 +349,7 @@ export const STRUCTURES_DEMO: {
   },
   {
     id: 6,
+    parentId: 2,
     libelle: "Service du courrier central",
     sigle: "SCC",
     nature: "Service",
@@ -346,6 +360,7 @@ export const STRUCTURES_DEMO: {
   },
   {
     id: 7,
+    parentId: 2,
     libelle: "Service juridique",
     sigle: "SJ",
     nature: "Service",
@@ -356,6 +371,7 @@ export const STRUCTURES_DEMO: {
   },
   {
     id: 8,
+    parentId: 1,
     libelle: "DSR — Division du suivi et de la relance",
     sigle: "DSR",
     nature: "Division",
@@ -382,6 +398,7 @@ export const STRUCTURES_DEMO: {
    */
   {
     id: 13,
+    parentId: 1,
     libelle: "DDLM — Direction du dragage et de la logistique maritime",
     sigle: "DDLM",
     nature: "Direction",
@@ -392,6 +409,7 @@ export const STRUCTURES_DEMO: {
   },
   {
     id: 14,
+    parentId: 13,
     libelle: "RDD — Régie du dragage",
     sigle: "RDD",
     nature: "Service",
@@ -402,6 +420,7 @@ export const STRUCTURES_DEMO: {
   },
   {
     id: 15,
+    parentId: 1,
     libelle: "DEX — Direction de l'exploitation",
     sigle: "DEX",
     nature: "Direction",
@@ -412,6 +431,7 @@ export const STRUCTURES_DEMO: {
   },
   {
     id: 16,
+    parentId: 1,
     libelle: "DFC — Direction des finances et de la comptabilité",
     sigle: "DFC",
     nature: "Direction",
@@ -422,6 +442,7 @@ export const STRUCTURES_DEMO: {
   },
   {
     id: 9,
+    parentId: 1,
     libelle: "Douala Terminal Services",
     sigle: "DTS",
     nature: "Filiale",
@@ -432,6 +453,7 @@ export const STRUCTURES_DEMO: {
   },
   {
     id: 10,
+    parentId: 1,
     libelle: "Société de Manutention Portuaire",
     sigle: "SMP",
     nature: "Filiale",
@@ -442,6 +464,7 @@ export const STRUCTURES_DEMO: {
   },
   {
     id: 11,
+    parentId: 1,
     libelle: "Succursale de Kribi",
     sigle: "SKR",
     nature: "Succursale",
@@ -452,6 +475,7 @@ export const STRUCTURES_DEMO: {
   },
   {
     id: 12,
+    parentId: 1,
     libelle: "Succursale de Limbé",
     sigle: "SLB",
     nature: "Succursale",
@@ -578,103 +602,149 @@ export const CORRESPONDANTS_DEMO = [
   },
 ];
 
+/**
+ * Le cahier de décharge — A-11.
+ *
+ * Une ligne par affectation : `courrierId` et `structure` ont été ajoutés le
+ * 26 août 2026 avec le cahier réel, et les dates sont en ISO parce que c'est ce
+ * que le serveur rend — la mise en forme est du ressort de l'écran.
+ */
 export const ACCUSES_DEMO = [
   {
     id: 1,
+    courrierId: 1,
     reference: "A-2026-0421",
-    destinataire: "DAF — Service comptabilité",
+    destinataire: "S. Bamba",
+    structure: "DAF",
     objet: "Facture du prestataire de maintenance",
-    remise: "2 août, 15h10",
+    remise: "2026-08-02",
     coursier: "I. Ouattara",
     etat: "Signé",
-    recepteur: "S. Bamba, chef de service",
-    decharge: "2 août 2026, 15h10",
+    recepteur: "S. Bamba",
+    decharge: "2026-08-02",
   },
   {
     id: 2,
+    courrierId: 2,
     reference: "A-2026-0419",
-    destinataire: "Direction du Foncier",
+    destinataire: "M. Diallo",
+    structure: "DFO",
     objet: "Contestation d'un titre foncier",
-    remise: "2 août, 14h40",
+    remise: "2026-08-02",
     coursier: "I. Ouattara",
     etat: "En attente",
     recepteur: "—",
-    decharge: "à renseigner",
+    decharge: "—",
   },
   {
     id: 3,
+    courrierId: 3,
     reference: "A-2026-0417",
-    destinataire: "Cabinet",
+    destinataire: "F. Konaté",
+    structure: "CAB",
     objet: "Invitation au séminaire régional",
-    remise: "1 août, 11h05",
+    remise: "2026-08-01",
     coursier: "B. Cissé",
     etat: "Signé",
-    recepteur: "F. Konaté, secrétaire particulière",
-    decharge: "1 août 2026, 11h05",
+    recepteur: "F. Konaté",
+    decharge: "2026-08-01",
   },
   {
     id: 4,
+    courrierId: 4,
     reference: "A-2026-0409",
-    destinataire: "DCG — Contrôle de gestion",
+    destinataire: "A. Yao",
+    structure: "DCG",
     objet: "Rapport trimestriel à consolider",
-    remise: "31 juillet, 09h20",
+    remise: "2026-07-31",
     coursier: "I. Ouattara",
     etat: "Non retourné",
     recepteur: "—",
-    decharge: "à renseigner",
+    decharge: "—",
   },
   {
     id: 5,
+    courrierId: 5,
     reference: "A-2026-0402",
-    destinataire: "DRH — Bureau des carrières",
+    destinataire: "L. Sanogo",
+    structure: "DRH",
     objet: "Demande de mise à disposition",
-    remise: "30 juillet, 16h35",
+    remise: "2026-07-30",
     coursier: "B. Cissé",
     etat: "Signé",
-    recepteur: "L. Sanogo, directrice",
-    decharge: "30 juillet 2026, 16h35",
+    recepteur: "L. Sanogo",
+    decharge: "2026-07-30",
   },
   {
     id: 6,
+    courrierId: 6,
     reference: "A-2026-0396",
-    destinataire: "DAF — Bureau des mandats",
+    destinataire: "K. Traoré",
+    structure: "DAF",
     objet: "Demande de pièces justificatives",
-    remise: "29 juillet, 10h15",
+    remise: "2026-07-29",
     coursier: "I. Ouattara",
     etat: "Non retourné",
     recepteur: "—",
-    decharge: "à renseigner",
+    decharge: "—",
   },
 ];
 
+/**
+ * Les écarts signalés — A-12.
+ *
+ * Les trois états réels du registre : `ouvert`, `pris_en_compte`, `clos`. Il n'y
+ * a pas d'état « Résolu » ni « En cours » — c'était le vocabulaire de la
+ * maquette, et il a été aligné le 26 août 2026 sur celui de la base.
+ */
 export const SIGNALEMENTS_DEMO = [
   {
     id: 1,
-    reference: "EC-2026-0087",
+    courrierId: 6,
+    reference: "A-2026-0396",
     type: "Pièce manquante",
-    detail: "A-2026-0396 · 2 annexes sur 4 · signalé par M. Diallo",
-    etat: "En cours",
+    typeCode: "PIECE_MANQUANTE",
+    gravite: "NOTABLE",
+    detail: "2 annexes sur 4 seulement dans le pli remis.",
+    destinataire: "DAF",
+    emisPar: "M. Diallo",
+    emisLe: "2026-08-03T09:20:00",
+    etat: "Ouvert",
+    etatCode: "ouvert" as const,
+    suiteDonnee: null,
+    peutAvancer: true,
   },
   {
     id: 2,
-    reference: "EC-2026-0084",
+    courrierId: 4,
+    reference: "A-2026-0409",
     type: "Pli non reçu",
-    detail: "A-2026-0409 · bordereau du 31 juillet · signalé par A. Yao",
-    etat: "En cours",
+    typeCode: "PLI_NON_RECU",
+    gravite: "BLOQUANTE",
+    detail: "Inscrit au bordereau du 31 juillet, jamais remis au service.",
+    destinataire: "DSR",
+    emisPar: "A. Yao",
+    emisLe: "2026-08-04T11:02:00",
+    etat: "Pris en compte",
+    etatCode: "pris_en_compte" as const,
+    suiteDonnee: null,
+    peutAvancer: true,
   },
   {
     id: 3,
-    reference: "EC-2026-0079",
+    courrierId: 2,
+    reference: "A-2026-0419",
     type: "Destinataire erroné",
-    detail: "A-2026-0381 · recoté à la DRH · signalé par S. Bamba",
-    etat: "Résolu",
-  },
-  {
-    id: 4,
-    reference: "EC-2026-0074",
-    type: "Doublon d'enregistrement",
-    detail: "A-2026-0370 annulé au profit de A-2026-0368",
-    etat: "Résolu",
+    typeCode: "DESTINATAIRE_ERRONE",
+    gravite: "MINEURE",
+    detail: "Le dossier relève de la DRH, pas du Foncier.",
+    destinataire: "DSR",
+    emisPar: "S. Bamba",
+    emisLe: "2026-07-30T15:44:00",
+    etat: "Clos",
+    etatCode: "clos" as const,
+    suiteDonnee: "Recoté à la DRH le 31 juillet.",
+    peutAvancer: false,
   },
 ];
 

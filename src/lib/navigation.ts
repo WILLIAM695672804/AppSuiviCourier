@@ -48,7 +48,11 @@ export const MENU: EntreeMenu[][] = [
       permissions: [PERMISSIONS.LEC],
       compteur: "courriers",
       sousEntrees: [
-        { libelle: "Courriers arrivés", chemin: "/courriers", permissions: [PERMISSIONS.LEC] },
+        {
+          libelle: "Courriers arrivés",
+          chemin: "/courriers",
+          permissions: [PERMISSIONS.LEC],
+        },
         {
           libelle: "Courriers départ",
           chemin: "/courriers/departs",
@@ -71,7 +75,17 @@ export const MENU: EntreeMenu[][] = [
           chemin: "/courriers/internes",
           permissions: [PERMISSIONS.LEC],
         },
-        { libelle: "Import de masse", chemin: "/courriers/import", permissions: [PERMISSIONS.ENR] },
+        /*
+         * Le bureau d'ordre de la structure — au Port, c'est son point focal.
+         * Il est sous « Courriers » et non a part : celui qui le tient ouvre
+         * d'abord le registre, et son cahier d'entree-sortie est une vue de ce
+         * meme registre, bornee a sa structure.
+         */
+        {
+          libelle: "Bureau d'ordre",
+          chemin: "/courriers/bureau-ordre",
+          permissions: [PERMISSIONS.BO_STR],
+        },
       ],
     },
     {
@@ -95,6 +109,18 @@ export const MENU: EntreeMenu[][] = [
       compteur: "relances",
       compteurAlerte: true,
     },
+    /*
+     * Le mapping complet de la DSR : ou est bloque chaque courrier, et depuis
+     * quand. Entree de premier niveau et non sous-entree du suivi — c'est
+     * l'ecran d'ouverture de celui qui relance, pas une vue supplementaire d'un
+     * portefeuille.
+     */
+    {
+      libelle: "Supervision des délais",
+      chemin: "/courriers/supervision",
+      icone: "cible",
+      permissions: [PERMISSIONS.REL],
+    },
   ],
   [
     /*
@@ -107,7 +133,12 @@ export const MENU: EntreeMenu[][] = [
       /*
        * La vue d'ensemble passe avant le cockpit, et pour un seul poste.
        * Le Directeur general ouvre l'application sur l'etat de l'institution ;
-       * il descend ensuite dans le cockpit pour arbitrer.
+       * il descend ensuite dans le detail par ce qu'il regarde.
+       *
+       * L'entree ne s'affiche plus nulle part : une session qui porte VUE_DG
+       * n'a pas de barre laterale (ADR 027). Elle reste ici parce que le menu
+       * et les routes se lisent ensemble — la retirer donnerait a croire que
+       * l'ecran n'existe pas.
        */
       libelle: "Vue d'ensemble",
       chemin: "/direction",
@@ -216,7 +247,12 @@ export const MENU: EntreeMenu[][] = [
       libelle: "Gouvernance",
       chemin: "/gouvernance/decisions",
       icone: "reunion",
-      permissions: [PERMISSIONS.DEC, PERMISSIONS.INST, PERMISSIONS.DISPO, PERMISSIONS.REL],
+      permissions: [
+        PERMISSIONS.DEC,
+        PERMISSIONS.INST,
+        PERMISSIONS.DISPO,
+        PERMISSIONS.REL,
+      ],
       repliable: true,
       sousEntrees: [
         {
@@ -243,7 +279,7 @@ export const MENU: EntreeMenu[][] = [
           permissions: [PERMISSIONS.DEC],
         },
         {
-          libelle: "Disponibilité des responsables",
+          libelle: "Disponibilité des agents",
           chemin: "/gouvernance/disponibilites",
           permissions: [PERMISSIONS.DISPO],
         },
@@ -360,7 +396,11 @@ export const MENU: EntreeMenu[][] = [
       permissions: [PERMISSIONS.STAT, PERMISSIONS.IMP, PERMISSIONS.ACT_LEC],
       repliable: true,
       sousEntrees: [
-        { libelle: "Statistiques", chemin: "/statistiques", permissions: [PERMISSIONS.STAT] },
+        {
+          libelle: "Statistiques",
+          chemin: "/statistiques",
+          permissions: [PERMISSIONS.STAT],
+        },
         {
           libelle: "Analyses croisées",
           chemin: "/pilotage/analyses",
@@ -378,7 +418,11 @@ export const MENU: EntreeMenu[][] = [
           // de l'institution, un responsable celui de sa structure.
           permissions: [PERMISSIONS.STAT, PERMISSIONS.ACT_LEC],
         },
-        { libelle: "Impressions", chemin: "/impressions", permissions: [PERMISSIONS.IMP] },
+        {
+          libelle: "Impressions",
+          chemin: "/impressions",
+          permissions: [PERMISSIONS.IMP],
+        },
       ],
     },
   ],
@@ -419,9 +463,13 @@ export function filtrerMenu(permissions: Permission[]): EntreeMenu[][] {
       .filter((entree) => autorisee(permissions, entree.permissions))
       .map((entree) => ({
         ...entree,
-        sousEntrees: entree.sousEntrees?.filter((sous) => autorisee(permissions, sous.permissions)),
+        sousEntrees: entree.sousEntrees?.filter((sous) =>
+          autorisee(permissions, sous.permissions),
+        ),
       }))
       // Un groupe repliable sans aucune sous-entree lisible n'a plus d'objet.
-      .filter((entree) => !entree.repliable || (entree.sousEntrees?.length ?? 0) > 0),
+      .filter(
+        (entree) => !entree.repliable || (entree.sousEntrees?.length ?? 0) > 0,
+      ),
   ).filter((groupe) => groupe.length > 0);
 }

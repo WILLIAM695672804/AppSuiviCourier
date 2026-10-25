@@ -38,8 +38,10 @@ import { formaterDate } from "@/lib/format";
  * faire. Trois partis pris s'y lisent.
  *
  * Le profil ne montre que des phrases, jamais les codes de permission.
- * Le profil administrateur est verrouille — retirer par erreur le droit
- * d'administrer fermerait l'application a tout le monde.
+ * **Tous les profils se modifient**, y compris ceux du referentiel livre : ils
+ * decrivent l'organisation telle qu'on l'a comprise, et l'administrateur du Port
+ * la connait mieux (ADR 041). Ce que le referentiel livre garde, c'est de ne pas
+ * pouvoir sortir du catalogue — le semis et les migrations le citent par son code.
  * Chaque case cochee dit combien d'agents elle concerne, parce qu'un droit
  * n'est jamais accorde dans l'abstrait.
  */
@@ -154,13 +156,15 @@ function OngletProfils() {
               <span className="min-w-0 flex-1 truncate text-xs leading-none font-semibold text-encre">
                 {profil.libelle}
               </span>
-              {profil.verrouille ? (
+              {/* Le bouclier ne dit plus « intouchable » mais « livré avec
+                  l'application ». Le nombre d'agents s'affiche pour tous : c'est
+                  la première chose à savoir avant de décocher une case. */}
+              {profil.verrouille && (
                 <Icone nom="bouclier" taille={13} className="flex-none text-confidentiel" />
-              ) : (
-                <span className="flex-none text-[10.5px] leading-none font-medium text-encre-tenue">
-                  {profil.nombreAgents} agents
-                </span>
               )}
+              <span className="flex-none text-[10.5px] leading-none font-medium text-encre-tenue">
+                {profil.nombreAgents} agents
+              </span>
             </button>
           ))}
         </div>
@@ -236,23 +240,21 @@ function OngletProfils() {
         <Carte
           titre={choisi.libelle}
           aDroite={
-            choisi.verrouille ? (
-              <Etiquette ton="confidentiel">Verrouillé</Etiquette>
-            ) : (
-              <div className="flex items-center gap-2.5">
-                <span className="text-[11px] leading-none font-medium text-encre-tenue">
-                  {choisi.nombreAgents} agents portent ce profil
-                </span>
-                <VieDuProfil key={choisi.id} profil={choisi} onInvalide={() => setChoisiId(null)} />
-              </div>
-            )
+            <div className="flex items-center gap-2.5">
+              {choisi.verrouille && <Etiquette ton="confidentiel">Référentiel livré</Etiquette>}
+              <span className="text-[11px] leading-none font-medium text-encre-tenue">
+                {choisi.nombreAgents} agents portent ce profil
+              </span>
+              <VieDuProfil key={choisi.id} profil={choisi} onInvalide={() => setChoisiId(null)} />
+            </div>
           }
         >
           {choisi.verrouille && (
             <div className="mt-3.5">
               <Encart ton="confidentiel" icone="bouclier">
-                Ce profil ne peut être modifié : sans lui, plus personne ne pourrait administrer
-                l'application.
+                Profil livré avec l'application. Ses droits se modifient comme ceux des autres ;
+                il ne peut pas être retiré du catalogue, parce qu'il est cité par le paramétrage
+                initial. Un droit décoché s'applique à tous les agents qui portent ce profil.
               </Encart>
             </div>
           )}
@@ -261,6 +263,18 @@ function OngletProfils() {
             <span className="font-bold text-encre-faible">{choisi.code}</span>
             {choisi.description ? ` — ${choisi.description}` : ""}
           </p>
+
+          {/* Un refus du serveur doit se lire ici : la case revient d'elle-même
+              à son état précédent, et sans message le clic paraîtrait n'avoir
+              aucun effet. C'est le cas du dernier profil à porter le droit
+              d'administrer, que le serveur protège. */}
+          {basculer.isError && (
+            <div className="mt-3.5">
+              <Encart ton="danger" icone="croix">
+                {messageDErreur(basculer.error, "Le droit n'a pas pu être modifié.")}
+              </Encart>
+            </div>
+          )}
 
           <div className="mt-4 flex flex-col gap-5">
             {GROUPES_PERMISSIONS.map((groupe) => (
@@ -272,7 +286,6 @@ function OngletProfils() {
                   <CaseLibellee
                     key={permission.code}
                     cochee={choisi.permissions.includes(permission.code)}
-                    desactivee={choisi.verrouille}
                     onChange={(accordee) =>
                       basculer.mutate({ permission: permission.code, accordee })
                     }
@@ -304,6 +317,9 @@ const SAISIE_VIDE = { code: "", libelle: "", description: "", depuisProfilId: ""
  * historique, et le journal continue de citer le profil sous lequel une décision
  * a été prise. Le serveur refuse d'ailleurs de retirer un profil encore porté :
  * l'écran le dit avant d'essayer.
+ *
+ * Le retrait est **le seul geste** qu'un profil du référentiel livré n'accepte
+ * pas — ses droits, eux, se cochent comme ceux des autres (ADR 041).
  */
 function VieDuProfil({ profil, onInvalide }: { profil: Profil; onInvalide: () => void }) {
   const modifier = useModifierProfil(profil.id);
@@ -332,9 +348,13 @@ function VieDuProfil({ profil, onInvalide }: { profil: Profil; onInvalide: () =>
       <Bouton icone="reglages" onClick={() => setRenommer(true)}>
         Renommer
       </Bouton>
-      <Bouton icone="croix" className="text-danger" onClick={() => setRetirer(true)}>
-        Retirer
-      </Bouton>
+      {/* Un profil du référentiel livré ne sort pas du catalogue : le serveur le
+          refuse, et proposer le bouton ferait promettre un geste impossible. */}
+      {!profil.verrouille && (
+        <Bouton icone="croix" className="text-danger" onClick={() => setRetirer(true)}>
+          Retirer
+        </Bouton>
+      )}
 
       <ModaleFormulaire
         ouverte={renommer}
